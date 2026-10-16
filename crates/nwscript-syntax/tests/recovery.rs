@@ -146,3 +146,33 @@ fn hostile_inputs_print_back() {
         let _ = p.debug_dump();
     }
 }
+
+/// Nesting past the parser's limit is one diagnostic, not a stack overflow,
+/// and the next declaration still parses.
+#[test]
+fn nesting_limit() {
+    for src in [
+        format!(
+            "void main() {{ x = {}1; }}\r\nvoid later() {{}}",
+            "(".repeat(100_000)
+        ),
+        format!(
+            "void main() {{ x = {}; }}\r\nvoid later() {{}}",
+            "-".repeat(100_000)
+        ),
+        format!(
+            "void main() {} \r\nvoid later() {{}}",
+            "{ if (x) ".repeat(50_000)
+        ),
+    ] {
+        let p = parse_ok(&src);
+        assert_eq!(codes(&p), ["E0207"]);
+        assert_eq!(function_names(&p), ["main", "later"]);
+    }
+    // Within the limit, nothing is reported.
+    parse_clean(&format!(
+        "void main() {{ x = {}1{}; }}",
+        "(".repeat(100),
+        ")".repeat(100)
+    ));
+}

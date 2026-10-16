@@ -41,6 +41,7 @@ codes! {
     E0204 Error "a number literal in no form NWScript reads";
     E0205 Error "a syntax error: the parser expected something else";
     E0206 Error "a malformed or misplaced directive";
+    E0207 Error "statements or expressions nested beyond the parser's limit";
 }
 
 /// The code with this id, if registered.

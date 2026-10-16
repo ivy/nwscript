@@ -49,6 +49,8 @@ pub(crate) fn parse_tokens(
         diags: Vec::new(),
         last_error: None,
         lex_errors,
+        depth: 0,
+        too_deep: false,
     };
     p.source_file();
     (p.builder.finish(), p.diags)
@@ -104,7 +106,16 @@ struct Parser<'a> {
     last_error: Option<usize>,
     /// Start offsets of the lexer's diagnostics.
     lex_errors: Vec<usize>,
+    /// Statements and expressions open around the current token.
+    depth: u32,
+    /// Whether [`MAX_DEPTH`] was exceeded in the current top-level
+    /// declaration, which silences further errors in it.
+    too_deep: bool,
 }
+
+/// How deeply statements and expressions may nest, together; it bounds the
+/// parser's recursion.
+const MAX_DEPTH: u32 = 256;
 
 impl Parser<'_> {
     // ---- the token cursor -------------------------------------------------
@@ -232,7 +243,7 @@ impl Parser<'_> {
 
     /// Report at the current token, once per token position.
     fn error_with(&mut self, d: impl FnOnce(Span) -> Diagnostic) {
-        if self.last_error == Some(self.cur) || self.after_lex_error() {
+        if self.last_error == Some(self.cur) || self.too_deep || self.after_lex_error() {
             return;
         }
         self.last_error = Some(self.cur);
@@ -295,6 +306,36 @@ impl Parser<'_> {
         self.finish();
     }
 
+    /// Count one level of statement or expression nesting. Past
+    /// [`MAX_DEPTH`] the construct is reported once, its first token is
+    /// skipped, and the caller treats it as missing.
+    fn enter(&mut self) -> bool {
+        if self.depth < MAX_DEPTH {
+            self.depth += 1;
+            return true;
+        }
+        if !self.too_deep {
+            self.too_deep = true;
+            let span = self.current_span();
+            self.diags.push(
+                Diagnostic::new(&codes::E0207, "nesting too deep")
+                    .primary(
+                        span,
+                        format!(
+                            "more than {MAX_DEPTH} levels of nested statements and expressions"
+                        ),
+                    )
+                    .help("split the expression or the nested blocks into functions"),
+            );
+        }
+        if !self.at(EOF) {
+            self.start(ERROR);
+            self.bump();
+            self.finish();
+        }
+        false
+    }
+
     // ---- top level ------------------------------------------------------
 
     fn source_file(&mut self) {
@@ -307,6 +348,9 @@ impl Parser<'_> {
     }
 
     fn top_level(&mut self) {
+        // Errors after the nesting limit are its consequences, up to the
+        // end of the declaration that passed it.
+        self.too_deep = false;
         match self.current() {
             HASH => self.directive(),
             SEMICOLON => {
@@ -566,6 +610,13 @@ impl Parser<'_> {
     }
 
     fn statement(&mut self) {
+        if self.enter() {
+            self.statement_inner();
+            self.depth -= 1;
+        }
+    }
+
+    fn statement_inner(&mut self) {
         match self.current() {
             L_CURLY => self.block(),
             SEMICOLON => {
@@ -754,6 +805,15 @@ impl Parser<'_> {
     /// Pratt loop over the binary, conditional and assignment operators.
     /// Returns false when no expression was found (and that was reported).
     fn expr_bp(&mut self, min_bp: u8) -> bool {
+        if !self.enter() {
+            return false;
+        }
+        let found = self.expr_bp_inner(min_bp);
+        self.depth -= 1;
+        found
+    }
+
+    fn expr_bp_inner(&mut self, min_bp: u8) -> bool {
         let cp = self.checkpoint();
         if !self.unary() {
             return false;
