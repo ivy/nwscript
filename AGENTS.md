@@ -25,6 +25,7 @@ The layout is `nss/`, `ncs/`, `nwscript.nss` as shipped, `oracle/` (the include 
 
 - Build and check: `cargo build --workspace`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --check`. A change is done when all four pass.
 - Corpus-backed tests: `NWSCRIPT_CORPUS=… cargo test --workspace -- --include-ignored`.
+- Fuzzing: targets live in `crates/<crate>/fuzz/`, outside the workspace, and need a nightly toolchain: from that directory, `mise x cargo:cargo-fuzz -- cargo +nightly fuzz run decode -- -max_total_time=600`.
 - Tools come from mise (`mise.toml`); do not install with brew, apt or npx.
 - Diagnostics are data (`nwscript-diag`): every error has a registered code with an explanation; never build one from rendered text.
 - Markdown: one paragraph per line, no hard wrapping. Documents state current facts, not their history.
