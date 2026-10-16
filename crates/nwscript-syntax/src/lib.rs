@@ -6,6 +6,23 @@
 //! input ([`Parse::to_bytes`]) whatever the input was. The grammar is
 //! `docs/grammar.md`; the typed view over the tree is [`ast`].
 //!
+//! Types: `void int float string object vector action` and `struct NAME`
+//! are keywords; any other type is written as a name. At the start of a
+//! statement, a type keyword, `struct`, `const`, or an identifier followed
+//! by an identifier begins a declaration; at top level every item but a
+//! directive or `;` is a declaration. Engine structure types (`effect`,
+//! `location`, KotOR 2's `itemproperty`) are therefore names
+//! ([`ast::TypeKind::Named`]), defined by `nwscript.nss`'s `#define` lines
+//! and checked by name resolution, which also rejects a name that is no
+//! type, such as `INT` on line 5145 of KotOR 1's `nwscript.nss`.
+//!
+//! Errors are `E02xx` diagnostics. A missing token is reported, never
+//! invented; a stray one is wrapped in an [`SyntaxKind::ERROR`] node. At
+//! most one error is reported per token, none that follows from a lexer
+//! error just before it, and an unterminated string or block comment ends
+//! at its line end, so one mistake yields one diagnostic and the rest of
+//! the file is still parsed.
+//!
 //! The tree's text is the source's bytes read as Latin-1 (see [`text`]), so
 //! a byte above 0x7F is two bytes of tree text. Diagnostics carry byte spans;
 //! [`Parse::span`] converts a tree range to one.
