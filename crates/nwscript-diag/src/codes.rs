@@ -40,6 +40,10 @@ codes! {
     E0103 Error "unknown NCS opcode";
     E0104 Error "NCS opcode with a type byte it does not take";
     E0105 Error "NCS file is truncated";
+    E0110 Error "unknown instruction in NCS assembly";
+    E0111 Error "bad operand in NCS assembly";
+    E0112 Error "jump to an undefined label in NCS assembly";
+    E0113 Error "label defined twice in NCS assembly";
 }
 
 /// The code with this id, if registered.

@@ -96,3 +96,47 @@ fn roundtrip_corpus() {
         failures[..failures.len().min(50)].join("\n")
     );
 }
+
+#[test]
+#[ignore = "needs the corpus: set NWSCRIPT_CORPUS"]
+fn roundtrip_corpus_through_assembly() {
+    let Some(root) = corpus() else {
+        eprintln!("skipping: no corpus; set NWSCRIPT_CORPUS to an extracted corpus directory");
+        return;
+    };
+    let mut files = ncs_files(&root.join("ncs"));
+    for group in ["modules", "rims"] {
+        for d in subdirs(&root.join(group)) {
+            files.extend(ncs_files(&d));
+        }
+    }
+    let mut failures = Vec::new();
+    for path in &files {
+        let bytes = std::fs::read(path).unwrap();
+        let program = decode(FileId(0), &bytes).unwrap();
+        for raw in [false, true] {
+            let text = nwscript_ncs::asm::print(
+                &program,
+                &nwscript_ncs::asm::PrintOptions {
+                    raw,
+                    routine_name: None,
+                },
+            );
+            match nwscript_ncs::asm::parse(FileId(0), text.as_bytes()) {
+                Ok(back) if encode(&back) == bytes => {}
+                Ok(_) => failures.push(format!("{} (raw: {raw}): different bytes", path.display())),
+                Err(e) => failures.push(format!(
+                    "{} (raw: {raw}): {:?}",
+                    path.display(),
+                    e[0].message
+                )),
+            }
+        }
+    }
+    println!(
+        "assembly: {}/{} byte-identical in both forms",
+        files.len() - failures.len(),
+        files.len()
+    );
+    assert!(failures.is_empty(), "{failures:#?}");
+}

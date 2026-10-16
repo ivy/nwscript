@@ -1,6 +1,7 @@
 //! Command dispatch and the context every command shares.
 
 pub mod conformance;
+pub mod disasm;
 mod explain;
 
 use crate::Exit;
@@ -101,6 +102,8 @@ pub fn run(cli: Cli) -> Exit {
     match cli.command {
         Command::Explain { code } => explain::run(&ctx, &code),
         Command::Conformance(args) => conformance::run(&ctx, &args),
+        Command::Disasm(args) => disasm::disasm(&ctx, &args),
+        Command::Asm(args) => disasm::asm(&ctx, &args),
         Command::InternalPanic => {
             crate::working_on("the internal-panic command");
             panic!("deliberate panic requested by `nws internal-panic`")

@@ -21,6 +21,7 @@
 //! range is the byte range of the offending bytes in the file.
 //! [`decode_named`] does both steps for a caller holding a name and bytes.
 
+pub mod asm;
 mod instruction;
 mod opcode;
 

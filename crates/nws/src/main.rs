@@ -4,6 +4,7 @@
 
 mod cli;
 mod cmd;
+mod io;
 mod output;
 
 use clap::Parser;

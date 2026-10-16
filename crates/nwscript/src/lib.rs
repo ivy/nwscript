@@ -6,11 +6,13 @@
 //! supplies, and every file a resolver returns is recorded so the
 //! [`Envelope`] can name each input with its hash.
 
+pub mod bytecode;
 pub mod envelope;
 pub mod resolve;
 
 pub use envelope::{Envelope, InputRecord, OutputRecord};
 pub use nwscript_diag as diag;
+pub use nwscript_ncs as ncs;
 pub use resolve::{FsResolver, MemResolver, Resolved, Resolver};
 
 use serde::Serialize;

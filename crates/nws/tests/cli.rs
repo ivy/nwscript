@@ -68,8 +68,6 @@ fn reserved_commands_say_not_yet_implemented() {
     for c in [
         "compile",
         "check",
-        "disasm",
-        "asm",
         "decompile",
         "run",
         "test",

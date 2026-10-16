@@ -111,12 +111,10 @@ pub enum Command {
     /// Check source without writing output. (not yet implemented)
     #[command(after_help = "Example:\n  nws --game k1 check k_my_script.nss")]
     Check(Reserved),
-    /// Disassemble NCS bytecode. (not yet implemented)
-    #[command(after_help = "Example:\n  nws disasm k_my_script.ncs")]
-    Disasm(Reserved),
-    /// Assemble the textual form into NCS. (not yet implemented)
-    #[command(after_help = "Example:\n  nws asm k_my_script.asm -o k_my_script.ncs")]
-    Asm(Reserved),
+    /// Disassemble NCS bytecode into assembly text.
+    Disasm(crate::cmd::disasm::DisasmArgs),
+    /// Assemble assembly text into NCS bytecode.
+    Asm(crate::cmd::disasm::AsmArgs),
     /// Recover source from bytecode, verified by recompiling. (not yet implemented)
     #[command(after_help = "Example:\n  nws --game k1 decompile k_my_script.ncs")]
     Decompile(Reserved),
