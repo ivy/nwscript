@@ -1,0 +1,27 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.88"
+license = "ISC"
+repository = "https://github.com/ivy/nwscript"
+
+[workspace.dependencies]
+nwscript = { path = "crates/nwscript" }
+nwscript-diag = { path = "crates/nwscript-diag" }
+nwscript-ncs = { path = "crates/nwscript-ncs" }
+nwscript-syntax = { path = "crates/nwscript-syntax" }
+nwscript-sema = { path = "crates/nwscript-sema" }
+nwscript-vm = { path = "crates/nwscript-vm" }
+nwscript-codegen = { path = "crates/nwscript-codegen" }
+nwscript-decomp = { path = "crates/nwscript-decomp" }
+nwscript-lua = { path = "crates/nwscript-lua" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

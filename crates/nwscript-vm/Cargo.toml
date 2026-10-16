@@ -1,0 +1,15 @@
+[package]
+name = "nwscript-vm"
+description = "The NCS interpreter: stack, frames, STORE_STATE closures, an engine trait and a recording engine."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+nwscript-ncs = { workspace = true }
+nwscript-diag = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,20 @@
+[package]
+name = "nwscript"
+description = "The façade: compile, decompile, assemble, run and check, with the resolver trait."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+nwscript-diag = { workspace = true }
+nwscript-ncs = { workspace = true }
+nwscript-syntax = { workspace = true }
+nwscript-sema = { workspace = true }
+nwscript-vm = { workspace = true }
+nwscript-codegen = { workspace = true }
+nwscript-decomp = { workspace = true }
+
+[lints]
+workspace = true

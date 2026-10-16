@@ -1,0 +1,15 @@
+[package]
+name = "nwscript-sema"
+description = "Name resolution, types, constants, the engine function table from nwscript.nss, and lints."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+nwscript-syntax = { workspace = true }
+nwscript-diag = { workspace = true }
+
+[lints]
+workspace = true
