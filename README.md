@@ -14,7 +14,8 @@ Everything this project knows about these games was worked out by other people, 
 - **TSLPatcher**, whose installer conventions every KotOR mod follows, and which the `nwnnsscomp` shim exists to honour.
 - **PyKotor, the Holocron Toolset and HoloPatcher**, which brought KotOR's formats, an editor, and a cross-platform installer and compiler to Python.
 - **DeNCS**, the decompiler whose output taught the community what the game's module scripts do.
-- **Beamdog's `nwnsc`** in neverwinter.nim, and **nwnrs**, the toolchains of the Neverwinter Nights community.
+- **Beamdog's `nwnsc`** in neverwinter.nim, the compiler of Neverwinter Nights: Enhanced Edition.
+- **nwnrs**, a Rust toolchain for Neverwinter Nights whose compiler, written for a different game, already accepts KotOR's `nwscript.nss` and compiles every vanilla KotOR script that nwnnsscomp does.
 
 This project is a clean-room implementation: it reads no other compiler's source. It measures the compilers above as black boxes, and each appears as a row in the conformance report.
 

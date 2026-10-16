@@ -17,7 +17,9 @@ Extract the corpus from your own game once (see `AGENTS.md`), then:
 ```bash
 export NWNNSSCOMP=/path/to/nwnnsscomp   # a native build: modshop's `mise run nwnnsscomp:build`
 export MODSHOP=/path/to/modshop         # for the pykotor row: a checkout after `uv sync`
+export NWNRS=$(mise x cargo:nwnrs@0.0.1 -- which nwnrs)   # for the nwnrs rows
 nws conformance --compiler nwnnsscomp-v100 --compiler nwnnsscomp --compiler pykotor \
+  --compiler nwnrs-o0 --compiler nwnrs-o1 --compiler nwnrs-o2 --compiler nwnrs-o3 \
   --timeout 120 --report conformance/report.json --markdown conformance/report.md
 ```
 

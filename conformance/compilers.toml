@@ -23,3 +23,26 @@ description = "pykotor's built-in compiler, compile_nss(source, Game.K1), from m
 command = ["{env:MODSHOP}/.venv/bin/python", "-I", "{repo}/conformance/drivers/pykotor_compile.py", "{in}", "{out}"]
 include = "nss"
 identity = ["{env:MODSHOP}/uv.lock"]
+
+# nwnrs (github.com/urothis/nwnrs), a Neverwinter Nights toolchain in Rust,
+# installed with `mise x cargo:nwnrs@0.0.1`. Its compiler runs through
+# `nwnrs pack INPUT OUTPUT`; the optimization levels are its own.
+[compiler.nwnrs-o0]
+description = "nwnrs 0.0.1, nwnrs pack, --optimization O0"
+command = ["{env:NWNRS}", "pack", "-f", "-j", "1", "--langspec", "{include}/nwscript.nss", "--include-dir", "{include}", "--optimization", "O0", "{in}", "{out}"]
+include = "oracle"
+
+[compiler.nwnrs-o1]
+description = "nwnrs 0.0.1, nwnrs pack, --optimization O1"
+command = ["{env:NWNRS}", "pack", "-f", "-j", "1", "--langspec", "{include}/nwscript.nss", "--include-dir", "{include}", "--optimization", "O1", "{in}", "{out}"]
+include = "oracle"
+
+[compiler.nwnrs-o2]
+description = "nwnrs 0.0.1, nwnrs pack, --optimization O2"
+command = ["{env:NWNRS}", "pack", "-f", "-j", "1", "--langspec", "{include}/nwscript.nss", "--include-dir", "{include}", "--optimization", "O2", "{in}", "{out}"]
+include = "oracle"
+
+[compiler.nwnrs-o3]
+description = "nwnrs 0.0.1, nwnrs pack, --optimization O3"
+command = ["{env:NWNRS}", "pack", "-f", "-j", "1", "--langspec", "{include}/nwscript.nss", "--include-dir", "{include}", "--optimization", "O3", "{in}", "{out}"]
+include = "oracle"
