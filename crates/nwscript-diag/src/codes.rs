@@ -35,6 +35,11 @@ macro_rules! codes {
 
 codes! {
     E0001 Error "an input file could not be read";
+    E0101 Error "not an NCS V1.0 file";
+    E0102 Error "the NCS program size record is missing or wrong";
+    E0103 Error "unknown NCS opcode";
+    E0104 Error "NCS opcode with a type byte it does not take";
+    E0105 Error "NCS file is truncated";
 }
 
 /// The code with this id, if registered.
