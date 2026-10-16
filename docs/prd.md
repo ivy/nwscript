@@ -371,6 +371,8 @@ Each script is classified per compiler as identical, same length, different leng
 
 The existing shell harness in the research document is the suite's first version and is replaced by the command.
 
+The corpus is extracted by `cargo xtask corpus extract --game-dir DIR`, a development task that reads the game's KEY/BIF archives and its module RIM and ERF capsules directly. It writes `nss/` and `ncs/` (every script `chitin.key` lists), `nwscript.nss` as shipped, `oracle/` (the scripts with BioWare's line-5145 typo in `nwscript.nss` corrected, the include directory for nwnnsscomp, which hangs on the shipped file), and `modules/` and `rims/` (each capsule's NCS by archive). It writes to `$NWSCRIPT_CORPUS`, by default `~/.cache/nwscript/corpus/k1`, which is where every corpus-backed test and command looks. `conformance/k1.toml` and `conformance/k1-modules.toml` are the committed manifests, names and sha256 hashes only, and `cargo xtask corpus verify` checks a corpus against them.
+
 ## Release readiness
 
 A release is the compiled binaries for every supported platform, signed and attested, with the fixtures a person expects before trusting a tool from a stranger. The first tagged release ships when milestone 4 is reached and everything in this section is in place, which is milestone 7.

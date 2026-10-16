@@ -14,6 +14,13 @@ Do not open the source of nwnnsscomp (`~/src/github.com/niv/nwn-tools`, `~/src/g
 
 No game bytes are committed, ever. Tests that need BioWare's scripts read a corpus extracted from the user's own game, from `$NWSCRIPT_CORPUS` (default `~/.cache/nwscript/corpus/k1`), and skip with a message naming the variable when it is absent.
 
+```bash
+cargo xtask corpus extract --game-dir PATH/TO/swkotor   # writes the corpus
+cargo xtask corpus verify                              # checks it against conformance/k1.toml
+```
+
+The layout is `nss/`, `ncs/`, `nwscript.nss` as shipped, `oracle/` (the include directory for nwnnsscomp, with BioWare's line-5145 typo fixed), and `modules/STEM/` and `rims/STEM/` for the NCS in each capsule. On the maintainer's build host the vanilla install is modshop's `games/kotor/data/game/vanilla/tree`.
+
 ## Working here
 
 - Build and check: `cargo build --workspace`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --check`. A change is done when all four pass.

@@ -1,0 +1,8 @@
+# The conformance manifests are script names and sha256 hashes of game
+# files; names like `k_..._key` make the generic-api-key rule fire on them.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "conformance manifests hold only names and sha256 hashes"
+paths = ['''^conformance/k1(-modules)?\.toml$''']
