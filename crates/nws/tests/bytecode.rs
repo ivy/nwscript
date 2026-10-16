@@ -47,6 +47,21 @@ fn disasm_then_asm_is_identical() {
 }
 
 #[test]
+fn disasm_cfg_is_graphviz() {
+    let ncs = tmp("cfg.ncs");
+    std::fs::write(&ncs, tiny_ncs()).unwrap();
+    nws()
+        .args(["disasm", "--cfg"])
+        .arg(&ncs)
+        .assert()
+        .code(0)
+        .stdout(
+            predicate::str::starts_with("digraph ncs {")
+                .and(predicate::str::contains("label=call")),
+        );
+}
+
+#[test]
 fn asm_errors_exit_1_with_codes() {
     let src = tmp("bad.asm");
     std::fs::write(&src, "    JMP nowhere\n    FROB\n").unwrap();

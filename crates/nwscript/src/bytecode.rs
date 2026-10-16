@@ -24,3 +24,15 @@ pub fn assemble(name: &str, text: &[u8], map: &mut SourceMap) -> Result<Vec<u8>,
     let file = map.add(name, text.to_vec());
     asm::parse(file, text).map(|p| encode(&p))
 }
+
+/// Decode NCS bytes and draw their control-flow graph as Graphviz.
+pub fn control_flow_dot(
+    name: &str,
+    bytes: &[u8],
+    map: &mut SourceMap,
+) -> Result<(Program, String), Diagnostic> {
+    let program = decode_named(name, bytes, map)?;
+    let cfg = nwscript_ncs::cfg::build(&program);
+    let dot = nwscript_ncs::cfg::to_dot(&program, &cfg);
+    Ok((program, dot))
+}

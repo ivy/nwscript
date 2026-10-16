@@ -16,6 +16,7 @@ Examples:
   nws disasm k_act_mispaz.ncs -o out.asm      write it to a file
   nws disasm --raw k_act_mispaz.ncs           offsets on each line, relative jumps
   nws disasm x.ncs | nws asm - -o y.ncs       y.ncs is byte-identical to x.ncs
+  nws disasm --cfg x.ncs | dot -Tsvg > x.svg   the control-flow graph
 
 The syntax is documented in docs/asm.md.")]
 pub struct DisasmArgs {
@@ -49,10 +50,6 @@ pub struct AsmArgs {
 }
 
 pub fn disasm(ctx: &Ctx, args: &DisasmArgs) -> Exit {
-    if args.cfg {
-        eprintln!("error: `nws disasm --cfg` is not yet implemented");
-        return Exit::Usage;
-    }
     crate::working_on(display_name(&args.input));
     let (bytes, input) = match read_input(&args.input, "bytecode") {
         Ok(x) => x,
@@ -68,7 +65,13 @@ pub fn disasm(ctx: &Ctx, args: &DisasmArgs) -> Exit {
         raw: args.raw,
         routine_name: None,
     };
-    match bytecode::disassemble(&display_name(&args.input), &bytes, &opts, &mut map) {
+    let name = display_name(&args.input);
+    let made = if args.cfg {
+        bytecode::control_flow_dot(&name, &bytes, &mut map)
+    } else {
+        bytecode::disassemble(&name, &bytes, &opts, &mut map)
+    };
+    match made {
         Err(d) => ctx.finish(env, "", vec![d], &map, Exit::Ok),
         Ok((program, text)) => {
             env.result =
@@ -82,7 +85,9 @@ pub fn disasm(ctx: &Ctx, args: &DisasmArgs) -> Exit {
                         return Exit::Errors;
                     }
                 },
-                _ if ctx.out.format == Format::Json => env.result["asm"] = text.into(),
+                _ if ctx.out.format == Format::Json => {
+                    env.result[if args.cfg { "dot" } else { "asm" }] = text.into()
+                }
                 _ => shown = text,
             }
             ctx.finish(env, &shown, Vec::new(), &map, Exit::Ok)

@@ -22,6 +22,7 @@
 //! [`decode_named`] does both steps for a caller holding a name and bytes.
 
 pub mod asm;
+pub mod cfg;
 mod instruction;
 mod opcode;
 
