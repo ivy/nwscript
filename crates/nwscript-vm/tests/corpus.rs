@@ -141,3 +141,47 @@ fn corpus_runs() {
     }
     assert!(machine.is_empty(), "machine faults: {machine:#?}");
 }
+
+/// The world model covers at least 60% of the engine call sites in the
+/// corpus, and running every script against an empty world faults no more
+/// than the recording engine does.
+#[test]
+#[ignore = "needs the corpus: set NWSCRIPT_CORPUS"]
+fn corpus_world_coverage() {
+    let Some(root) = corpus() else {
+        eprintln!("skipping: no corpus; set NWSCRIPT_CORPUS to an extracted corpus directory");
+        return;
+    };
+    let table = routines(&root.join("nwscript.nss"));
+    let modelled: std::collections::HashSet<&str> =
+        nwscript_vm::world::MODELS.iter().map(|m| m.0).collect();
+    let (mut sites, mut covered, mut machine) = (0usize, 0usize, Vec::new());
+    for f in all_ncs(&root) {
+        let p = nwscript_ncs::decode(FileId(0), &std::fs::read(&f).unwrap()).unwrap();
+        for i in p.instructions() {
+            if let nwscript_ncs::Operands::Action { routine, .. } = i.operands {
+                sites += 1;
+                covered += usize::from(
+                    table
+                        .get(usize::from(routine))
+                        .is_some_and(|r| modelled.contains(r.name.as_str())),
+                );
+            }
+        }
+        let r = run(
+            &p,
+            &table,
+            &mut nwscript_vm::World::new(0),
+            Limits::default(),
+        );
+        if let Some(fault) = &r.fault
+            && !fault.kind.is_engine_dependent()
+        {
+            machine.push(format!("{} {fault}", f.display()));
+        }
+    }
+    let pct = 100.0 * covered as f64 / sites as f64;
+    println!("world: models {covered} of {sites} engine call sites ({pct:.1}%)");
+    assert!(pct >= 60.0);
+    assert!(machine.is_empty(), "{machine:#?}");
+}

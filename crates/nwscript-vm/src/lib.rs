@@ -10,9 +10,11 @@
 
 mod machine;
 mod value;
+pub mod world;
 
 pub use machine::{Limits, run};
-pub use value::{Closure, Ty, Value};
+pub use value::{Closure, OBJECT_INVALID, OBJECT_SELF, Ty, Value};
+pub use world::World;
 
 use std::fmt;
 
@@ -38,6 +40,10 @@ pub struct Reply {
 /// it returns.
 pub trait Engine {
     fn call(&mut self, routine: u16, sig: &Routine, args: &[Value]) -> Reply;
+
+    /// A deferred action is about to run; an engine that tracks who owns
+    /// each action (`AssignCommand`) sets `OBJECT_SELF` for it here.
+    fn deferred_begins(&mut self, _closure: &Closure) {}
 }
 
 /// An engine that models nothing: every routine returns its type's default

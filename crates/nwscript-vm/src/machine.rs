@@ -611,6 +611,7 @@ pub fn run(
         m.bp = c.globals.len();
         m.calls.clear();
         m.current = Some(c.id);
+        engine.deferred_begins(&c);
         match program.index_at(c.resume) {
             Some(start) => fault = m.exec(engine, start).err(),
             None => {
