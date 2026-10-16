@@ -33,3 +33,4 @@ The layout is `nss/`, `ncs/`, `nwscript.nss` as shipped, `oracle/` (the include 
 - Markdown: one paragraph per line, no hard wrapping. Documents state current facts, not their history.
 - Commits: small and coherent, conventional-commit subjects, no AI attribution.
 - Prior work is described with respect: what it achieved and the constraints it was built under.
+- Record what the corpus teaches as you find it: a quirk of BioWare's compiler, a defect in the shipped sources, a trap in the bytecode. It goes in `docs/research/bytecode-quirks.md` with the evidence (file, offset, the command that shows it); measurements of tools go in their own dated file under `docs/research/`.
