@@ -19,6 +19,8 @@ cargo xtask corpus extract --game-dir PATH/TO/swkotor   # writes the corpus
 cargo xtask corpus verify                              # checks it against conformance/k1.toml
 ```
 
+[`docs/grammar.md`](docs/grammar.md) is the language as the corpus uses it, each construct cited with counts from `cargo xtask grammar-census`. After changing the census or the document, `cargo xtask grammar-census --check docs/grammar-census.txt --doc docs/grammar.md` confirms they agree.
+
 The layout is `nss/`, `ncs/`, `nwscript.nss` as shipped, `oracle/` (the include directory for nwnnsscomp, with BioWare's line-5145 typo fixed), and `modules/STEM/` and `rims/STEM/` for the NCS in each capsule. On the maintainer's build host the vanilla install is modshop's `games/kotor/data/game/vanilla/tree`.
 
 ## Working here

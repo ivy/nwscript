@@ -1,0 +1,363 @@
+# cargo xtask grammar-census over 1774 files in nss/ (nwscript.nss among them)
+# key, uses, files using it, uses in nwscript.nss, up to three files using it
+action_arg                                              520   127     0  e3_scripts.nss k_act_atkonend.nss k_act_bandatt.nss
+action_arg.engine_call                                  461   117     0  e3_scripts.nss k_act_atkonend.nss k_act_bandatt.nss
+action_arg.not_a_call                                     0     0     0
+action_arg.user_call                                     59    25     0  e3_scripts.nss k_act_atkonend.nss k_act_bandatt.nss
+assoc.left.additive                                      79    14     0  e3_scripts.nss k_ai_master.nss k_con_com31.nss
+assoc.left.additive.order_matters                         0     0     0
+assoc.left.equality.order_matters                         0     0     0
+assoc.left.logand                                       300   100     0  e3_scripts.nss k_ai_master.nss k_bant_trig.nss
+assoc.left.logor                                        266    40     0  k_act_bandatt.nss k_ai_master.nss k_amb_enemyflee.nss
+assoc.left.multiplicative                                 0     0     0
+assoc.left.multiplicative.order_matters                   0     0     0
+assoc.left.relational.order_matters                       0     0     0
+assoc.left.shift                                          0     0     0
+decl.const                                                0     0     0
+entry.both                                                0     0     0
+entry.has_params                                          0     0     0
+entry.main.returns_void                                 767   767     0  fightback.nss k_act_atkonend.nss k_act_bandatt.nss
+entry.none                                               24    24     1  e3_scripts.nss k_inc_cheat.nss k_inc_dan.nss
+entry.starting_conditional.returns_int                  983   983     0  k_act_foeinsight.nss k_com_comrepr.nss k_con_at_ebon.nss
+expr.assign.add_assign                                   12     6     0  k_inc_ebonhawk.nss k_inc_force.nss k_inc_tar.nss
+expr.assign.as_operand                                    1     1     0  k_inc_treasure.nss
+expr.assign.assign                                     2515   711     0  e3_scripts.nss k_act_caloatt.nss k_act_com31.nss
+expr.assign.bitand_assign                                 0     0     0
+expr.assign.bitor_assign                                  0     0     0
+expr.assign.bitxor_assign                                 0     0     0
+expr.assign.chained                                       0     0     0
+expr.assign.div_assign                                    8     3     0  k_inc_force.nss k_sup_droid.nss nw_s0_lghtnbolt.nss
+expr.assign.mod_assign                                    0     0     0
+expr.assign.mul_assign                                    0     0     0
+expr.assign.operand_unparenthesized                       0     0     0
+expr.assign.shl_assign                                    0     0     0
+expr.assign.shr_assign                                    0     0     0
+expr.assign.sub_assign                                    7     1     0  k_sup_grenade.nss
+expr.assign.target_not_lvalue                             0     0     0
+expr.assign.to_member                                    11     1     0  k_inc_generic.nss
+expr.assign.ushr_assign                                   0     0     0
+expr.binary.add                                         539   110     0  e3_scripts.nss k_act_com31.nss k_act_nospeak.nss
+expr.binary.add.string_literal_operand                  272    40     0  e3_scripts.nss k_act_com31.nss k_act_nospeak.nss
+expr.binary.bitand                                        3     2     0  e3_scripts.nss k_inc_gensupport.nss
+expr.binary.bitor                                        18     3     0  e3_scripts.nss k_inc_dan.nss k_inc_force.nss
+expr.binary.bitxor                                        0     0     0
+expr.binary.div                                          50    11     0  k_ai_master.nss k_hen_canduser.nss k_inc_force.nss
+expr.binary.eq                                         3238   811     0  e3_scripts.nss fightback.nss k_ai_master.nss
+expr.binary.ge                                           91    55     0  k_ai_master.nss k_com_comrepr.nss k_con_com31.nss
+expr.binary.gt                                          325   143     0  k_ai_master.nss k_bant_trig.nss k_con_candstim01.nss
+expr.binary.le                                          128    31     0  k_ai_master.nss k_bant_trig.nss k_con_bastpm.nss
+expr.binary.logand                                     1175   388     0  e3_scripts.nss k_act_foeinsight.nss k_ai_master.nss
+expr.binary.logor                                       742    94     0  e3_scripts.nss k_act_bandatt.nss k_act_caloatt.nss
+expr.binary.lt                                          185   106     0  e3_scripts.nss k_act_caloatt.nss k_act_foeinsight.nss
+expr.binary.mod                                           1     1     0  k_inc_force.nss
+expr.binary.mul                                          25     9     0  k_hen_canduser.nss k_inc_ebonhawk.nss k_inc_force.nss
+expr.binary.ne                                          181    58     0  e3_scripts.nss k_ai_master.nss k_bant_trig.nss
+expr.binary.shl                                           1     1     0  k_inc_dan.nss
+expr.binary.shr                                           0     0     0
+expr.binary.sub                                          57    26     0  e3_scripts.nss k_ai_master.nss k_hcan_state44.nss
+expr.binary.ushr                                          0     0     0
+expr.call                                             12343  1730     0  e3_scripts.nss fightback.nss k_act_atkonend.nss
+expr.call.engine                                       9724  1469     0  e3_scripts.nss fightback.nss k_act_atkonend.nss
+expr.call.engine.arity_mismatch                           1     1     0  k_act_bastadd.nss
+expr.call.engine.default_used.float_literal             548    82     0  e3_scripts.nss k_act_com42.nss k_act_com43.nss
+expr.call.engine.default_used.identifier                694   110     0  e3_scripts.nss fightback.nss k_act_com43.nss
+expr.call.engine.default_used.int_literal               535   197     0  e3_scripts.nss k_act_bastadd.nss k_act_bastrmv.nss
+expr.call.engine.default_used.negative_int_literal      204    31     0  e3_scripts.nss k_act_foeinsight.nss k_ai_master.nss
+expr.call.engine.default_used.object_invalid             21     7     0  k_act_mispaz.nss k_ai_master.nss k_hjol_userdef01.nss
+expr.call.engine.default_used.object_self               509    51     0  e3_scripts.nss fightback.nss k_ai_master.nss
+expr.call.engine.default_used.string_literal           1111    64     0  k_act_hk47simul.nss k_ai_master.nss k_bant_trig.nss
+expr.call.engine.default_used.vector_literal             62     7     0  k_inc_force.nss k_inc_gensupport.nss k_pman_sonic.nss
+expr.call.engine.omits_defaults                        1942   295     0  e3_scripts.nss fightback.nss k_act_bastadd.nss
+expr.call.no_arguments                                 1666   622     0  e3_scripts.nss fightback.nss k_act_atkonend.nss
+expr.call.user                                         2619   500     0  e3_scripts.nss k_act_atkonend.nss k_act_bandatt.nss
+expr.call.user.arity_mismatch                             0     0     0
+expr.call.user.default_used.float_literal                19    11     0  k_inc_force.nss k_inc_generic.nss k_inc_gensupport.nss
+expr.call.user.default_used.identifier                   92    47     0  k_act_electric.nss k_act_exitarea.nss k_act_startgas.nss
+expr.call.user.default_used.int_literal                  26     9     0  k_inc_force.nss k_inc_generic.nss k_inc_treasure.nss
+expr.call.user.default_used.object_invalid               40    12     0  k_act_atkonend.nss k_act_bandatt.nss k_act_caloatt.nss
+expr.call.user.default_used.object_self                  18    12     0  k_def_repairsp.nss k_def_rependd.nss k_hjol_spawn01.nss
+expr.call.user.default_used.string_literal               37    21     0  k_amb_prey_ude.nss k_def_calodef.nss k_def_userdef01.nss
+expr.call.user.omits_defaults                           196    89     0  k_act_atkonend.nss k_act_bandatt.nss k_act_caloatt.nss
+expr.call.user.undeclared                                42     3     0  e3_scripts.nss nw_g0_conversat.nss nw_s0_lghtnbolt.nss
+expr.conditional                                          0     0     0
+expr.member                                              21     1     0  k_inc_generic.nss
+expr.member.chained                                       0     0     0
+expr.member.named_field                                  21     1     0  k_inc_generic.nss
+expr.member.of_call                                       0     0     0
+expr.member.xyz                                           0     0     0
+expr.object_invalid                                      52    11    13  fightback.nss k_ai_master.nss k_inc_force.nss
+expr.object_self                                       1290   210    89  e3_scripts.nss k_act_atkonend.nss k_act_bandatt.nss
+expr.paren                                             1458   579     0  e3_scripts.nss k_ai_master.nss k_bant_trig.nss
+expr.postfix.dec                                         58     5     0  e3_scripts.nss k_inc_dan.nss k_inc_gensupport.nss
+expr.postfix.inc                                        142    40     0  e3_scripts.nss k_act_caloatt.nss k_act_candstim01.nss
+expr.postfix.target_not_lvalue                            0     0     0
+expr.string.adjacent                                      0     0     0
+expr.unary.bitnot                                         1     1     0  e3_scripts.nss
+expr.unary.neg                                           85    17    20  e3_scripts.nss k_act_xoratt.nss k_ai_master.nss
+expr.unary.neg.float_literal                              1     1     0  k_inc_generic.nss
+expr.unary.neg.int_literal                               83    17    20  e3_scripts.nss k_act_xoratt.nss k_ai_master.nss
+expr.unary.neg.other                                      1     1     0  k_inc_utility.nss
+expr.unary.not                                          303    58     0  e3_scripts.nss k_act_com31.nss k_ai_master.nss
+expr.unary.plus                                           0     0     0
+expr.unary.predec                                         1     1     0  k_inc_force.nss
+expr.vector_literal                                       3     1     3  nwscript.nss
+expr.vector_literal.element.float_literal                 9     1     9  nwscript.nss
+expr.vector_literal.elements_3                            3     1     3  nwscript.nss
+file                                                   1774  1774     1  e3_scripts.nss fightback.nss k_act_atkonend.nss
+function.body.empty                                      21    18     0  k_act_com41.nss k_act_heartoff.nss k_act_hearton.nss
+function.return.effect                                   94     3    87  k_inc_end.nss nw_s0_lghtnbolt.nss nwscript.nss
+function.return.event                                     4     1     4  nwscript.nss
+function.return.float                                    56     3    48  k_inc_force.nss nw_s0_lghtnbolt.nss nwscript.nss
+function.return.int                                    1799  1004   236  k_act_foeinsight.nss k_com_comrepr.nss k_con_at_ebon.nss
+function.return.location                                  6     1     6  nwscript.nss
+function.return.object                                  135    10    95  e3_scripts.nss k_inc_dan.nss k_inc_end.nss
+function.return.string                                   49     7    26  e3_scripts.nss k_inc_ebonhawk.nss k_inc_gensupport.nss
+function.return.struct                                    0     0     0
+function.return.talent                                   23     3     5  k_inc_generic.nss k_inc_gensupport.nss nwscript.nss
+function.return.vector                                   13     2    11  k_inc_dan.nss nwscript.nss
+function.return.void                                   1750   790   253  e3_scripts.nss fightback.nss k_act_atkonend.nss
+lex.comment.block                                      1262   870     0  k_act_atkonend.nss k_act_bandatt.nss k_act_bastadd.nss
+lex.comment.block.contains_block_open                     0     0     0
+lex.comment.block.contains_line_comment                  75    25     0  k_ai_master.nss k_def_attacked01.nss k_def_combend01.nss
+lex.comment.block.multiline                            1262   870     0  k_act_atkonend.nss k_act_bandatt.nss k_act_bastadd.nss
+lex.comment.block.unterminated                            0     0     0
+lex.comment.line                                      10346  1035  2024  e3_scripts.nss k_act_atkonend.nss k_act_bandatt.nss
+lex.comment.line.at_eof                                   0     0     0
+lex.comment.line.backslash_end                            0     0     0
+lex.comment.line.contains_block_close                     0     0     0
+lex.comment.line.contains_block_open                      6     3     0  e3_scripts.nss k_inc_gensupport.nss k_inc_man.nss
+lex.ctrl_z                                                0     0     0
+lex.float.digits_dot                                      0     0     0
+lex.float.digits_dot_digits                             874   124    18  e3_scripts.nss k_act_atkonend.nss k_act_bandatt.nss
+lex.float.digits_dot_digits_exp                           0     0     0
+lex.float.digits_dot_digits_f                            64    23    32  k_def_bandspn.nss k_inc_dan.nss k_inc_force.nss
+lex.float.digits_dot_digits_upper_f                       0     0     0
+lex.float.digits_exp                                      0     0     0
+lex.float.digits_f                                        0     0     0
+lex.float.dot_digits                                      0     0     0
+lex.hash_mid_line                                         0     0     0
+lex.ident                                             39931  1774  3434  e3_scripts.nss fightback.nss k_act_atkonend.nss
+lex.ident.keyword_other_case                              3     1     3  nwscript.nss
+lex.int.decimal                                        6411   997  1537  e3_scripts.nss k_act_bandatt.nss k_act_caloatt.nss
+lex.int.hex                                              75     3     0  e3_scripts.nss k_inc_generic.nss k_inc_gensupport.nss
+lex.int.hex.lower_digits                                 36     2     0  k_inc_generic.nss k_inc_gensupport.nss
+lex.int.hex.upper_digits                                  0     0     0
+lex.int.hex.upper_x                                       0     0     0
+lex.int.leading_zero                                      0     0     0
+lex.keyword.OBJECT_INVALID                               52    11    13  fightback.nss k_ai_master.nss k_inc_force.nss
+lex.keyword.OBJECT_SELF                                1290   210    89  e3_scripts.nss k_act_atkonend.nss k_act_bandatt.nss
+lex.keyword.action                                        3     1     3  nwscript.nss
+lex.keyword.break                                       235    24     0  k_ai_master.nss k_inc_drop.nss k_inc_force.nss
+lex.keyword.case                                        282    25     0  k_ai_master.nss k_inc_drop.nss k_inc_force.nss
+lex.keyword.const                                         0     0     0
+lex.keyword.continue                                      0     0     0
+lex.keyword.default                                       6     3     0  k_inc_lev.nss k_inc_tar.nss k_inc_unk.nss
+lex.keyword.do                                            1     1     0  k_inc_treasure.nss
+lex.keyword.effect                                      287    25   106  k_act_com42.nss k_act_com43.nss k_def_buff.nss
+lex.keyword.else                                       1120   228     0  e3_scripts.nss k_ai_master.nss k_amb_prey_ude.nss
+lex.keyword.event                                         5     1     5  nwscript.nss
+lex.keyword.float                                       256    17   140  e3_scripts.nss k_ai_master.nss k_hen_canduser.nss
+lex.keyword.for                                          37    19     0  k_con_classdiff.nss k_con_classsame.nss k_inc_dan.nss
+lex.keyword.if                                         3135   651     0  e3_scripts.nss fightback.nss k_act_bandatt.nss
+lex.keyword.int                                        6005  1152  2164  e3_scripts.nss k_act_caloatt.nss k_act_candstim01.nss
+lex.keyword.itemproperty                                  0     0     0
+lex.keyword.location                                     70    15    32  k_amb_predator01.nss k_inc_dan.nss k_inc_end.nss
+lex.keyword.object                                     1346   153   483  e3_scripts.nss k_act_bandatt.nss k_act_caloatt.nss
+lex.keyword.return                                     2445  1011     0  e3_scripts.nss k_act_foeinsight.nss k_ai_master.nss
+lex.keyword.string                                      371    34   110  e3_scripts.nss k_act_nospeak.nss k_ai_master.nss
+lex.keyword.struct                                        2     1     0  k_inc_generic.nss
+lex.keyword.switch                                       33    25     0  k_ai_master.nss k_inc_drop.nss k_inc_force.nss
+lex.keyword.talent                                       74     3    12  k_inc_generic.nss k_inc_gensupport.nss nwscript.nss
+lex.keyword.vector                                       30     3    27  k_inc_dan.nss k_inc_generic.nss nwscript.nss
+lex.keyword.void                                       1751   790   254  e3_scripts.nss fightback.nss k_act_atkonend.nss
+lex.keyword.while                                       131    39     0  e3_scripts.nss k_act_bandatt.nss k_act_caloatt.nss
+lex.line_end.cr                                           0     0     0
+lex.line_end.crlf                                     53564  1774  5172  e3_scripts.nss fightback.nss k_act_atkonend.nss
+lex.line_end.lf                                           0     0     0
+lex.no_final_line_end                                     2     2     1  k_inc_kas.nss nwscript.nss
+lex.non_ascii.code                                        0     0     0
+lex.non_ascii.comment                                     7     7     1  k_pman_casamad_s.nss k_pman_casamad_y.nss k_pman_huktmad_y.nss
+lex.non_ascii.string                                      0     0     0
+lex.number.followed_by_ident_char                         0     0     0
+lex.string                                             4391  1275    24  e3_scripts.nss k_act_bandatt.nss k_act_bastadd.nss
+lex.string.contains_comment_marker                        0     0     0
+lex.string.empty                                        167    47    22  e3_scripts.nss k_act_mispaz.nss k_ai_master.nss
+lex.string.escape.backslash                               0     0     0
+lex.string.escape.n                                       0     0     0
+lex.string.escape.quote                                   0     0     0
+lex.string.unterminated                                   0     0     0
+lex.ws.tab                                              267    10     0  k_con_classsame.nss k_con_isjedi.nss k_con_perseasy.nss
+lex.ws.vt_ff                                              0     0     0
+param                                                  2244    31  1074  e3_scripts.nss k_amb_predator01.nss k_inc_cheat.nss
+param.default                                           627    20   311  e3_scripts.nss k_inc_dan.nss k_inc_debug.nss
+param.default.float_literal                              67     8    30  e3_scripts.nss k_inc_debug.nss k_inc_force.nss
+param.default.identifier                                169    14    92  e3_scripts.nss k_inc_dan.nss k_inc_end.nss
+param.default.in_definition                             158    19     0  e3_scripts.nss k_inc_dan.nss k_inc_debug.nss
+param.default.in_definition_only                          0     0     0
+param.default.in_prototype                              275    18   198  e3_scripts.nss k_inc_dan.nss k_inc_debug.nss
+param.default.in_prototype_and_definition                76    17     0  e3_scripts.nss k_inc_dan.nss k_inc_debug.nss
+param.default.in_prototype_only                           1     1     0  k_inc_generic.nss
+param.default.int_literal                                81     8    47  e3_scripts.nss k_inc_debug.nss k_inc_force.nss
+param.default.negative_int_literal                       14     1    14  nwscript.nss
+param.default.object_invalid                             36     4    13  k_inc_generic.nss k_inc_tar.nss k_inc_utility.nss
+param.default.object_self                               195    13    89  k_inc_drop.nss k_inc_end.nss k_inc_generic.nss
+param.default.string_literal                             62    11    23  e3_scripts.nss k_inc_dan.nss k_inc_debug.nss
+param.default.vector_literal                              3     1     3  nwscript.nss
+param.list.empty                                       2558  1769   162  e3_scripts.nss fightback.nss k_act_atkonend.nss
+param.list.void                                           0     0     0
+param.required_after_default                              0     0     0
+param.type.action                                         3     1     3  nwscript.nss
+param.type.effect                                        44     3    19  k_inc_force.nss nw_s0_lghtnbolt.nss nwscript.nss
+param.type.event                                          1     1     1  nwscript.nss
+param.type.float                                        149     9    81  e3_scripts.nss k_inc_debug.nss k_inc_force.nss
+param.type.int                                         1035    24   450  e3_scripts.nss k_inc_cheat.nss k_inc_dan.nss
+param.type.location                                      47     7    26  k_amb_predator01.nss k_inc_force.nss k_inc_man.nss
+param.type.object                                       716    21   388  e3_scripts.nss k_amb_predator01.nss k_inc_drop.nss
+param.type.string                                       220    18    83  e3_scripts.nss k_amb_predator01.nss k_inc_dan.nss
+param.type.struct                                         0     0     0
+param.type.talent                                        13     2     7  k_inc_generic.nss nwscript.nss
+param.type.vector                                        16     1    16  nwscript.nss
+param.unnamed                                             0     0     0
+pp.define                                                 5     1     5  nwscript.nss
+pp.define.no_value                                        0     0     0
+pp.define.value_int                                       1     1     1  nwscript.nss
+pp.define.value_word                                      4     1     4  nwscript.nss
+pp.include                                             1196   964     0  k_act_atkonend.nss k_act_bandatt.nss k_act_bastadd.nss
+pp.include.after_declaration                              0     0     0
+pp.include.cycle                                          0     0     0
+pp.include.in_include_file                               11    11     0  k_inc_cheat.nss k_inc_dan.nss k_inc_end.nss
+pp.include.not_lowercase                                  1     1     0  k_swg_hk47fix.nss
+pp.include.not_quoted                                     0     0     0
+pp.include.reached_twice                                  0     0     0
+pp.include.target                                      1196    19     0  k_inc_cheat.nss k_inc_dan.nss k_inc_debug.nss
+pp.include.target_missing                                 0     0     0
+pp.include.trailing_comment                               0     0     0
+pp.include.trailing_text                                  0     0     0
+pp.include.with_extension                                 0     0     0
+pp.inside_function                                        0     0     0
+pp.other                                                  0     0     0
+pp.space_after_hash                                       0     0     0
+prec.additive_over_multiplicative                         1     1     0  k_inc_force.nss
+prec.bitand_over_equality                                 0     0     0
+prec.bitand_over_relational                               0     0     0
+prec.bitor_over_bitxor                                    0     0     0
+prec.bitor_over_equality                                  0     0     0
+prec.bitor_over_relational                                0     0     0
+prec.bitxor_over_bitand                                   0     0     0
+prec.equality_over_multiplicative                         1     1     0  k_inc_force.nss
+prec.equality_over_relational                             0     0     0
+prec.logand_over_bitor                                    0     0     0
+prec.logand_over_equality                               525    89     0  e3_scripts.nss k_ai_master.nss k_amb_predator01.nss
+prec.logand_over_relational                             256    34     0  e3_scripts.nss k_act_foeinsight.nss k_ai_master.nss
+prec.logor_over_equality                                795    30     0  k_ai_master.nss k_amb_enemyflee.nss k_def_calospn.nss
+prec.logor_over_logand                                    0     0     0
+prec.logor_over_relational                               34    10     0  e3_scripts.nss k_act_caloatt.nss k_ai_master.nss
+prec.not_operand_of_comparison                            1     1     0  k_swg_jolee12.nss
+prec.relational_over_additive                             3     1     0  k_inc_utility.nss
+prec.relational_over_multiplicative                       1     1     0  k_pkas_freyyuser.nss
+prec.relational_over_shift                                0     0     0
+prec.shift_over_additive                                  0     0     0
+sem.call_before_declaration                               0     0     0
+sem.recursive_call                                        7     6     0  e3_scripts.nss k_inc_dan.nss k_inc_force.nss
+stmt.block                                             3585   491     0  e3_scripts.nss fightback.nss k_act_bandatt.nss
+stmt.block.empty                                        131    21     0  k_ai_master.nss k_amb_prey_ude.nss k_def_calodef.nss
+stmt.break.in_loop                                        1     1     0  k_inc_tar.nss
+stmt.break.in_switch                                    234    24     0  k_ai_master.nss k_inc_drop.nss k_inc_force.nss
+stmt.break.outside                                        0     0     0
+stmt.continue                                             0     0     0
+stmt.continue.outside_loop                                0     0     0
+stmt.decl                                              2230   955     0  e3_scripts.nss k_act_bandatt.nss k_act_caloatt.nss
+stmt.decl.after_statement                               366    53     0  e3_scripts.nss k_act_com31.nss k_act_com42.nss
+stmt.decl.declarator                                   2304   955     0  e3_scripts.nss k_act_bandatt.nss k_act_caloatt.nss
+stmt.decl.in_case_unbraced                                1     1     0  k_pkas_randwalk.nss
+stmt.decl.init                                         1297   300     0  e3_scripts.nss k_act_bandatt.nss k_act_caloatt.nss
+stmt.decl.multi_declarator                               33    21     0  k_con_classdiff.nss k_con_classsame.nss k_def_buff.nss
+stmt.decl.type.effect                                   149    24     0  k_act_com42.nss k_act_com43.nss k_def_buff.nss
+stmt.decl.type.float                                     39    13     0  e3_scripts.nss k_ai_master.nss k_hen_canduser.nss
+stmt.decl.type.int                                     1416   871     0  e3_scripts.nss k_act_caloatt.nss k_act_candstim01.nss
+stmt.decl.type.location                                  17    12     0  k_amb_predator01.nss k_inc_dan.nss k_inc_end.nss
+stmt.decl.type.object                                   494   149     0  e3_scripts.nss k_act_bandatt.nss k_act_caloatt.nss
+stmt.decl.type.string                                    76    27     0  e3_scripts.nss k_act_nospeak.nss k_ai_master.nss
+stmt.decl.type.struct                                     0     0     0
+stmt.decl.type.talent                                    38     2     0  k_inc_generic.nss k_inc_gensupport.nss
+stmt.decl.type.vector                                     1     1     0  k_inc_generic.nss
+stmt.do_while                                             1     1     0  k_inc_treasure.nss
+stmt.do_while.body_unbraced                               0     0     0
+stmt.empty                                                3     2     0  k_inc_force.nss k_pdan_jedi37.nss
+stmt.expr                                              6681  1395     0  e3_scripts.nss fightback.nss k_act_atkonend.nss
+stmt.expr.assign                                       2456   710     0  e3_scripts.nss k_act_caloatt.nss k_act_com31.nss
+stmt.expr.call                                         4025   970     0  e3_scripts.nss fightback.nss k_act_atkonend.nss
+stmt.expr.compound_assign                                27     8     0  k_inc_ebonhawk.nss k_inc_force.nss k_inc_tar.nss
+stmt.expr.no_effect                                       5     3     0  k_hen_canduser.nss k_inc_generic.nss k_pebn_galaxy.nss
+stmt.expr.postfix_incdec                                167    33     0  e3_scripts.nss k_act_caloatt.nss k_act_candstim01.nss
+stmt.expr.prefix_incdec                                   1     1     0  k_inc_force.nss
+stmt.for                                                 37    19     0  k_con_classdiff.nss k_con_classsame.nss k_inc_dan.nss
+stmt.for.body_unbraced                                    0     0     0
+stmt.for.comma_list                                       0     0     0
+stmt.for.init_declaration                                 0     0     0
+stmt.for.parts.init_cond_step                            37    19     0  k_con_classdiff.nss k_con_classsame.nss k_inc_dan.nss
+stmt.for.parts.none                                       0     0     0
+stmt.if                                                3135   651     0  e3_scripts.nss fightback.nss k_act_bandatt.nss
+stmt.if.dangling_else                                     0     0     0
+stmt.if.else                                           1120   228     0  e3_scripts.nss k_ai_master.nss k_amb_prey_ude.nss
+stmt.if.else_if                                         752    57     0  k_ai_master.nss k_amb_prey_ude.nss k_def_buff.nss
+stmt.if.else_unbraced                                     8     8     0  k_hjuh_p07.nss k_hjuh_p07d.nss k_hjuh_p07l.nss
+stmt.if.then_unbraced                                   272   186     0  k_hcan_state07.nss k_hcan_state32.nss k_hjuh_h07.nss
+stmt.return.value                                      2149  1006     0  e3_scripts.nss k_act_foeinsight.nss k_com_comrepr.nss
+stmt.return.value_parenthesized                         102    20     0  e3_scripts.nss k_con_bastpm.nss k_con_canderpm.nss
+stmt.return.void                                        296    16     0  e3_scripts.nss k_ai_master.nss k_inc_force.nss
+stmt.struct_definition                                    0     0     0
+stmt.switch                                              33    25     0  k_ai_master.nss k_inc_drop.nss k_inc_force.nss
+stmt.switch.case                                        282    25     0  k_ai_master.nss k_inc_drop.nss k_inc_force.nss
+stmt.switch.case.identifier                              46     1     0  k_inc_force.nss
+stmt.switch.case.int_literal                            236    25     0  k_ai_master.nss k_inc_drop.nss k_inc_force.nss
+stmt.switch.default                                       6     3     0  k_inc_lev.nss k_inc_tar.nss k_inc_unk.nss
+stmt.switch.default_not_last                              0     0     0
+stmt.switch.empty                                         0     0     0
+stmt.switch.fallthrough                                  42     1     0  k_qa.nss
+stmt.switch.group_braced                                 47     5     0  k_inc_force.nss k_pdan_elise_d.nss k_pdan_kath02.nss
+stmt.switch.jump_inside_braces                            0     0     0
+stmt.switch.label_nested                                  0     0     0
+stmt.switch.last_group_falls_out                          9     8     0  k_inc_force.nss k_inc_lev.nss k_inc_tar.nss
+stmt.switch.nested                                        6     3     0  k_inc_lev.nss k_inc_tar.nss k_inc_unk.nss
+stmt.switch.stacked_labels                                1     1     0  k_pkas_randwalk.nss
+stmt.switch.statement_before_first_label                  0     0     0
+stmt.switch.trailing_label_without_statement              0     0     0
+stmt.while                                              130    39     0  e3_scripts.nss k_act_bandatt.nss k_act_caloatt.nss
+stmt.while.body_unbraced                                  0     0     0
+struct.member                                            10     1     0  k_inc_generic.nss
+struct.member.multi_declarator                            0     0     0
+struct.member.type.int                                    9     1     0  k_inc_generic.nss
+struct.member.type.object                                 1     1     0  k_inc_generic.nss
+top.empty_declaration                                     0     0     0
+top.function.definition                                2723  1772     0  e3_scripts.nss fightback.nss k_act_atkonend.nss
+top.function.definition_after_prototype                 422    30     0  e3_scripts.nss k_amb_predator01.nss k_inc_cheat.nss
+top.function.definition_differs_from_prototype            2     1     0  k_inc_ebonhawk.nss
+top.function.prototype                                 1206    31   771  e3_scripts.nss k_amb_predator01.nss k_inc_cheat.nss
+top.function.prototype_after_definition                   0     0     0
+top.function.prototype_repeated                           1     1     0  k_inc_ebonhawk.nss
+top.function.redefinition                                 0     0     0
+top.global                                             1785    14  1490  e3_scripts.nss k_inc_dan.nss k_inc_drop.nss
+top.global.after_function_definition                     17     1     0  e3_scripts.nss
+top.global.declarator                                  1785    14  1490  e3_scripts.nss k_inc_dan.nss k_inc_drop.nss
+top.global.init.call                                      2     2     0  k_inc_man.nss k_inc_tat.nss
+top.global.init.expression                                0     0     0
+top.global.init.float_literal                            12     2    11  k_inc_force.nss nwscript.nss
+top.global.init.identifier                                3     2     2  k_inc_treasure.nss nwscript.nss
+top.global.init.int_literal                            1724    13  1470  e3_scripts.nss k_inc_dan.nss k_inc_drop.nss
+top.global.init.negative_int_literal                     12     3     6  k_inc_end.nss k_inc_utility.nss nwscript.nss
+top.global.init.string_literal                           24     4     1  k_inc_dan.nss k_inc_end.nss k_inc_man.nss
+top.global.multi_declarator                               0     0     0
+top.global.type.float                                    12     2    11  k_inc_force.nss nwscript.nss
+top.global.type.int                                    1746    14  1478  e3_scripts.nss k_inc_dan.nss k_inc_drop.nss
+top.global.type.string                                   26     5     1  k_inc_dan.nss k_inc_end.nss k_inc_man.nss
+top.global.type.struct                                    1     1     0  k_inc_generic.nss
+top.global.uninitialized                                  8     2     0  k_inc_force.nss k_inc_generic.nss
+top.struct                                                1     1     0  k_inc_generic.nss
+# values: key, largest, file
+lex.ident.longest                                        50 nwscript.nss
+lex.int.decimal.largest                               65535 nwscript.nss
+lex.int.hex.largest                                   65535 k_inc_generic.nss
+lex.string.longest                                       80 k_sup_galaxymap.nss
+# parse errors: file:line, message
+nwscript.nss:5145: expected a type, found `INT`
