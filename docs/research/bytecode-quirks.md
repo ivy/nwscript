@@ -47,6 +47,10 @@ The stack-depth analysis over the corpus (`crates/nwscript-ncs/tests/cfg.rs`) fi
 
 For every other instruction the second byte is a type. For `STORE_STATE` it is the distance from the instruction to the code the deferred action resumes at, and in BioWare's bytecode it is always `0x10`: past the 10-byte `STORE_STATE` and the 6-byte `JMP` that skips the action's body. The decoder accepts only `0x10`, as Torlack's specification gives it.
 
+### Object constants are 0 and 1
+
+`OBJECT_SELF` compiles to `CONSTO 0` and `OBJECT_INVALID` to `CONSTO 1`; no other `CONSTO` operand appears in the corpus. `k_sup_gohawk` and `k_sup_guiopen`, which use `OBJECT_INVALID` and not `OBJECT_SELF`, hold only `CONSTO 1`.
+
 ## The shipped sources
 
 ### `nwscript.nss` line 5145
