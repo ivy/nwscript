@@ -1,0 +1,77 @@
+---
+source: crates/nwscript-syntax/tests/productions.rs
+expression: dump(src)
+---
+SOURCE_FILE@0..89
+  GLOBAL_DECL@0..10
+    TYPE@0..3
+      INT_KW@0..3 "int"
+    WHITESPACE@3..4 " "
+    DECLARATOR@4..9
+      IDENT@4..5 "A"
+      WHITESPACE@5..6 " "
+      EQ@6..7 "="
+      WHITESPACE@7..8 " "
+      LITERAL@8..9
+        INT_NUMBER@8..9 "1"
+    SEMICOLON@9..10 ";"
+  NEWLINE@10..12 "\r\n"
+  GLOBAL_DECL@12..20
+    TYPE@12..17
+      FLOAT_KW@12..17 "float"
+    WHITESPACE@17..18 " "
+    DECLARATOR@18..19
+      IDENT@18..19 "B"
+    SEMICOLON@19..20 ";"
+  NEWLINE@20..22 "\r\n"
+  GLOBAL_DECL@22..54
+    TYPE@22..28
+      STRING_KW@22..28 "string"
+    WHITESPACE@28..29 " "
+    DECLARATOR@29..53
+      IDENT@29..30 "C"
+      WHITESPACE@30..31 " "
+      EQ@31..32 "="
+      WHITESPACE@32..33 " "
+      CALL_EXPR@33..53
+        NAME_REF@33..50
+          IDENT@33..50 "GetStringByStrRef"
+        ARG_LIST@50..53
+          L_PAREN@50..51 "("
+          LITERAL@51..52
+            INT_NUMBER@51..52 "5"
+          R_PAREN@52..53 ")"
+    SEMICOLON@53..54 ";"
+  NEWLINE@54..56 "\r\n"
+  GLOBAL_DECL@56..69
+    TYPE@56..59
+      INT_KW@56..59 "int"
+    WHITESPACE@59..60 " "
+    DECLARATOR@60..65
+      IDENT@60..61 "D"
+      WHITESPACE@61..62 " "
+      EQ@62..63 "="
+      WHITESPACE@63..64 " "
+      NAME_REF@64..65
+        IDENT@64..65 "A"
+    COMMA@65..66 ","
+    WHITESPACE@66..67 " "
+    DECLARATOR@67..68
+      IDENT@67..68 "E"
+    SEMICOLON@68..69 ";"
+  NEWLINE@69..71 "\r\n"
+  GLOBAL_DECL@71..87
+    CONST_KW@71..76 "const"
+    WHITESPACE@76..77 " "
+    TYPE@77..80
+      INT_KW@77..80 "int"
+    WHITESPACE@80..81 " "
+    DECLARATOR@81..86
+      IDENT@81..82 "F"
+      WHITESPACE@82..83 " "
+      EQ@83..84 "="
+      WHITESPACE@84..85 " "
+      LITERAL@85..86
+        INT_NUMBER@85..86 "2"
+    SEMICOLON@86..87 ";"
+  NEWLINE@87..89 "\r\n"

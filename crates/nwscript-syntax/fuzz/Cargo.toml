@@ -1,0 +1,23 @@
+[package]
+name = "nwscript-syntax-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+nwscript-diag = { path = "../../nwscript-diag" }
+nwscript-syntax = { path = ".." }
+
+# Built with `cargo +nightly fuzz` from this directory, outside the main workspace.
+[workspace]
+
+[[bin]]
+name = "parse"
+path = "fuzz_targets/parse.rs"
+test = false
+doc = false
+bench = false

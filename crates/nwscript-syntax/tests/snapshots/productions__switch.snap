@@ -1,0 +1,100 @@
+---
+source: crates/nwscript-syntax/tests/productions.rs
+expression: dump(src)
+---
+SOURCE_FILE@0..118
+  FUNCTION_DECL@0..118
+    TYPE@0..4
+      VOID_KW@0..4 "void"
+    WHITESPACE@4..5 " "
+    IDENT@5..9 "main"
+    PARAM_LIST@9..11
+      L_PAREN@9..10 "("
+      R_PAREN@10..11 ")"
+    WHITESPACE@11..12 " "
+    BLOCK@12..118
+      L_CURLY@12..13 "{"
+      WHITESPACE@13..14 " "
+      SWITCH_STMT@14..116
+        SWITCH_KW@14..20 "switch"
+        WHITESPACE@20..21 " "
+        L_PAREN@21..22 "("
+        NAME_REF@22..23
+          IDENT@22..23 "n"
+        R_PAREN@23..24 ")"
+        WHITESPACE@24..25 " "
+        BLOCK@25..116
+          L_CURLY@25..26 "{"
+          WHITESPACE@26..27 " "
+          CASE_LABEL@27..34
+            CASE_KW@27..31 "case"
+            WHITESPACE@31..32 " "
+            LITERAL@32..33
+              INT_NUMBER@32..33 "0"
+            COLON@33..34 ":"
+          WHITESPACE@34..35 " "
+          CASE_LABEL@35..58
+            CASE_KW@35..39 "case"
+            WHITESPACE@39..40 " "
+            NAME_REF@40..57
+              IDENT@40..57 "FORCE_POWER_CHOKE"
+            COLON@57..58 ":"
+          WHITESPACE@58..59 " "
+          LOCAL_DECL@59..69
+            TYPE@59..62
+              INT_KW@59..62 "int"
+            WHITESPACE@62..63 " "
+            DECLARATOR@63..68
+              IDENT@63..64 "x"
+              WHITESPACE@64..65 " "
+              EQ@65..66 "="
+              WHITESPACE@66..67 " "
+              LITERAL@67..68
+                INT_NUMBER@67..68 "1"
+            SEMICOLON@68..69 ";"
+          WHITESPACE@69..70 " "
+          BREAK_STMT@70..76
+            BREAK_KW@70..75 "break"
+            SEMICOLON@75..76 ";"
+          WHITESPACE@76..77 " "
+          CASE_LABEL@77..84
+            CASE_KW@77..81 "case"
+            WHITESPACE@81..82 " "
+            LITERAL@82..83
+              INT_NUMBER@82..83 "2"
+            COLON@83..84 ":"
+          WHITESPACE@84..85 " "
+          BLOCK@85..93
+            L_CURLY@85..86 "{"
+            WHITESPACE@86..87 " "
+            EXPR_STMT@87..91
+              CALL_EXPR@87..90
+                NAME_REF@87..88
+                  IDENT@87..88 "f"
+                ARG_LIST@88..90
+                  L_PAREN@88..89 "("
+                  R_PAREN@89..90 ")"
+              SEMICOLON@90..91 ";"
+            WHITESPACE@91..92 " "
+            R_CURLY@92..93 "}"
+          WHITESPACE@93..94 " "
+          BREAK_STMT@94..100
+            BREAK_KW@94..99 "break"
+            SEMICOLON@99..100 ";"
+          WHITESPACE@100..101 " "
+          DEFAULT_LABEL@101..109
+            DEFAULT_KW@101..108 "default"
+            COLON@108..109 ":"
+          WHITESPACE@109..110 " "
+          EXPR_STMT@110..114
+            CALL_EXPR@110..113
+              NAME_REF@110..111
+                IDENT@110..111 "g"
+              ARG_LIST@111..113
+                L_PAREN@111..112 "("
+                R_PAREN@112..113 ")"
+            SEMICOLON@113..114 ";"
+          WHITESPACE@114..115 " "
+          R_CURLY@115..116 "}"
+      WHITESPACE@116..117 " "
+      R_CURLY@117..118 "}"

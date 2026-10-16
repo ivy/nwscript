@@ -9,6 +9,10 @@ repository.workspace = true
 
 [dependencies]
 nwscript-diag = { workspace = true }
+rowan = "0.16"
+
+[dev-dependencies]
+insta = "1.49"
 
 [lints]
 workspace = true
