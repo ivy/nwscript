@@ -1,0 +1,64 @@
+//! Writing a command's outcome: rendered text, or one JSON envelope.
+
+use crate::cli::{ColorArg, Format};
+use nwscript::Envelope;
+use nwscript::diag::{Diagnostic, SourceMap, json::to_json, render};
+use std::io::{IsTerminal, Write};
+
+pub struct Output {
+    pub format: Format,
+    pub color: render::Color,
+    pub quiet: bool,
+}
+
+impl Output {
+    pub fn new(format: Format, color: ColorArg, quiet: bool) -> Self {
+        let color = match color {
+            ColorArg::Always => render::Color::Always,
+            ColorArg::Never => render::Color::Never,
+            ColorArg::Auto => {
+                if std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty())
+                    || !std::io::stderr().is_terminal()
+                {
+                    render::Color::Never
+                } else {
+                    render::Color::Always
+                }
+            }
+        };
+        Output {
+            format,
+            color,
+            quiet,
+        }
+    }
+
+    /// Emit a finished command: text to stdout and diagnostics to stderr, or
+    /// the envelope (diagnostics inside it) as one JSON document on stdout.
+    pub fn emit(&self, mut env: Envelope, text: &str, diags: &[Diagnostic], map: &SourceMap) {
+        match self.format {
+            crate::cli::Format::Json => {
+                env.diagnostics = diags.iter().map(|d| to_json(d, map)).collect();
+                let mut out = std::io::stdout().lock();
+                serde_json::to_writer_pretty(&mut out, &env).expect("stdout");
+                writeln!(out).expect("stdout");
+            }
+            crate::cli::Format::Text => {
+                let mut err = std::io::stderr().lock();
+                for d in diags {
+                    if self.quiet && !d.is_error() {
+                        continue;
+                    }
+                    write!(err, "{}", render::render(d, map, self.color)).expect("stderr");
+                }
+                if !text.is_empty() {
+                    let mut out = std::io::stdout().lock();
+                    write!(out, "{text}").expect("stdout");
+                    if !text.ends_with('\n') {
+                        writeln!(out).expect("stdout");
+                    }
+                }
+            }
+        }
+    }
+}

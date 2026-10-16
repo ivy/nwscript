@@ -8,6 +8,9 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
 nwscript-diag = { workspace = true }
 nwscript-ncs = { workspace = true }
 nwscript-syntax = { workspace = true }
