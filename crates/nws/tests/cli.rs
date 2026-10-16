@@ -75,7 +75,6 @@ fn reserved_commands_say_not_yet_implemented() {
         "test",
         "diff",
         "fn",
-        "conformance",
         "lua",
         "fmt",
         "lsp",
@@ -121,6 +120,6 @@ fn every_help_has_an_example() {
     ] {
         let out = nws().args([c, "--help"]).output().unwrap();
         let text = String::from_utf8_lossy(&out.stdout);
-        assert!(text.contains("Example:"), "`nws {c} --help` has no example");
+        assert!(text.contains("Example"), "`nws {c} --help` has no example");
     }
 }

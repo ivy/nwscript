@@ -132,11 +132,8 @@ pub enum Command {
     /// Look up an engine function. (not yet implemented)
     #[command(after_help = "Example:\n  nws --game k1 fn GetGlobalNumber")]
     Fn(Reserved),
-    /// Measure compilers against the vanilla corpus. (not yet implemented)
-    #[command(
-        after_help = "Example:\n  nws conformance --corpus ~/.cache/nwscript/corpus/k1 --manifest conformance/k1.toml"
-    )]
-    Conformance(Reserved),
+    /// Measure compilers against the vanilla corpus.
+    Conformance(Box<crate::cmd::conformance::Args>),
     /// Run a Lua script against the library. (not yet implemented)
     #[command(after_help = "Example:\n  nws --game k1 lua survey.lua")]
     Lua(Reserved),

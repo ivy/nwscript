@@ -40,8 +40,8 @@ impl Output {
             crate::cli::Format::Json => {
                 env.diagnostics = diags.iter().map(|d| to_json(d, map)).collect();
                 let mut out = std::io::stdout().lock();
-                serde_json::to_writer_pretty(&mut out, &env).expect("stdout");
-                writeln!(out).expect("stdout");
+                let doc = serde_json::to_string_pretty(&env).expect("the envelope serializes");
+                ignore_closed_pipe(writeln!(out, "{doc}"));
             }
             crate::cli::Format::Text => {
                 let mut err = std::io::stderr().lock();
@@ -49,16 +49,24 @@ impl Output {
                     if self.quiet && !d.is_error() {
                         continue;
                     }
-                    write!(err, "{}", render::render(d, map, self.color)).expect("stderr");
+                    ignore_closed_pipe(write!(err, "{}", render::render(d, map, self.color)));
                 }
                 if !text.is_empty() {
                     let mut out = std::io::stdout().lock();
-                    write!(out, "{text}").expect("stdout");
-                    if !text.ends_with('\n') {
-                        writeln!(out).expect("stdout");
-                    }
+                    let nl = if text.ends_with('\n') { "" } else { "\n" };
+                    ignore_closed_pipe(write!(out, "{text}{nl}"));
                 }
             }
         }
+    }
+}
+
+/// A reader that stops reading (`nws ... | head`) is not an error; any other
+/// write failure is.
+fn ignore_closed_pipe(r: std::io::Result<()>) {
+    if let Err(e) = r
+        && e.kind() != std::io::ErrorKind::BrokenPipe
+    {
+        panic!("writing output: {e}");
     }
 }

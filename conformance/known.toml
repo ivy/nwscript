@@ -1,0 +1,20 @@
+# Causes established for scripts no compiler can reproduce, by analysis
+# recorded in docs/research/nwnnsscomp-conformance.md. The report shows the
+# cause beside each failure; a cause is a finding about BioWare's sources,
+# not about any compiler.
+
+[cause.not-a-script]
+summary = "an include file with no entry point; there is nothing to compile"
+scripts = ["k_inc_generic", "k_inc_gensupport", "k_inc_switch", "k_inc_unk", "k_inc_walkways"]
+
+[cause.stale-prototype]
+summary = "BioWare compiled this against declarations that were not shipped: the shipped nwscript.nss prototype of AddPartyMember/RemovePartyMember, or k_inc_ebonhawk's forward declaration of EBO_PlayTakeOff, disagrees with the call or definition"
+scripts = [
+  "k_act_bastadd", "k_act_bastrmv", "k_act_canderrmv", "k_act_carthrmv", "k_act_hki47rmv",
+  "k_act_joleermv", "k_act_juhanirmv", "k_act_missionrmv", "k_act_t3m3rmv", "k_act_zaalrmv",
+  "k_act_makeitem", "k_con_makeitem", "k_pebn_galaxy", "k_sup_galaxmap", "k_sup_galaxymap",
+]
+
+[cause.undeclared]
+summary = "uses a name the shipped sources do not declare: a constant BioWare's own build had (TRASK_DOOR_JAMMED), or a Neverwinter Nights function KotOR's table lacks (StartConversation, ResistSpell)"
+scripts = ["k_pend_door04", "nw_g0_conversat", "nw_s0_lghtnbolt"]

@@ -1,0 +1,25 @@
+# Compilers the conformance suite can run, as argv templates.
+#
+# Placeholders: {in} the source file name in the work directory (the
+# command runs there), {out} the output file name the suite expects there,
+# {name} the script name, {include} the include directory (absolute, from
+# `include` below, relative to the corpus), {corpus} the corpus root,
+# {repo} this repository, {env:VAR} an environment variable (an error when
+# unset). `identity` lists files whose hashes identify the compiler in the
+# report, beside its first argv element.
+
+[compiler.nwnnsscomp-v100]
+description = "Edward T. Smith's nwnnsscomp, native build (modshop's mise run nwnnsscomp:build), -v1.00"
+command = ["{env:NWNNSSCOMP}", "-c", "-g", "-q", "-v1.00", "-i", "{include}", "{in}"]
+include = "oracle"
+
+[compiler.nwnnsscomp]
+description = "Edward T. Smith's nwnnsscomp, native build, default version"
+command = ["{env:NWNNSSCOMP}", "-c", "-g", "-q", "-i", "{include}", "{in}"]
+include = "oracle"
+
+[compiler.pykotor]
+description = "pykotor's built-in compiler, compile_nss(source, Game.K1), from modshop's environment (uv sync there first)"
+command = ["{env:MODSHOP}/.venv/bin/python", "-I", "{repo}/conformance/drivers/pykotor_compile.py", "{in}", "{out}"]
+include = "nss"
+identity = ["{env:MODSHOP}/uv.lock"]
