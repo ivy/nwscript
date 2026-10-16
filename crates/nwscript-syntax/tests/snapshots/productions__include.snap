@@ -1,0 +1,30 @@
+---
+source: crates/nwscript-syntax/tests/productions.rs
+expression: dump(src)
+---
+SOURCE_FILE@0..66
+  INCLUDE@0..22
+    HASH@0..1 "#"
+    INCLUDE_KW@1..8 "include"
+    WHITESPACE@8..9 " "
+    STRING@9..22 "\"k_inc_debug\""
+  NEWLINE@22..24 "\r\n"
+  INCLUDE@24..48
+    HASH@24..25 "#"
+    INCLUDE_KW@25..32 "include"
+    WHITESPACE@32..33 " "
+    STRING@33..48 "\"K_inc_utility\""
+  NEWLINE@48..50 "\r\n"
+  FUNCTION_DECL@50..64
+    TYPE@50..54
+      VOID_KW@50..54 "void"
+    WHITESPACE@54..55 " "
+    IDENT@55..59 "main"
+    PARAM_LIST@59..61
+      L_PAREN@59..60 "("
+      R_PAREN@60..61 ")"
+    WHITESPACE@61..62 " "
+    BLOCK@62..64
+      L_CURLY@62..63 "{"
+      R_CURLY@63..64 "}"
+  NEWLINE@64..66 "\r\n"

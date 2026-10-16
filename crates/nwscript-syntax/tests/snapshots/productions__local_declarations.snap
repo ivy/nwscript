@@ -1,0 +1,118 @@
+---
+source: crates/nwscript-syntax/tests/productions.rs
+expression: dump(src)
+---
+SOURCE_FILE@0..119
+  FUNCTION_DECL@0..119
+    TYPE@0..4
+      VOID_KW@0..4 "void"
+    WHITESPACE@4..5 " "
+    IDENT@5..9 "main"
+    PARAM_LIST@9..11
+      L_PAREN@9..10 "("
+      R_PAREN@10..11 ")"
+    WHITESPACE@11..12 " "
+    BLOCK@12..119
+      L_CURLY@12..13 "{"
+      WHITESPACE@13..14 " "
+      LOCAL_DECL@14..20
+        TYPE@14..17
+          INT_KW@14..17 "int"
+        WHITESPACE@17..18 " "
+        DECLARATOR@18..19
+          IDENT@18..19 "a"
+        SEMICOLON@19..20 ";"
+      WHITESPACE@20..21 " "
+      LOCAL_DECL@21..41
+        TYPE@21..24
+          INT_KW@21..24 "int"
+        WHITESPACE@24..25 " "
+        DECLARATOR@25..30
+          IDENT@25..26 "b"
+          WHITESPACE@26..27 " "
+          EQ@27..28 "="
+          WHITESPACE@28..29 " "
+          LITERAL@29..30
+            INT_NUMBER@29..30 "1"
+        COMMA@30..31 ","
+        WHITESPACE@31..32 " "
+        DECLARATOR@32..33
+          IDENT@32..33 "c"
+        COMMA@33..34 ","
+        WHITESPACE@34..35 " "
+        DECLARATOR@35..40
+          IDENT@35..36 "d"
+          WHITESPACE@36..37 " "
+          EQ@37..38 "="
+          WHITESPACE@38..39 " "
+          NAME_REF@39..40
+            IDENT@39..40 "b"
+        SEMICOLON@40..41 ";"
+      WHITESPACE@41..42 " "
+      EXPR_STMT@42..46
+        CALL_EXPR@42..45
+          NAME_REF@42..43
+            IDENT@42..43 "f"
+          ARG_LIST@43..45
+            L_PAREN@43..44 "("
+            R_PAREN@44..45 ")"
+        SEMICOLON@45..46 ";"
+      WHITESPACE@46..47 " "
+      LOCAL_DECL@47..62
+        TYPE@47..53
+          STRING_KW@47..53 "string"
+        WHITESPACE@53..54 " "
+        DECLARATOR@54..61
+          IDENT@54..55 "s"
+          WHITESPACE@55..56 " "
+          EQ@56..57 "="
+          WHITESPACE@57..58 " "
+          LITERAL@58..61
+            STRING@58..61 "\"x\""
+        SEMICOLON@61..62 ";"
+      WHITESPACE@62..63 " "
+      LOCAL_DECL@63..88
+        TYPE@63..69
+          IDENT@63..69 "effect"
+        WHITESPACE@69..70 " "
+        DECLARATOR@70..87
+          IDENT@70..71 "e"
+          WHITESPACE@71..72 " "
+          EQ@72..73 "="
+          WHITESPACE@73..74 " "
+          CALL_EXPR@74..87
+            NAME_REF@74..84
+              IDENT@74..84 "EffectHeal"
+            ARG_LIST@84..87
+              L_PAREN@84..85 "("
+              LITERAL@85..86
+                INT_NUMBER@85..86 "1"
+              R_PAREN@86..87 ")"
+        SEMICOLON@87..88 ";"
+      WHITESPACE@88..89 " "
+      LOCAL_DECL@89..100
+        TYPE@89..97
+          STRUCT_KW@89..95 "struct"
+          WHITESPACE@95..96 " "
+          IDENT@96..97 "S"
+        WHITESPACE@97..98 " "
+        DECLARATOR@98..99
+          IDENT@98..99 "t"
+        SEMICOLON@99..100 ";"
+      WHITESPACE@100..101 " "
+      LOCAL_DECL@101..117
+        CONST_KW@101..106 "const"
+        WHITESPACE@106..107 " "
+        TYPE@107..110
+          INT_KW@107..110 "int"
+        WHITESPACE@110..111 " "
+        DECLARATOR@111..116
+          IDENT@111..112 "k"
+          WHITESPACE@112..113 " "
+          EQ@113..114 "="
+          WHITESPACE@114..115 " "
+          LITERAL@115..116
+            INT_NUMBER@115..116 "3"
+        SEMICOLON@116..117 ";"
+      WHITESPACE@117..118 " "
+      R_CURLY@118..119 "}"

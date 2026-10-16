@@ -1,0 +1,122 @@
+---
+source: crates/nwscript-syntax/tests/productions.rs
+expression: dump(src)
+---
+SOURCE_FILE@0..99
+  FUNCTION_DECL@0..99
+    TYPE@0..4
+      VOID_KW@0..4 "void"
+    WHITESPACE@4..5 " "
+    IDENT@5..9 "main"
+    PARAM_LIST@9..11
+      L_PAREN@9..10 "("
+      R_PAREN@10..11 ")"
+    WHITESPACE@11..12 " "
+    BLOCK@12..99
+      L_CURLY@12..13 "{"
+      WHITESPACE@13..14 " "
+      WHILE_STMT@14..36
+        WHILE_KW@14..19 "while"
+        WHITESPACE@19..20 " "
+        L_PAREN@20..21 "("
+        BIN_EXPR@21..26
+          NAME_REF@21..22
+            IDENT@21..22 "i"
+          WHITESPACE@22..23 " "
+          LT@23..24 "<"
+          WHITESPACE@24..25 " "
+          LITERAL@25..26
+            INT_NUMBER@25..26 "3"
+        R_PAREN@26..27 ")"
+        WHITESPACE@27..28 " "
+        BLOCK@28..36
+          L_CURLY@28..29 "{"
+          WHITESPACE@29..30 " "
+          EXPR_STMT@30..34
+            POSTFIX_EXPR@30..33
+              NAME_REF@30..31
+                IDENT@30..31 "i"
+              PLUS2@31..33 "++"
+            SEMICOLON@33..34 ";"
+          WHITESPACE@34..35 " "
+          R_CURLY@35..36 "}"
+      WHITESPACE@36..37 " "
+      DO_STMT@37..63
+        DO_KW@37..39 "do"
+        WHITESPACE@39..40 " "
+        BLOCK@40..48
+          L_CURLY@40..41 "{"
+          WHITESPACE@41..42 " "
+          EXPR_STMT@42..46
+            POSTFIX_EXPR@42..45
+              NAME_REF@42..43
+                IDENT@42..43 "i"
+              MINUS2@43..45 "--"
+            SEMICOLON@45..46 ";"
+          WHITESPACE@46..47 " "
+          R_CURLY@47..48 "}"
+        WHITESPACE@48..49 " "
+        WHILE_KW@49..54 "while"
+        WHITESPACE@54..55 " "
+        L_PAREN@55..56 "("
+        BIN_EXPR@56..61
+          NAME_REF@56..57
+            IDENT@56..57 "i"
+          WHITESPACE@57..58 " "
+          GT@58..59 ">"
+          WHITESPACE@59..60 " "
+          LITERAL@60..61
+            INT_NUMBER@60..61 "0"
+        R_PAREN@61..62 ")"
+        SEMICOLON@62..63 ";"
+      WHITESPACE@63..64 " "
+      FOR_STMT@64..97
+        FOR_KW@64..67 "for"
+        WHITESPACE@67..68 " "
+        L_PAREN@68..69 "("
+        FOR_INIT@69..74
+          ASSIGN_EXPR@69..74
+            NAME_REF@69..70
+              IDENT@69..70 "i"
+            WHITESPACE@70..71 " "
+            EQ@71..72 "="
+            WHITESPACE@72..73 " "
+            LITERAL@73..74
+              INT_NUMBER@73..74 "0"
+        SEMICOLON@74..75 ";"
+        WHITESPACE@75..76 " "
+        FOR_COND@76..81
+          BIN_EXPR@76..81
+            NAME_REF@76..77
+              IDENT@76..77 "i"
+            WHITESPACE@77..78 " "
+            LT@78..79 "<"
+            WHITESPACE@79..80 " "
+            LITERAL@80..81
+              INT_NUMBER@80..81 "3"
+        SEMICOLON@81..82 ";"
+        WHITESPACE@82..83 " "
+        FOR_STEP@83..86
+          POSTFIX_EXPR@83..86
+            NAME_REF@83..84
+              IDENT@83..84 "i"
+            PLUS2@84..86 "++"
+        R_PAREN@86..87 ")"
+        WHITESPACE@87..88 " "
+        BLOCK@88..97
+          L_CURLY@88..89 "{"
+          WHITESPACE@89..90 " "
+          EXPR_STMT@90..95
+            CALL_EXPR@90..94
+              NAME_REF@90..91
+                IDENT@90..91 "f"
+              ARG_LIST@91..94
+                L_PAREN@91..92 "("
+                NAME_REF@92..93
+                  IDENT@92..93 "i"
+                R_PAREN@93..94 ")"
+            SEMICOLON@94..95 ";"
+          WHITESPACE@95..96 " "
+          R_CURLY@96..97 "}"
+      WHITESPACE@97..98 " "
+      R_CURLY@98..99 "}"

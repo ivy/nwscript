@@ -1,0 +1,44 @@
+---
+source: crates/nwscript-syntax/tests/productions.rs
+expression: dump(src)
+---
+SOURCE_FILE@0..114
+  DEFINE@0..31
+    HASH@0..1 "#"
+    DEFINE_KW@1..7 "define"
+    WHITESPACE@7..8 " "
+    IDENT@8..29 "ENGINE_NUM_STRUCTURES"
+    WHITESPACE@29..30 " "
+    DEFINE_BODY@30..31
+      INT_NUMBER@30..31 "2"
+  NEWLINE@31..33 "\r\n"
+  DEFINE@33..66
+    HASH@33..34 "#"
+    DEFINE_KW@34..40 "define"
+    WHITESPACE@40..41 " "
+    IDENT@41..59 "ENGINE_STRUCTURE_0"
+    WHITESPACE@59..60 " "
+    DEFINE_BODY@60..66
+      IDENT@60..66 "effect"
+  NEWLINE@66..68 "\r\n"
+  DEFINE@68..102
+    HASH@68..69 "#"
+    DEFINE_KW@69..75 "define"
+    WHITESPACE@75..76 " "
+    IDENT@76..94 "ENGINE_STRUCTURE_1"
+    WHITESPACE@94..97 "   "
+    DEFINE_BODY@97..102
+      IDENT@97..102 "event"
+  NEWLINE@102..104 "\r\n"
+  GLOBAL_DECL@104..114
+    TYPE@104..107
+      INT_KW@104..107 "int"
+    WHITESPACE@107..108 " "
+    DECLARATOR@108..113
+      IDENT@108..109 "X"
+      WHITESPACE@109..110 " "
+      EQ@110..111 "="
+      WHITESPACE@111..112 " "
+      LITERAL@112..113
+        INT_NUMBER@112..113 "1"
+    SEMICOLON@113..114 ";"
