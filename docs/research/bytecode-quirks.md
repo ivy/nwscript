@@ -51,6 +51,25 @@ For every other instruction the second byte is a type. For `STORE_STATE` it is t
 
 `OBJECT_SELF` compiles to `CONSTO 0` and `OBJECT_INVALID` to `CONSTO 1`; no other `CONSTO` operand appears in the corpus. `k_sup_gohawk` and `k_sup_guiopen`, which use `OBJECT_INVALID` and not `OBJECT_SELF`, hold only `CONSTO 1`.
 
+## Running the bytecode
+
+### BP points at the saved BP
+
+`SAVEBP` sets BP to the stack slot it saves the old BP into, so the last global variable is at `BP-4` and the first at `BP-4×n`. Treating BP as the slot above the saved one is off by one element, and it shows: in `modules/danm13_s/k_pdan_elise10.ncs`, `CPTOPBP -32, 4` must read the integer global just below the string `"bastila"`, which `SetGlobalNumber` then receives. With BP one slot higher the call gets the string. A deferred action's saved globals are the elements below BP, without the saved BP.
+
+### Module bytecode compiled against other declarations
+
+Fourteen module scripts call engine routines with arguments the shipped `nwscript.nss` does not declare for them, so their bytecode was compiled against an earlier table:
+
+- `k_act_carthjoin`, in twelve Taris module capsules, calls routine 574 with an object alone. The shipped declaration is `int AddPartyMember(int nNPC, object oCreature)`; the source-level failures of `k_act_*rmv` and `k_act_bastadd` in the conformance report are the same change seen from the other side.
+- `k_plev_corpse1`, in two Leviathan capsules, calls routine 700 with an object and an int. The shipped routine 700 is `void ActionBarkString(int strRef)`, one argument.
+
+The interpreter reports these as argument mismatches rather than machine faults (`FaultKind::ArgumentMismatch`).
+
+### Division by a defaulted zero
+
+Under an engine that answers every routine with its type's default, 158 module scripts divide by zero: `k_pdan_attack` divides `IntToFloat(GetCurrentHitPoints())` by `IntToFloat(GetMaxHitPoints())`, and the default maximum is 0. What the game's machine does on a float division by zero is not known; the interpreter stops with a fault marked as depending on the engine's answers.
+
 ## The shipped sources
 
 ### `nwscript.nss` line 5145
