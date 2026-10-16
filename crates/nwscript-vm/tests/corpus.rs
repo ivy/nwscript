@@ -125,7 +125,11 @@ fn corpus_runs() {
     let mut machine = Vec::new();
     for (k, v) in &faults {
         println!("  {k}: {}", v.len());
-        for x in v.iter().take(4) {
+        for x in v.iter().take(if k.starts_with("ArgumentMismatch") {
+            20
+        } else {
+            4
+        }) {
             println!("    {x}");
         }
         if !(k.starts_with("DivisionByZero")

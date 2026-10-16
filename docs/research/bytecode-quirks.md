@@ -61,7 +61,7 @@ For every other instruction the second byte is a type. For `STORE_STATE` it is t
 
 Fourteen module scripts call engine routines with arguments the shipped `nwscript.nss` does not declare for them, so their bytecode was compiled against an earlier table:
 
-- `k_act_carthjoin`, in twelve Taris module capsules, calls routine 574 with an object alone. The shipped declaration is `int AddPartyMember(int nNPC, object oCreature)`; the source-level failures of `k_act_*rmv` and `k_act_bastadd` in the conformance report are the same change seen from the other side.
+- `k_act_carthjoin`, in eleven Taris module capsules, and `k_ptar_missjoin` (`tar_m04aa_s`) call routine 574 with an object alone. The shipped declaration is `int AddPartyMember(int nNPC, object oCreature)`; the source-level failures of `k_act_*rmv` and `k_act_bastadd` in the conformance report are the same change seen from the other side.
 - `k_plev_corpse1`, in two Leviathan capsules, calls routine 700 with an object and an int. The shipped routine 700 is `void ActionBarkString(int strRef)`, one argument.
 
 The interpreter reports these as argument mismatches rather than machine faults (`FaultKind::ArgumentMismatch`).
