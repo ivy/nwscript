@@ -1,0 +1,17 @@
+---
+source: crates/nwscript-diag/tests/diag.rs
+expression: "render::render(&d, &map, render::Color::Never)"
+---
+E0001
+
+  × no function named `GetFirstPCx`
+   ╭─[k_act_com1.nss:3:16]
+ 2 │ {
+ 3 │     object o = GetFirstPCx();
+   ·     ────┬───   ─────┬─────
+   ·         │           ╰── not declared in nwscript.nss or any include
+   ·         ╰── the value is assigned here
+ 4 │     int n = 1;
+   ╰────
+  help: did you mean `GetFirstPC`?
+        note: run `nws explain E0001` for the full explanation

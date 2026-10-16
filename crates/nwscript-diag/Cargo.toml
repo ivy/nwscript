@@ -7,7 +7,17 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+lsp = ["dep:lsp-types"]
+
 [dependencies]
+miette = { version = "7.6", features = ["fancy-no-backtrace"] }
+serde = { version = "1", features = ["derive"] }
+lsp-types = { version = "0.97", optional = true }
+
+[dev-dependencies]
+insta = "1.49"
+serde_json = "1"
 
 [lints]
 workspace = true

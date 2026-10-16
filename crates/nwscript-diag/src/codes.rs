@@ -1,0 +1,43 @@
+//! The registry of diagnostic codes. Each code is declared once here, with
+//! its default severity, a one-line summary, and a long explanation kept in
+//! `explain/CODE.md` beside this crate, which `nws explain CODE` prints.
+//!
+//! Ranges: `E00xx` inputs and invocation, `E01xx` bytecode, `E02xx` syntax,
+//! `E03xx` semantic analysis, `E04xx` code generation, `E05xx` the
+//! interpreter, `E06xx` decompilation, `W0xxx` lints.
+
+use crate::Severity;
+
+/// A registered diagnostic code.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Code {
+    pub id: &'static str,
+    pub severity: Severity,
+    pub summary: &'static str,
+    pub explanation: &'static str,
+}
+
+macro_rules! codes {
+    ($( $id:ident $sev:ident $summary:literal; )*) => {
+        $(
+            #[doc = $summary]
+            pub static $id: Code = Code {
+                id: stringify!($id),
+                severity: Severity::$sev,
+                summary: $summary,
+                explanation: include_str!(concat!("../explain/", stringify!($id), ".md")),
+            };
+        )*
+        /// Every registered code, in declaration order.
+        pub static ALL: &[&Code] = &[$(&$id),*];
+    };
+}
+
+codes! {
+    E0001 Error "an input file could not be read";
+}
+
+/// The code with this id, if registered.
+pub fn lookup(id: &str) -> Option<&'static Code> {
+    ALL.iter().copied().find(|c| c.id.eq_ignore_ascii_case(id))
+}
