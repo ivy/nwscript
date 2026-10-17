@@ -13,5 +13,8 @@ nwscript-sema = { workspace = true }
 nwscript-codegen = { workspace = true }
 nwscript-diag = { workspace = true }
 
+[dev-dependencies]
+nwscript-syntax = { workspace = true }
+
 [lints]
 workspace = true

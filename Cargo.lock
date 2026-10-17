@@ -744,6 +744,7 @@ dependencies = [
  "nwscript-diag",
  "nwscript-ncs",
  "nwscript-sema",
+ "nwscript-syntax",
 ]
 
 [[package]]
