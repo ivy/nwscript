@@ -69,3 +69,27 @@ scripts = [
   "k_ptat_exitkrayt", "k_qa", "k_sup_droid", "k_sup_gohawk", "k_sup_grenade",
   "k_trg_senni", "k_trg_transfail1", "k_trp_generic",
 ]
+
+# Declarations inferred from BioWare's bytecode, each in a file of
+# conformance/overlays/ that says what it rests on. Compiled with
+# `--declarations bioware --compat bioware --overlay FILE`, the scripts
+# listed are byte-identical to BioWare's (crates/nwscript/tests/overlays_corpus.rs).
+# Of the 18 scripts of stale-prototype and undeclared, the other seven need no
+# overlay or have none: k_act_makeitem, k_con_makeitem, k_pebn_galaxy and
+# k_sup_galaxymap are identical under --compat bioware alone, which accepts
+# k_inc_ebonhawk's uncalled forward declarations as BioWare's compiler did;
+# k_sup_galaxmap and k_pend_door04 were compiled against older includes
+# (k_inc_ebonhawk and k_inc_stunt; a k_inc_end without a block of negative
+# globals and with TRASK_DOOR_JAMMED = 16), which declarations cannot supply;
+# nw_s0_lghtnbolt is Neverwinter Nights code compiled against NWN's table and
+# constants, most of them in functions it never calls, so its bytecode holds
+# no trace of their values.
+
+[overlay."overlays/k1-party-object.nss"]
+scripts = [
+  "k_act_bastadd", "k_act_bastrmv", "k_act_canderrmv", "k_act_carthrmv", "k_act_hki47rmv",
+  "k_act_joleermv", "k_act_juhanirmv", "k_act_missionrmv", "k_act_t3m3rmv", "k_act_zaalrmv",
+]
+
+[overlay."overlays/k1-nwn-conversation.nss"]
+scripts = ["nw_g0_conversat"]

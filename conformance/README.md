@@ -6,7 +6,8 @@ How closely each compiler reproduces BioWare's bytecode for the vanilla KotOR sc
 | --- | --- |
 | `k1.toml`, `k1-modules.toml` | the corpus manifests: script names and sha256 hashes, no game bytes |
 | `compilers.toml` | the compilers the suite can run, as argv templates |
-| `known.toml` | the established causes of failures no compiler can avoid |
+| `known.toml` | the established causes of failures no compiler can avoid, and which inferred overlay reproduces which scripts |
+| `overlays/` | declarations inferred from BioWare's bytecode, for `nws --overlay FILE`; each says what it rests on |
 | `drivers/` | small wrappers that give a library compiler a command line |
 | `report.json`, `report.md` | the last full measurement |
 
