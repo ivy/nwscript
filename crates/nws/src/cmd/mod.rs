@@ -24,6 +24,8 @@ pub struct Ctx {
     pub levels: Levels,
     pub out: Output,
     pub global: crate::cli::Global,
+    /// The `--overlay` files, read: each one's path and bytes.
+    pub overlays: Vec<(String, std::sync::Arc<[u8]>)>,
 }
 
 impl Ctx {
@@ -64,9 +66,13 @@ impl Ctx {
         }
     }
 
-    /// A checker taking the declarations `--declarations` names.
+    /// A checker taking the declarations `--declarations` names, then the
+    /// `--overlay` files.
     pub fn checker(&self, game: Game) -> nwscript::Checker {
-        nwscript::Checker::with_declarations(self.declarations(), game)
+        self.overlays.iter().fold(
+            nwscript::Checker::with_declarations(self.declarations(), game),
+            |c, (name, bytes)| c.with_overlay(name.clone(), bytes.clone()),
+        )
     }
 
     /// A resolver over the `-I` directories (after `first`, the input's own
@@ -129,6 +135,16 @@ pub fn run(cli: Cli) -> Exit {
         Ok(l) => l,
         Err(e) => return e,
     };
+    let mut overlays = Vec::new();
+    for p in &cli.global.overlay {
+        match std::fs::read(p) {
+            Ok(b) => overlays.push((p.display().to_string(), b.into())),
+            Err(e) => {
+                eprintln!("error: cannot read the overlay {}: {e}", p.display());
+                return Exit::Usage;
+            }
+        }
+    }
     let ctx = Ctx {
         game: cli.global.game.map(|g| match g {
             GameArg::K1 => Game::K1,
@@ -137,6 +153,7 @@ pub fn run(cli: Cli) -> Exit {
         levels,
         out: Output::new(cli.global.format, cli.global.color, cli.global.quiet),
         global: cli.global,
+        overlays,
     };
     match cli.command {
         Command::Explain { code } => explain::run(&ctx, &code),

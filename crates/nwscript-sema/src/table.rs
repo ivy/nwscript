@@ -213,6 +213,12 @@ impl EngineTable {
     /// than the shipped ones, such as the older `ActionStartConversation`
     /// BioWare's own scripts were compiled against. A prototype naming no
     /// routine in the table is reported and ignored.
+    ///
+    /// A prototype under a `// nwscript: routine N` comment is routine `N`
+    /// instead, whatever its name: the table's earlier eras, where a routine
+    /// had another number or a number had another routine. The name then
+    /// calls routine `N`, and the routine `N` replaces is no longer callable
+    /// by its own name.
     pub fn overlay(&mut self, file: FileId, bytes: &[u8]) -> Vec<Diagnostic> {
         let p = parse(file, bytes);
         let mut diags: Vec<Diagnostic> = p.diagnostics().to_vec();
@@ -220,17 +226,53 @@ impl EngineTable {
             let Some(func) = self.function_decl(&p, &f, &mut diags) else {
                 continue;
             };
-            match self.by_name.get(&func.name) {
-                Some(&i) => self.functions[i] = func,
-                None => diags.push(
+            let slot = match routine_directive(&func.doc) {
+                None => self.by_name.get(&func.name).copied(),
+                Some(Ok(n)) if n < self.functions.len() => Some(n),
+                Some(Ok(n)) => {
+                    diags.push(
+                        Diagnostic::new(
+                            &codes::E0304,
+                            format!(
+                                "the overlay places `{}` at routine {n}, past the table's last",
+                                func.name
+                            ),
+                        )
+                        .primary(func.span, "declared here")
+                        .help(format!(
+                            "nwscript.nss declares routines 0 to {}",
+                            self.functions.len().saturating_sub(1)
+                        )),
+                    );
+                    continue;
+                }
+                Some(Err(text)) => {
+                    diags.push(
+                        Diagnostic::new(&codes::E0304, format!("`{text}` is no routine number"))
+                            .primary(func.span, "the prototype it applies to")
+                            .help("write `// nwscript: routine N` with N a routine number, on the line above the prototype"),
+                    );
+                    continue;
+                }
+            };
+            let Some(i) = slot else {
+                diags.push(
                     Diagnostic::new(
                         &codes::E0304,
                         format!("the overlay declares `{}`, which is no engine routine", func.name),
                     )
                     .primary(func.span, "not in nwscript.nss")
-                    .help("an overlay changes the declarations of routines nwscript.nss has; it adds none"),
-                ),
+                    .help("an overlay changes the declarations of routines nwscript.nss has; `// nwscript: routine N` above a prototype places it at routine N"),
+                );
+                continue;
+            };
+            let displaced = std::mem::replace(&mut self.functions[i], func);
+            if displaced.name != self.functions[i].name
+                && self.by_name.get(&displaced.name) == Some(&i)
+            {
+                self.by_name.remove(&displaced.name);
             }
+            self.by_name.insert(self.functions[i].name.clone(), i);
         }
         diags
     }
@@ -347,6 +389,16 @@ fn guess_type(name: &str) -> Type {
 }
 
 /// The comment lines directly above a prototype.
+/// The routine number a `nwscript: routine N` line of a prototype's comment
+/// gives: `None` without one, the text after `routine` when it is no number.
+fn routine_directive(doc: &str) -> Option<Result<usize, String>> {
+    doc.lines().find_map(|l| {
+        let rest = l.trim().strip_prefix("nwscript:")?.trim_start();
+        let n = rest.strip_prefix("routine")?.trim();
+        Some(n.parse().map_err(|_| n.to_string()))
+    })
+}
+
 fn doc_comment(f: &ast::FunctionDecl) -> String {
     use nwscript_syntax::SyntaxKind;
     let mut lines = Vec::new();

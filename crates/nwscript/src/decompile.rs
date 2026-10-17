@@ -68,8 +68,18 @@ pub struct ProjectCompiler<R: crate::Resolver> {
 
 impl<R: crate::Resolver> ProjectCompiler<R> {
     pub fn new(resolver: R, game: crate::Game, declarations: crate::Declarations) -> Self {
+        Self::with_checker(
+            resolver,
+            game,
+            crate::Checker::with_declarations(declarations, game),
+        )
+    }
+
+    /// Verify with this checker, which carries the declarations and
+    /// overlays the bytecode is read with.
+    pub fn with_checker(resolver: R, game: crate::Game, checker: crate::Checker) -> Self {
         ProjectCompiler {
-            checker: crate::Checker::with_declarations(declarations, game),
+            checker,
             resolver,
             game,
             levels: Mode::Bioware.levels(),

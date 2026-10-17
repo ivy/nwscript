@@ -372,3 +372,11 @@ code      = letter digit digit digit digit ;   (* a lint code such as W0001; cas
 ```
 
 A directive at the end of a line of code applies to that line; a directive alone on its line applies to the next line. It allows the lints it names on that line, and nothing else: an error cannot be allowed. No vanilla script contains one.
+
+An overlay, a file of prototypes that `--overlay` applies after `nwscript.nss`, takes one more directive, on the comment above a prototype:
+
+```ebnf
+routine_directive = "//" { " " } "nwscript:" { " " } "routine" " " digit { digit } ;
+```
+
+The prototype is then routine N, whatever its name: calls to the name compile to `ACTION N`, and the routine N displaced is no longer callable by its own name. This is how an overlay states an earlier era of the engine table, where a routine sat at another number or a number held another routine (`conformance/overlays/`). Without it, an overlay's prototype replaces the declaration of the routine of the same name and keeps its number.

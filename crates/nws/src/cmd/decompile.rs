@@ -177,6 +177,16 @@ fn engine_table(ctx: &Ctx, resolver: &mut nwscript::FsResolver) -> Result<Engine
         let file = table_map.add(name, text.as_bytes().to_vec());
         let _ = table.overlay(file, text.as_bytes());
     }
+    let mut diags = Vec::new();
+    for (name, bytes) in &ctx.overlays {
+        let file = table_map.add(name.clone(), bytes.to_vec());
+        diags.extend(table.overlay(file, bytes));
+    }
+    if nwscript::diag::has_errors(&diags) {
+        ctx.out
+            .emit(Envelope::new("decompile", ctx.game), "", &diags, &table_map);
+        return Err(Exit::Errors);
+    }
     Ok(table)
 }
 
@@ -199,11 +209,13 @@ fn verifier(
             );
             return Err(Exit::Usage);
         };
-        return Ok(Some(Box::new(nwscript::decompile::ProjectCompiler::new(
-            ctx.resolver(dir),
-            game,
-            ctx.declarations(),
-        ))));
+        return Ok(Some(Box::new(
+            nwscript::decompile::ProjectCompiler::with_checker(
+                ctx.resolver(dir),
+                game,
+                ctx.checker(game),
+            ),
+        )));
     };
     let include = nwscript_path
         .and_then(Path::parent)

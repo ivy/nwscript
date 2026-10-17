@@ -522,3 +522,36 @@ fn an_overlay_changes_a_routines_declaration_and_keeps_its_number() {
     assert_eq!(c.callee, Callee::Engine(n));
     assert_eq!(c.args.len(), 1);
 }
+
+#[test]
+fn a_routine_directive_places_a_prototype_at_another_number() {
+    let mut t = table();
+    let (shipped, _) = t.function("AddPartyMember").unwrap();
+    let (random, _) = t.function("Random").unwrap();
+    let (print, _) = t.function("PrintString").unwrap();
+    let (a, b) = (usize::from(random), usize::from(print));
+    let overlay = format!(
+        "// nwscript: routine {a}\r\nint AddPartyMember(object oCreature);\r\n// nwscript: routine {b}\r\nint StartConversation();\r\n// nwscript: routine 99999\r\nvoid Far();\r\n// nwscript: routine x\r\nvoid Bad();\r\n"
+    );
+    let diags = t.overlay(FileId(2000), overlay.as_bytes());
+    assert_eq!(
+        diags.iter().map(|d| d.code.id).collect::<Vec<_>>(),
+        ["E0304", "E0304"]
+    );
+    assert_eq!(t.function("AddPartyMember").unwrap().0, random);
+    assert_eq!(t.function("StartConversation").unwrap().0, print);
+    assert!(t.function("Random").is_none());
+    // The slot the name had keeps its routine, for reading bytecode.
+    assert_eq!(t.functions[usize::from(shipped)].name, "AddPartyMember");
+    let src = "void main() { AddPartyMember(GetObjectByTag(\"bastila\")); StartConversation(); }";
+    let a = analyze(
+        "t.nss",
+        parse(FileId(0), src.as_bytes()),
+        &t,
+        &mut ParsedIncludes::new(),
+    );
+    assert!(a.diagnostics.is_empty(), "{}", show(&a.diagnostics));
+    let calls = body(&a.program, "main");
+    assert_eq!(call_of(expr_of(&calls[0])).callee, Callee::Engine(random));
+    assert_eq!(call_of(expr_of(&calls[1])).callee, Callee::Engine(print));
+}

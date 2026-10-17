@@ -15,7 +15,8 @@ use std::sync::Arc;
 pub struct Checker {
     tables: HashMap<String, (Arc<[u8]>, Arc<EngineTable>)>,
     parses: HashMap<String, (Arc<[u8]>, Parse)>,
-    overlay: Option<(&'static str, &'static str)>,
+    /// Overlays applied to every engine table in order, by name.
+    overlays: Vec<(String, Arc<[u8]>)>,
 }
 
 /// Which declarations of the engine's routines a script is compiled
@@ -63,9 +64,23 @@ impl Checker {
     /// A checker whose engine tables take these declarations.
     pub fn with_declarations(declarations: Declarations, game: crate::Game) -> Self {
         Checker {
-            overlay: declarations.overlay(game),
+            overlays: declarations
+                .overlay(game)
+                .map(|(n, t)| (n.to_string(), Arc::from(t.as_bytes())))
+                .into_iter()
+                .collect(),
             ..Self::default()
         }
+    }
+
+    /// Apply the overlay `bytes`, named `name` in diagnostics, after the
+    /// declarations' own: prototypes that replace the shipped ones, and
+    /// `// nwscript: routine N` to place one at another number
+    /// ([`EngineTable::overlay`]). What it reports is reported with the
+    /// first script checked.
+    pub fn with_overlay(mut self, name: impl Into<String>, bytes: impl Into<Arc<[u8]>>) -> Self {
+        self.overlays.push((name.into(), bytes.into()));
+        self
     }
 
     /// Check the script `name` with contents `bytes`, finding its includes
@@ -83,16 +98,16 @@ impl Checker {
     ) -> Checked {
         let file = map.add(name.to_string(), bytes.to_vec());
         let main = parse(file, bytes);
+        let mut overlay_diags = Vec::new();
         let table = match resolver.nwscript() {
             Ok(Some(r)) => match self.tables.get(&r.path) {
                 Some((b, t)) if *b == r.bytes => t.clone(),
                 _ => {
                     let f = map.add(r.path.clone(), r.bytes.clone());
                     let mut t = EngineTable::from_nwscript(f, &r.bytes).0;
-                    if let Some((name, text)) = self.overlay {
-                        let o = map.add(name, text.as_bytes().to_vec());
-                        // A prototype the file lacks is no routine to replace.
-                        let _ = t.overlay(o, text.as_bytes());
+                    for (name, text) in &self.overlays {
+                        let o = map.add(name.clone(), text.to_vec());
+                        overlay_diags.extend(t.overlay(o, text));
                     }
                     let t = Arc::new(t);
                     self.tables.insert(r.path, (r.bytes, t.clone()));
@@ -130,8 +145,9 @@ impl Checker {
             parses: &mut self.parses,
         };
         let analysis = analyze(name, main, &table, &mut includes);
+        overlay_diags.extend(analysis.diagnostics.iter().cloned());
         Checked {
-            diagnostics: analysis.diagnostics.clone(),
+            diagnostics: overlay_diags,
             analysis: Some(analysis),
             table: Some(table),
         }
