@@ -60,7 +60,9 @@ pub fn run(ctx: &Ctx, args: &CheckArgs) -> Exit {
         for i in resolver.inputs() {
             push_input(&mut env.inputs, i.clone());
         }
-        let errors = out.diagnostics.iter().filter(|d| d.is_error()).count();
+        // A file's status counts what remains after the lint levels.
+        let diagnostics = ctx.leveled(out.diagnostics);
+        let errors = diagnostics.iter().filter(|d| d.is_error()).count();
         if errors > 0 {
             failed += 1;
         }
@@ -74,9 +76,9 @@ pub fn run(ctx: &Ctx, args: &CheckArgs) -> Exit {
             "ok": errors == 0,
             "entry": entry,
             "errors": errors,
-            "warnings": out.diagnostics.len() - errors,
+            "warnings": diagnostics.len() - errors,
         }));
-        diags.extend(out.diagnostics);
+        diags.extend(diagnostics);
     }
     let text = if failed == 0 {
         format!("checked {}: no errors", plural(args.files.len()))

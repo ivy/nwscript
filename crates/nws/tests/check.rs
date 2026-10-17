@@ -138,6 +138,13 @@ fn compile_writes_bytecode_and_assembly_and_goes_on_past_errors() {
     assert_eq!(doc["result"]["files"][0]["ok"], false);
     assert_eq!(doc["result"]["files"][1]["ok"], true);
     assert_eq!(doc["outputs"].as_array().unwrap().len(), 2);
+    let roles: Vec<&str> = doc["inputs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["role"].as_str().unwrap())
+        .collect();
+    assert_eq!(roles, ["source", "nwscript", "source", "include"]);
     let ncs = std::fs::read(out.join("ok.ncs")).unwrap();
     assert!(ncs.starts_with(b"NCS V1.0"));
     let asm = std::fs::read_to_string(out.join("ok.asm")).unwrap();
