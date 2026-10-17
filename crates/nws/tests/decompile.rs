@@ -1,5 +1,5 @@
-//! `nws decompile` on hand-assembled bytecode, verified by stand-in
-//! compilers, and on the corpus with nwnnsscomp.
+//! `nws decompile` on hand-assembled bytecode, verified by the project's
+//! compiler and by stand-ins for nwnnsscomp, and on the corpus.
 
 use assert_cmd::Command;
 use predicates::prelude::*;
@@ -80,16 +80,29 @@ fn no_verify_prints_the_source() {
 }
 
 #[test]
-fn verification_needs_a_compiler() {
-    let d = dir("nocompiler");
+fn verification_needs_a_game() {
+    let d = dir("nogame");
     let ncs = setup(&d);
     nws()
         .arg("decompile")
         .arg(&ncs)
-        .env_remove("NWNNSSCOMP")
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("--no-verify"));
+        .stderr(predicate::str::contains("--game k1"));
+}
+
+#[test]
+fn the_projects_compiler_verifies_by_default() {
+    let d = dir("project");
+    let ncs = setup(&d);
+    nws()
+        .args(["--game", "k1", "decompile", "--strict"])
+        .arg(&ncs)
+        .assert()
+        .code(0)
+        .stdout(predicate::str::contains(
+            "// verified: recompiles to the original bytes\nvoid main()",
+        ));
 }
 
 #[test]
@@ -169,32 +182,29 @@ fn bytecode_without_an_entry_stub_is_e0601() {
         .stderr(predicate::str::contains("E0601"));
 }
 
-/// The corpus root and nwnnsscomp, when both are present.
-fn corpus_and_oracle() -> Option<(PathBuf, PathBuf)> {
-    let home = PathBuf::from(std::env::var_os("HOME")?);
+#[test]
+#[ignore = "needs the corpus (NWSCRIPT_CORPUS)"]
+fn a_vanilla_script_verifies_with_bioware_declarations() {
     let corpus = std::env::var_os("NWSCRIPT_CORPUS")
         .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".cache/nwscript/corpus/k1"));
-    let cc = std::env::var_os("NWNNSSCOMP").map(PathBuf::from)?;
-    (corpus.join("oracle/nwscript.nss").is_file() && cc.is_file()).then_some((corpus, cc))
-}
-
-#[test]
-#[ignore = "needs the corpus (NWSCRIPT_CORPUS) and nwnnsscomp (NWNNSSCOMP)"]
-fn a_vanilla_script_verifies_with_nwnnsscomp() {
-    let Some((corpus, cc)) = corpus_and_oracle() else {
-        eprintln!("skipping: set NWSCRIPT_CORPUS and NWNNSSCOMP");
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache/nwscript/corpus/k1"))
+        })
+        .unwrap();
+    if !corpus.join("nwscript.nss").is_file() {
+        eprintln!(
+            "skipping: no corpus at {} (set NWSCRIPT_CORPUS)",
+            corpus.display()
+        );
         return;
-    };
+    }
+    // Its ActionStartConversation call has the eleven arguments BioWare's declaration took.
     nws()
-        .arg("-I")
-        .arg(corpus.join("oracle"))
-        .args(["decompile", "--strict", "--compiler"])
-        .arg(&cc)
-        .arg(corpus.join("ncs/k_pdan_mand04.ncs"))
+        .args(["--game", "k1", "--declarations", "bioware", "--nwscript"])
+        .arg(corpus.join("nwscript.nss"))
+        .args(["decompile", "--strict"])
+        .arg(corpus.join("ncs/k_pend_door01.ncs"))
         .assert()
         .code(0)
-        .stdout(predicate::str::contains(
-            "return nLocal1 == 0 || nLocal1 == 1;",
-        ));
+        .stdout(predicate::str::contains("ActionStartConversation("));
 }

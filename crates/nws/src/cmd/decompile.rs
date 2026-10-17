@@ -1,10 +1,11 @@
 //! `nws decompile`: source from bytecode, each function verified by
 //! recompiling it.
 //!
-//! Until the project's own compiler lands, verification runs nwnnsscomp as a
-//! black box behind the library's `Compiler` interface: the recovered source
-//! is written to a scratch directory and compiled there with `-v1.00`
-//! against the directory that holds `nwscript.nss`.
+//! Verification compiles the recovered source with the project's compiler
+//! (`nwscript::decompile::ProjectCompiler`). `--compiler PATH` verifies with
+//! nwnnsscomp instead, run as a black box behind the same `Compiler`
+//! interface: the source is written to a scratch directory and compiled
+//! there with `-v1.00` against the directory that holds `nwscript.nss`.
 
 use super::Ctx;
 use crate::Exit;
@@ -20,20 +21,27 @@ use std::time::{Duration, Instant};
 #[derive(clap::Args, Debug)]
 #[command(after_help = "\
 Examples:
-  nws -I corpus/oracle decompile k_act_mispaz.ncs              print the source
-  nws -I corpus/oracle decompile k_act_mispaz.ncs -o out.nss   write it to a file
-  nws -I corpus/oracle decompile --strict x.ncs                exit 3 unless every function verifies
-  nws -I corpus/oracle decompile --no-verify x.ncs             skip recompiling
+  nws --game k1 -I scripts decompile k_act_mispaz.ncs             print the source
+  nws --game k1 -I scripts decompile k_act_mispaz.ncs -o out.nss  write it to a file
+  nws --game k1 --declarations bioware decompile x.ncs            BioWare's own declarations
+  nws --game k1 decompile --strict x.ncs                          exit 3 unless every function verifies
+  nws -I scripts decompile --no-verify x.ncs                      skip recompiling
+  nws -I oracle decompile --compiler ~/bin/nwnnsscomp x.ncs       verify with nwnnsscomp
 
 Each function is recompiled and compared with the original bytes; a comment
 above it says `verified`, `unverified` with the first offset that differs, or
 `not recovered` with the reason, and each function that is not verified is
-also reported as warning E0602. Verification runs nwnnsscomp (--compiler, or
-$NWNNSSCOMP) with -v1.00 against the directory holding nwscript.nss, which
--I or --nwscript names; nwnnsscomp never returns on KotOR 1's shipped
+also reported as warning E0602. Verification uses the project's compiler for
+--game, checking in the bioware mode (no lint stops it); --declarations
+bioware compiles against the declarations BioWare's own scripts were
+compiled against, which their bytecode needs (and which the decompiler then
+reads the bytecode with too). nwscript.nss comes from -I or --nwscript.
+
+--compiler PATH verifies with nwnnsscomp instead, run with -v1.00 against
+the directory holding nwscript.nss; it never returns on KotOR 1's shipped
 nwscript.nss, so point it at a copy with line 5145 corrected (the corpus's
-oracle/ directory). In JSON mode result.functions[] has each function's name,
-status and offset, and result.verified the count.")]
+oracle/ directory). In JSON mode result.functions[] has each function's
+name, status and offset, and result.verified the count.")]
 pub struct Args {
     /// The NCS file, or - for stdin.
     pub input: PathBuf,
@@ -46,10 +54,10 @@ pub struct Args {
     /// Exit 3 if any function is not verified.
     #[arg(long, conflicts_with = "no_verify")]
     pub strict: bool,
-    /// The compiler to verify with: an nwnnsscomp executable.
-    #[arg(long, value_name = "PATH", env = "NWNNSSCOMP")]
+    /// Verify with this nwnnsscomp executable instead of the project's compiler.
+    #[arg(long, value_name = "PATH")]
     pub compiler: Option<PathBuf>,
-    /// Seconds before a verifying compilation is abandoned.
+    /// Seconds before an nwnnsscomp compilation is abandoned.
     #[arg(long, value_name = "SECS", default_value_t = 30)]
     pub timeout: u64,
 }
@@ -153,9 +161,9 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
                 d.to_path_buf()
             }
         });
-    let mut resolver = ctx.resolver(dir);
+    let mut resolver = ctx.resolver(dir.clone());
     let mut table_map = SourceMap::new();
-    let table = match nwscript::engine::load_table(&mut resolver, &mut table_map) {
+    let mut table = match nwscript::engine::load_table(&mut resolver, &mut table_map) {
         Ok(Some((t, _))) => t,
         Ok(None) => {
             eprintln!(
@@ -168,6 +176,11 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
             return Exit::Errors;
         }
     };
+    // The bytecode is read with the declarations it is verified against.
+    if let Some((name, text)) = ctx.game.and_then(|g| ctx.declarations().overlay(g)) {
+        let file = table_map.add(name, text.as_bytes().to_vec());
+        let _ = table.overlay(file, text.as_bytes());
+    }
     let nwscript_path = nwscript::Resolver::inputs(&resolver)
         .iter()
         .find(|i| i.role == "nwscript")
@@ -175,14 +188,23 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
     env.inputs
         .extend(nwscript::Resolver::inputs(&resolver).iter().cloned());
 
-    let mut verifier = None;
-    if !args.no_verify {
-        let Some(bin) = args.compiler.clone() else {
+    let mut verifier: Option<Box<dyn Compiler>> = None;
+    if !args.no_verify && args.compiler.is_none() {
+        let Some(game) = ctx.game else {
             eprintln!(
-                "error: verification needs a compiler: pass --compiler PATH (nwnnsscomp) or set NWNNSSCOMP, or skip it with --no-verify"
+                "error: verification compiles for a game: pass --game k1 or --game k2, or skip it with --no-verify"
             );
             return Exit::Usage;
         };
+        verifier = Some(Box::new(nwscript::decompile::ProjectCompiler::new(
+            ctx.resolver(dir.clone()),
+            game,
+            ctx.declarations(),
+        )));
+    }
+    if !args.no_verify
+        && let Some(bin) = args.compiler.clone()
+    {
         let include = nwscript_path
             .as_deref()
             .and_then(Path::parent)
@@ -196,12 +218,12 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
             .unwrap_or(Path::new("."))
             .to_path_buf();
         let include = std::fs::canonicalize(&include).unwrap_or(include);
-        verifier = Some(Nwnnsscomp {
+        verifier = Some(Box::new(Nwnnsscomp {
             bin,
             include,
             work: std::env::temp_dir().join(format!("nws-decompile-{}", std::process::id())),
             timeout: Duration::from_secs(args.timeout),
-        });
+        }));
     }
 
     let mut map = SourceMap::new();
@@ -210,7 +232,7 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
         &name,
         &bytes,
         &table,
-        verifier.as_mut().map(|v| v as &mut dyn Compiler),
+        verifier.as_mut().map(|v| &mut **v as &mut dyn Compiler),
         &mut map,
     );
     drop(verifier);

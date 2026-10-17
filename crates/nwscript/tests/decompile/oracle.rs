@@ -1,10 +1,12 @@
-//! Test helpers: the corpus, the engine table, and the interim verifier,
-//! nwnnsscomp run as a black box behind the [`Compiler`] interface.
+//! Test helpers for decompiling the corpus: finding it, its engine table
+//! under either declaration set, and nwnnsscomp run as a black box behind
+//! the decompiler's `Compiler` interface, as an optional comparison.
 
 #![allow(dead_code)]
 
-use nwscript_decomp::CompileError;
-use nwscript_sema::EngineTable;
+use nwscript::Declarations;
+use nwscript::decompile::CompileError;
+use nwscript::sema::EngineTable;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -27,9 +29,14 @@ pub fn corpus() -> Option<PathBuf> {
     }
 }
 
-pub fn table(corpus: &Path) -> EngineTable {
+/// The engine table the corpus's nwscript.nss declares, with `declarations` applied.
+pub fn table(corpus: &Path, declarations: Declarations) -> EngineTable {
     let bytes = std::fs::read(corpus.join("nwscript.nss")).expect("nwscript.nss");
-    EngineTable::from_nwscript(nwscript_diag::FileId(0), &bytes).0
+    let mut t = EngineTable::from_nwscript(nwscript::diag::FileId(0), &bytes).0;
+    if let Some((_, text)) = declarations.overlay(nwscript::Game::K1) {
+        let _ = t.overlay(nwscript::diag::FileId(1), text.as_bytes());
+    }
+    t
 }
 
 /// nwnnsscomp: `$NWNNSSCOMP`, else modshop's native build beside this checkout.

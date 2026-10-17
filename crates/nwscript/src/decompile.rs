@@ -3,6 +3,7 @@
 //! The compiler that verifies is the caller's: anything implementing
 //! [`Compiler`], source bytes in and NCS bytes out.
 
+use crate::modes::{Mode, finish};
 use nwscript_diag::{Diagnostic, SourceMap, Span, codes};
 use nwscript_ncs::decode;
 use nwscript_sema::EngineTable;
@@ -54,8 +55,8 @@ pub fn decompile<'t>(
 /// through a resolver (for `nwscript.nss`) and compiled for a game.
 ///
 /// Verification asks whether source compiles to given bytes, not whether
-/// it is good style, so no lints run and what BioWare's compiler and
-/// nwnnsscomp accepted is accepted (`--compat bioware`). The declarations
+/// it is good style, so the check runs in [`Mode::Bioware`]: lints stay
+/// warnings and what BioWare's compiler accepted is accepted. The declarations
 /// are the checker's: [`crate::Declarations::BioWare`] restores the
 /// eleven-argument `ActionStartConversation` BioWare's bytecode calls.
 pub struct ProjectCompiler<R: crate::Resolver> {
@@ -67,17 +68,11 @@ pub struct ProjectCompiler<R: crate::Resolver> {
 
 impl<R: crate::Resolver> ProjectCompiler<R> {
     pub fn new(resolver: R, game: crate::Game, declarations: crate::Declarations) -> Self {
-        let mut levels = nwscript_diag::Levels::default();
-        levels.accepted = codes::NWNNSSCOMP_ACCEPTED
-            .iter()
-            .chain(codes::BIOWARE_ACCEPTED)
-            .map(|c| c.id)
-            .collect();
         ProjectCompiler {
             checker: crate::Checker::with_declarations(declarations, game),
             resolver,
             game,
-            levels,
+            levels: Mode::Bioware.levels(),
         }
     }
 }
@@ -89,10 +84,8 @@ impl<R: crate::Resolver> Compiler for ProjectCompiler<R> {
             .checker
             .check(&mut self.resolver, &mut map, "decompiled.nss", source);
         let main = map.files().next().map(|(id, _)| id);
-        let first_error = out
-            .diagnostics
+        let first_error = finish(out.analysis.as_ref(), out.diagnostics, &map, &self.levels)
             .into_iter()
-            .filter_map(|d| self.levels.apply(d))
             .find(|d| d.is_error());
         let fail = |d: &Diagnostic| CompileError {
             message: format!("error[{}]: {}", d.code.id, d.message),

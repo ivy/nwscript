@@ -56,13 +56,17 @@ impl Ctx {
         nwscript::modes::finish(analysis, diags, map, &self.levels)
     }
 
-    /// A checker taking the declarations `--declarations` names.
-    pub fn checker(&self, game: Game) -> nwscript::Checker {
-        let d = match self.global.declarations {
+    /// The declarations `--declarations` names.
+    pub fn declarations(&self) -> nwscript::Declarations {
+        match self.global.declarations {
             crate::cli::DeclarationsArg::Shipped => nwscript::Declarations::Shipped,
             crate::cli::DeclarationsArg::Bioware => nwscript::Declarations::BioWare,
-        };
-        nwscript::Checker::with_declarations(d, game)
+        }
+    }
+
+    /// A checker taking the declarations `--declarations` names.
+    pub fn checker(&self, game: Game) -> nwscript::Checker {
+        nwscript::Checker::with_declarations(self.declarations(), game)
     }
 
     /// A resolver over the `-I` directories (after `first`, the input's own

@@ -1,33 +1,44 @@
 //! The decompiler's headline numbers: the fraction of functions whose
-//! recovered source recompiles to the original bytes, with nwnnsscomp
-//! `-v1.00` as the interim verifier, over the vanilla pairs and over the
-//! module scripts.
+//! recovered source recompiles to the original bytes, over the vanilla
+//! pairs and over the module scripts. The verifier is the project's
+//! compiler, checking in the bioware mode, once against the shipped
+//! declarations and once against BioWare's own (`Declarations::BioWare`);
+//! `NWSCRIPT_DECOMP_VERIFIER=nwnnsscomp` verifies with nwnnsscomp `-v1.00`
+//! instead (`$NWNNSSCOMP`, else modshop's build), for comparison.
 //!
 //! ```bash
-//! cargo test -p nwscript-decomp --release --test corpus -- --ignored --nocapture
+//! cargo test -p nwscript --release --test decompile_corpus -- --ignored --nocapture
 //! ```
 //!
 //! `NWSCRIPT_DECOMP_ONLY=k_act_*` limits a run to matching scripts,
-//! `NWSCRIPT_DECOMP_DUMP=DIR` writes each recovered source there, and
-//! `NWSCRIPT_DECOMP_LIST=1` names the scripts not verified whole.
+//! `NWSCRIPT_DECOMP_DUMP=DIR` writes each recovered source there (as
+//! verified against BioWare's declarations), and `NWSCRIPT_DECOMP_LIST=1`
+//! names the scripts not verified whole.
 
+#[path = "decompile/oracle.rs"]
 mod common;
 
-use nwscript_decomp::{Status, decompile};
+use nwscript::Declarations;
+use nwscript::decompile::{Compiler, ProjectCompiler, Status};
+use nwscript::ncs::Program;
+use nwscript_decomp::decompile;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
-
-/// The vanilla verified fraction must not fall below this. Measured: 3,972
-/// of 4,029 functions; every other one calls an engine routine with
-/// arguments the shipped nwscript.nss no longer declares, or is in one of
-/// the two Neverwinter Nights leftovers.
-const VANILLA_FLOOR: f64 = 0.985;
-/// The module verified fraction must not fall below this. Measured: 45,769
-/// of 46,511 functions; every other one calls an engine routine with
-/// arguments the shipped nwscript.nss no longer declares.
-const MODULE_FLOOR: f64 = 0.984;
+/// The floors hold the project's compiler to its measurement; the
+/// nwnnsscomp comparison is reported, not held.
+///
+/// The vanilla verified fraction, against BioWare's declarations, must not
+/// fall below this. Measured: 4,023 of 4,029 functions; the others call
+/// engine routines with arguments neither declaration set has (an older
+/// ActionStartConversation, the Neverwinter Nights leftovers).
+const VANILLA_FLOOR: f64 = 0.998;
+/// The module verified fraction, against BioWare's declarations, must not
+/// fall below this. Measured: 46,475 of 46,511 functions; the others call
+/// engine routines with arguments neither declaration set has, or the
+/// routine whose shipped declaration does not read (SetAvailableNPCId).
+const MODULE_FLOOR: f64 = 0.999;
 
 fn glob(pat: &str, s: &str) -> bool {
     fn go(p: &[u8], s: &[u8]) -> bool {
@@ -154,12 +165,60 @@ struct Job {
     oracle_limited: bool,
 }
 
-/// Decompile and verify every job in parallel; tallies by group.
-fn run(jobs: &[Job], corpus: &Path, bin: &Path) -> BTreeMap<String, Tally> {
-    let table = common::table(corpus);
+/// How a run verifies: which declarations, and with what compiler.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Setup {
+    Project(Declarations),
+    Nwnnsscomp,
+}
+
+impl Setup {
+    fn name(self) -> &'static str {
+        match self {
+            Setup::Project(Declarations::Shipped) => "project compiler, shipped declarations",
+            Setup::Project(Declarations::BioWare) => "project compiler, BioWare's declarations",
+            Setup::Nwnnsscomp => "nwnnsscomp -v1.00, shipped declarations",
+        }
+    }
+
+    fn declarations(self) -> Declarations {
+        match self {
+            Setup::Project(d) => d,
+            Setup::Nwnnsscomp => Declarations::Shipped,
+        }
+    }
+}
+
+/// The verifier runs use, from `NWSCRIPT_DECOMP_VERIFIER`.
+fn setups() -> Option<(Vec<Setup>, Option<PathBuf>)> {
+    if std::env::var("NWSCRIPT_DECOMP_VERIFIER").is_ok_and(|v| v == "nwnnsscomp") {
+        let bin = common::nwnnsscomp()?;
+        return Some((vec![Setup::Nwnnsscomp], Some(bin)));
+    }
+    Some((
+        vec![
+            Setup::Project(Declarations::Shipped),
+            Setup::Project(Declarations::BioWare),
+        ],
+        None,
+    ))
+}
+
+/// Decompile and verify every job in parallel under each setup. The
+/// tallies are by group, one per setup and a last for functions verified
+/// under any of them.
+/// Each group's tallies: one per setup, then the union.
+type Tallies = BTreeMap<String, Vec<Tally>>;
+
+fn run(jobs: &[Job], corpus: &Path) -> Option<(Vec<Setup>, Tallies)> {
+    let (setups, bin) = setups()?;
+    let tables: Vec<_> = setups
+        .iter()
+        .map(|s| common::table(corpus, s.declarations()))
+        .collect();
     let include = corpus.join("oracle");
     let dump = std::env::var_os("NWSCRIPT_DECOMP_DUMP").map(PathBuf::from);
-    let tallies: Mutex<BTreeMap<String, Tally>> = Mutex::new(BTreeMap::new());
+    let tallies: Mutex<Tallies> = Mutex::new(BTreeMap::new());
     let next = AtomicUsize::new(0);
     // Tests run in parallel in one process: each run gets its own directory.
     static RUNS: AtomicUsize = AtomicUsize::new(0);
@@ -171,77 +230,122 @@ fn run(jobs: &[Job], corpus: &Path, bin: &Path) -> BTreeMap<String, Tally> {
     let workers = std::thread::available_parallelism().map_or(4, |n| n.get());
     std::thread::scope(|s| {
         for w in 0..workers {
-            let (tallies, next, table, include, dump) = (&tallies, &next, &table, &include, &dump);
+            let (tallies, next, tables, include, dump, setups, bin) =
+                (&tallies, &next, &tables, &include, &dump, &setups, &bin);
             let work = work_root.join(w.to_string());
             s.spawn(move || {
+                let mut compilers: Vec<Box<dyn Compiler>> = setups
+                    .iter()
+                    .map(|s| -> Box<dyn Compiler> {
+                        match *s {
+                            Setup::Project(d) => Box::new(ProjectCompiler::new(
+                                nwscript::FsResolver::new(vec![corpus.to_path_buf()], None),
+                                nwscript::Game::K1,
+                                d,
+                            )),
+                            Setup::Nwnnsscomp => {
+                                let (bin, include, work) =
+                                    (bin.clone().unwrap(), include.clone(), work.clone());
+                                Box::new(move |src: &[u8]| {
+                                    common::oracle_compile(&bin, &include, &work, src)
+                                })
+                            }
+                        }
+                    })
+                    .collect();
                 loop {
                     let i = next.fetch_add(1, Ordering::Relaxed);
                     let Some(job) = jobs.get(i) else { break };
-                    let t = one(job, table, bin, include, &work, dump.as_deref());
-                    tallies
-                        .lock()
-                        .unwrap()
+                    let t = one(job, tables, &mut compilers, dump.as_deref());
+                    let mut all = tallies.lock().unwrap();
+                    let slot = all
                         .entry(job.group.clone())
-                        .or_default()
-                        .add(&t);
+                        .or_insert_with(|| vec![Tally::default(); t.len()]);
+                    for (a, b) in slot.iter_mut().zip(&t) {
+                        a.add(b);
+                    }
                 }
             });
         }
     });
     let _ = std::fs::remove_dir_all(&work_root);
-    tallies.into_inner().unwrap()
+    Some((setups, tallies.into_inner().unwrap()))
 }
 
 fn one(
     job: &Job,
-    table: &nwscript_sema::EngineTable,
-    bin: &Path,
-    include: &Path,
-    work: &Path,
+    tables: &[nwscript::sema::EngineTable],
+    compilers: &mut [Box<dyn Compiler>],
     dump: Option<&Path>,
-) -> Tally {
+) -> Vec<Tally> {
+    let bytes = std::fs::read(&job.path).unwrap();
+    let mut map = nwscript::diag::SourceMap::new();
+    let program: Program = nwscript::ncs::decode_named(job.name.clone(), &bytes, &mut map).unwrap();
+    let mut statuses: Vec<Vec<Status>> = Vec::new();
+    for (k, (table, compiler)) in tables.iter().zip(compilers.iter_mut()).enumerate() {
+        let mut d = match decompile(&program, table) {
+            Ok(d) => d,
+            Err(e) => {
+                let mut t = Tally {
+                    scripts: 1,
+                    failed: 1,
+                    ..Tally::default()
+                };
+                t.reasons.insert(format!("(script) {e}"), 1);
+                t.unverified_scripts.push(job.name.clone());
+                return vec![t; tables.len() + 1];
+            }
+        };
+        d.verify(&program, &mut **compiler);
+        let src = d.source();
+        if k + 1 == tables.len()
+            && let Some(dir) = dump
+        {
+            let path = dir.join(format!("{}.nss", job.name));
+            let _ = std::fs::create_dir_all(path.parent().unwrap());
+            let _ = std::fs::write(path, &src);
+        }
+        let parsed = nwscript_syntax::parse(nwscript::diag::FileId(0), &src);
+        assert!(
+            parsed.diagnostics().is_empty(),
+            "{}: the recovered source does not parse: {:?}",
+            job.name,
+            parsed.diagnostics().first().map(|d| &d.message)
+        );
+        statuses.push(d.functions.iter().map(|f| f.status.clone()).collect());
+    }
+    let mut out: Vec<Tally> = statuses.iter().map(|s| tally(job, s)).collect();
+    // A function verified under any declaration set.
+    let any: Vec<Status> = (0..statuses[0].len())
+        .map(|i| {
+            statuses
+                .iter()
+                .map(|s| &s[i])
+                .find(|s| **s == Status::Verified)
+                .unwrap_or(&statuses[statuses.len() - 1][i])
+                .clone()
+        })
+        .collect();
+    out.push(tally(job, &any));
+    out
+}
+
+fn tally(job: &Job, statuses: &[Status]) -> Tally {
     let mut t = Tally {
         scripts: 1,
         ..Tally::default()
     };
-    let bytes = std::fs::read(&job.path).unwrap();
-    let mut map = nwscript_diag::SourceMap::new();
-    let program = nwscript_ncs::decode_named(job.name.clone(), &bytes, &mut map).unwrap();
-    let mut d = match decompile(&program, table) {
-        Ok(d) => d,
-        Err(e) => {
-            t.failed += 1;
-            t.reasons.insert(format!("(script) {e}"), 1);
-            t.unverified_scripts.push(job.name.clone());
-            return t;
-        }
-    };
-    let mut compiler = |src: &[u8]| common::oracle_compile(bin, include, work, src);
-    d.verify(&program, &mut compiler);
-    let src = d.source();
-    if let Some(dir) = dump {
-        let path = dir.join(format!("{}.nss", job.name));
-        let _ = std::fs::create_dir_all(path.parent().unwrap());
-        let _ = std::fs::write(path, &src);
-    }
-    let parsed = nwscript_syntax::parse(nwscript_diag::FileId(0), &src);
-    assert!(
-        parsed.diagnostics().is_empty(),
-        "{}: the recovered source does not parse: {:?}",
-        job.name,
-        parsed.diagnostics().first().map(|d| &d.message)
-    );
-    if d.functions.iter().all(|f| f.status == Status::Verified) {
+    if statuses.iter().all(|s| *s == Status::Verified) {
         t.whole += 1;
     } else {
         t.unverified_scripts.push(job.name.clone());
     }
-    for f in &d.functions {
+    for status in statuses {
         t.functions += 1;
         if job.oracle_limited {
             t.oracle_limited += 1;
         }
-        match &f.status {
+        match status {
             Status::Verified => {
                 t.verified += 1;
                 if job.oracle_limited {
@@ -253,6 +357,15 @@ fn one(
                 if detail.contains("older declaration") {
                     t.stale += 1;
                 }
+                let key = if detail.is_empty() {
+                    "(unverified) recompiles differently".to_string()
+                } else {
+                    format!(
+                        "(unverified) {}",
+                        detail.split(" at offset").next().unwrap_or(detail)
+                    )
+                };
+                *t.reasons.entry(key).or_default() += 1;
             }
             Status::NotRecovered { reason } => {
                 t.not_recovered += 1;
@@ -273,13 +386,20 @@ fn only() -> Option<String> {
     std::env::var("NWSCRIPT_DECOMP_ONLY").ok()
 }
 
+/// Print each setup's tally and the union; return the last setup's.
+fn report(what: &str, setups: &[Setup], tallies: &[Tally]) {
+    for (s, t) in setups.iter().zip(tallies) {
+        t.report(&format!("{what}, {}", s.name()));
+    }
+    if setups.len() > 1 {
+        tallies[setups.len()].report(&format!("{what}, verified under either declaration set"));
+    }
+}
+
 #[test]
-#[ignore = "needs the corpus and nwnnsscomp; run with --ignored"]
+#[ignore = "needs the corpus; run with --ignored"]
 fn vanilla_verified_fraction() {
     let Some(corpus) = common::corpus() else {
-        return;
-    };
-    let Some(bin) = common::nwnnsscomp() else {
         return;
     };
     let classes = oracle_classes();
@@ -300,27 +420,29 @@ fn vanilla_verified_fraction() {
         .filter(|j| only.as_deref().is_none_or(|g| glob(g, &j.name)))
         .collect();
     jobs.sort_by(|a, b| a.name.cmp(&b.name));
-    let tallies = run(&jobs, &corpus, &bin);
+    let Some((setups, tallies)) = run(&jobs, &corpus) else {
+        return;
+    };
     let t = tallies.get("vanilla").cloned().unwrap_or_default();
-    t.report("vanilla pairs");
+    report("vanilla pairs", &setups, &t);
+    let head = &t[setups.len() - 1];
     println!(
         "  in the scripts nwnnsscomp does not reproduce from BioWare's source: {} functions, {} verified",
-        t.oracle_limited, t.oracle_limited_verified
+        head.oracle_limited, head.oracle_limited_verified
     );
-    assert!(
-        t.fraction() >= VANILLA_FLOOR,
-        "verified fraction {:.4} fell below the floor {VANILLA_FLOOR}",
-        t.fraction()
-    );
+    if only.is_none() && setups.len() > 1 {
+        assert!(
+            head.fraction() >= VANILLA_FLOOR,
+            "verified fraction {:.4} fell below the floor {VANILLA_FLOOR}",
+            head.fraction()
+        );
+    }
 }
 
 #[test]
-#[ignore = "needs the corpus and nwnnsscomp; run with --ignored"]
+#[ignore = "needs the corpus; run with --ignored"]
 fn module_verified_fraction() {
     let Some(corpus) = common::corpus() else {
-        return;
-    };
-    let Some(bin) = common::nwnnsscomp() else {
         return;
     };
     let only = only();
@@ -355,24 +477,32 @@ fn module_verified_fraction() {
         }
     }
     jobs.sort_by(|a, b| a.name.cmp(&b.name));
-    let tallies = run(&jobs, &corpus, &bin);
-    let mut all = Tally::default();
+    let Some((setups, tallies)) = run(&jobs, &corpus) else {
+        return;
+    };
+    let n = setups.len();
+    let mut all = vec![Tally::default(); n + 1];
     for (g, t) in &tallies {
+        let head = &t[n - 1];
         println!(
             "{g:24} {:5} scripts {:6} functions {:6} verified ({:.2}%)",
-            t.scripts,
-            t.functions,
-            t.verified,
-            t.fraction() * 100.0
+            head.scripts,
+            head.functions,
+            head.verified,
+            head.fraction() * 100.0
         );
-        all.add(t);
+        for (a, b) in all.iter_mut().zip(t) {
+            a.add(b);
+        }
     }
-    all.report("module scripts");
-    assert!(
-        all.fraction() >= MODULE_FLOOR,
-        "verified fraction {:.4} fell below the floor {MODULE_FLOOR}",
-        all.fraction()
-    );
+    report("module scripts", &setups, &all);
+    if only.is_none() && n > 1 {
+        assert!(
+            all[n - 1].fraction() >= MODULE_FLOOR,
+            "verified fraction {:.4} fell below the floor {MODULE_FLOOR}",
+            all[n - 1].fraction()
+        );
+    }
 }
 
 /// Small, structure-preserving damage to every vanilla script (an operand
@@ -380,11 +510,11 @@ fn module_verified_fraction() {
 #[test]
 #[ignore = "needs the corpus; run with --ignored"]
 fn damaged_bytecode_never_panics() {
-    use nwscript_ncs::Operands as O;
+    use nwscript::ncs::Operands as O;
     let Some(corpus) = common::corpus() else {
         return;
     };
-    let table = common::table(&corpus);
+    let table = common::table(&corpus, Declarations::Shipped);
     // xorshift: the same damage on every run.
     let mut seed: u64 = 0x9e37_79b9_7f4a_7c15;
     let mut rnd = move || {
@@ -401,7 +531,7 @@ fn damaged_bytecode_never_panics() {
     let mut panics = Vec::new();
     for path in &files {
         let bytes = std::fs::read(path).unwrap();
-        let program = nwscript_ncs::decode(nwscript_diag::FileId(0), &bytes).unwrap();
+        let program = nwscript::ncs::decode(nwscript::diag::FileId(0), &bytes).unwrap();
         for _ in 0..20 {
             let mut ins = program.instructions().to_vec();
             let n = ins.len();
@@ -438,7 +568,7 @@ fn damaged_bytecode_never_panics() {
                     _ => ins.swap(k, rnd() as usize % n),
                 }
             }
-            let damaged = nwscript_ncs::Program::new(ins);
+            let damaged = Program::new(ins);
             let ok = std::panic::catch_unwind(|| {
                 if let Ok(d) = decompile(&damaged, &table) {
                     let _ = d.source();
