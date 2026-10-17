@@ -13,3 +13,6 @@ nwscript-diag = { workspace = true }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+nwscript-ncs = { workspace = true }
