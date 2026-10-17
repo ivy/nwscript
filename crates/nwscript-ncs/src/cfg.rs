@@ -314,7 +314,7 @@ pub fn stack_depths(p: &Program, cfg: &Cfg, action: &dyn Fn(u16, u8) -> Option<i
                             _ => {}
                         }
                     }
-                    d = e.map(|e| cur + e);
+                    d = e.and_then(|e| cur.checked_add(e));
                 }
                 if let Some(d) = d {
                     for &s in &blk.succs {
