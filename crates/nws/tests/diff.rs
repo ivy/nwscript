@@ -128,3 +128,31 @@ fn source_inputs_are_compiled_first() {
         .code(1)
         .stderr(predicate::str::contains("does not compile"));
 }
+
+#[test]
+fn a_world_file_runs_both_in_it() {
+    let d = setup();
+    std::fs::write(
+        d.join("w.toml"),
+        "seed = 3\n[[objects]]\nkind = 1\ntag = \"pc\"\n",
+    )
+    .unwrap();
+    Command::cargo_bin("nws")
+        .unwrap()
+        .args(["diff", "--level", "trace", "--world"])
+        .arg(d.join("w.toml"))
+        .arg(d.join("a.ncs"))
+        .arg(d.join("b.ncs"))
+        .assert()
+        .code(0);
+    std::fs::write(d.join("bad.toml"), "party = [\"nobody\"]\n").unwrap();
+    Command::cargo_bin("nws")
+        .unwrap()
+        .args(["diff", "--level", "trace", "--world"])
+        .arg(d.join("bad.toml"))
+        .arg(d.join("a.ncs"))
+        .arg(d.join("b.ncs"))
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("nobody"));
+}

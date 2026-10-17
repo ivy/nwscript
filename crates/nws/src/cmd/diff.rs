@@ -31,6 +31,9 @@ pub struct Args {
     /// The engine for the trace comparison.
     #[arg(long, value_enum, default_value_t = EngineArg::Recording)]
     pub engine: EngineArg,
+    /// Run both in this world (TOML, as a snapshot's [world]); implies --engine world.
+    #[arg(long, value_name = "FILE")]
+    pub world: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
@@ -142,12 +145,30 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
                         env.inputs
                             .extend(nwscript::Resolver::inputs(&resolver).iter().cloned());
                         let routines = nwscript::engine::routines(&table);
-                        let world = args.engine == EngineArg::World;
+                        let spec = match &args.world {
+                            Some(f) => match std::fs::read_to_string(f)
+                                .map_err(|e| e.to_string())
+                                .and_then(|t| {
+                                    toml::from_str::<nwscript::snapshot::WorldSpec>(&t)
+                                        .map_err(|e| e.to_string())
+                                }) {
+                                Ok(s) => Some(s),
+                                Err(e) => {
+                                    eprintln!("error: {}: {e}", f.display());
+                                    return Exit::Usage;
+                                }
+                            },
+                            None => (args.engine == EngineArg::World)
+                                .then(nwscript::snapshot::WorldSpec::default),
+                        };
+                        if let Some(Err(e)) = spec.as_ref().map(|s| s.build()) {
+                            eprintln!("error: the world: {e}");
+                            return Exit::Usage;
+                        }
                         let mut make = move || -> Box<dyn Engine> {
-                            if world {
-                                Box::new(World::new(0))
-                            } else {
-                                Box::new(Recording)
+                            match &spec {
+                                Some(s) => Box::new(s.build().unwrap_or_else(|_| World::new(0))),
+                                None => Box::new(Recording),
                             }
                         };
                         ("trace", compare::trace(&pa, &pb, &routines, &mut make))
