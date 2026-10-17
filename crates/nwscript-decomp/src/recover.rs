@@ -1850,6 +1850,11 @@ fn finish(sh: &mut Shared) {
             }
         }
     }
+    for f in &mut sh.script.funcs {
+        if let Ok(b) = &mut f.body {
+            fors(b);
+        }
+    }
     name_vars(sh);
 }
 
@@ -1883,20 +1888,69 @@ fn visit_calls(body: &[Stmt], f: &mut impl FnMut(usize, &[Expr])) {
                 expr(c, f);
                 visit_calls(b, f);
             }
+            Stmt::For(i, c, st, b) => {
+                expr(i, f);
+                expr(c, f);
+                expr(st, f);
+                visit_calls(b, f);
+            }
             Stmt::Block(b) => visit_calls(b, f),
             _ => {}
         }
     }
 }
 
+/// Name variables in the order the source declares them: globals, then
+/// each function's parameters and locals, numbered per function.
 fn name_vars(sh: &mut Shared) {
-    let mut counters: HashMap<(Option<usize>, u8), u32> = HashMap::new();
-    let structures = &sh.table.structures;
-    for v in 0..sh.script.vars.len() {
-        let var = &sh.script.vars[v];
-        if var.part_of.is_some() && sh.script.vars[var.part_of.unwrap().0].kind == var.kind {
+    fn decls(body: &[Stmt], out: &mut Vec<VarId>) {
+        for st in body {
+            match st {
+                Stmt::Decl(v) => out.push(*v),
+                Stmt::If(_, t, e) => {
+                    decls(t, out);
+                    if let Some(e) = e {
+                        decls(e, out);
+                    }
+                }
+                Stmt::While(_, b)
+                | Stmt::DoWhile(b, _)
+                | Stmt::Switch(_, b)
+                | Stmt::Block(b)
+                | Stmt::For(_, _, _, b) => decls(b, out),
+                _ => {}
+            }
+        }
+    }
+    let mut order: Vec<VarId> = Vec::new();
+    for f in &sh.script.funcs {
+        if f.kind == FuncKind::Globals
+            && let Ok(b) = &f.body
+        {
+            decls(b, &mut order);
+        }
+    }
+    for f in &sh.script.funcs {
+        if f.kind == FuncKind::Globals {
             continue;
         }
+        order.extend(&f.params);
+        if let Ok(b) = &f.body {
+            decls(b, &mut order);
+        }
+    }
+    order.extend(0..sh.script.vars.len());
+    let mut named = vec![false; sh.script.vars.len()];
+    let mut counters: HashMap<(Option<usize>, u8), u32> = HashMap::new();
+    let structures = &sh.table.structures;
+    for v in order {
+        // A slot of a joined variable goes by the whole variable's name.
+        let v = sh.script.root(v).0;
+        if named[v] {
+            continue;
+        }
+        named[v] = true;
+        let var = &sh.script.vars[v];
         let prefix = match var.ty {
             None | Some(Ty::Int) => "n".to_string(),
             Some(Ty::Float) => "f".into(),
@@ -1919,4 +1973,68 @@ fn name_vars(sh: &mut Shared) {
         *c += 1;
         sh.script.vars[v].name = format!("{prefix}{kind}{c}");
     }
+}
+
+/// `init; while (cond) { ...; step; }` as BioWare writes it, `for (init;
+/// cond; step) { ... }`, where the two compile alike: the body declares
+/// nothing at its top level (a `for` body's locals are popped before the
+/// step) and does not `continue` (which in a `for` goes to the step).
+fn fors(body: &mut Vec<Stmt>) {
+    for st in body.iter_mut() {
+        match st {
+            Stmt::If(_, t, e) => {
+                fors(t);
+                if let Some(e) = e {
+                    fors(e);
+                }
+            }
+            Stmt::While(_, b) | Stmt::DoWhile(b, _) | Stmt::Switch(_, b) | Stmt::Block(b) => {
+                fors(b)
+            }
+            _ => {}
+        }
+    }
+    let mut k = 1;
+    while k < body.len() {
+        let fits = match (&body[k - 1], &body[k]) {
+            (Stmt::Expr(init @ (Expr::Assign(..) | Expr::IncDec { .. })), Stmt::While(_, b)) => {
+                let var = |e: &Expr| match e {
+                    Expr::Assign(p, _) | Expr::IncDec { place: p, .. } => Some(p.clone()),
+                    _ => None,
+                };
+                match b.last() {
+                    Some(Stmt::Expr(step @ (Expr::Assign(..) | Expr::IncDec { .. }))) => {
+                        var(init) == var(step)
+                            && !b.iter().any(|s| matches!(s, Stmt::Decl(_)))
+                            && !continues(b)
+                    }
+                    _ => false,
+                }
+            }
+            _ => false,
+        };
+        if fits {
+            let Stmt::Expr(init) = body.remove(k - 1) else {
+                unreachable!()
+            };
+            let Stmt::While(cond, mut b) = body.remove(k - 1) else {
+                unreachable!()
+            };
+            let Some(Stmt::Expr(step)) = b.pop() else {
+                unreachable!()
+            };
+            body.insert(k - 1, Stmt::For(init, cond, step, b));
+        }
+        k += 1;
+    }
+}
+
+/// Whether a loop body continues its loop (not a nested one).
+fn continues(body: &[Stmt]) -> bool {
+    body.iter().any(|s| match s {
+        Stmt::Continue => true,
+        Stmt::If(_, t, e) => continues(t) || e.as_deref().is_some_and(continues),
+        Stmt::Block(b) | Stmt::Switch(_, b) => continues(b),
+        _ => false,
+    })
 }

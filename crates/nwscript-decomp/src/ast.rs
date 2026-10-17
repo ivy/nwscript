@@ -204,6 +204,8 @@ pub enum Stmt {
     If(Expr, Vec<Stmt>, Option<Vec<Stmt>>),
     While(Expr, Vec<Stmt>),
     DoWhile(Vec<Stmt>, Expr),
+    /// `for (init; cond; step) body`.
+    For(Expr, Expr, Expr, Vec<Stmt>),
     /// The subject and the body, whose top level holds `Case` and `Default` labels.
     Switch(Expr, Vec<Stmt>),
     Case(i32),

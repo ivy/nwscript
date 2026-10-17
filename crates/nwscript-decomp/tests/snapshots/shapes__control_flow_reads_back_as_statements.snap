@@ -1,0 +1,58 @@
+---
+source: crates/nwscript-decomp/tests/shapes.rs
+expression: source_of(&d)
+---
+// Recovered from NCS bytecode: 0 of 3 functions verified by recompiling.
+
+// unchecked: recovered, not recompiled
+int nGlobal1 = 3;
+
+int sub_27e(int nParam1, int nParam2);
+
+// unchecked: recovered, not recompiled
+void main()
+{
+    int nLocal1 = 0;
+    while (nLocal1 < 10) {
+        nLocal1++;
+        if (nLocal1 == 5) {
+            break;
+        }
+    }
+    do {
+        nLocal1--;
+    } while (nLocal1 > 0);
+    for (nLocal1 = 0; nLocal1 < 3; nLocal1++) {
+        PrintInteger(nLocal1);
+    }
+    switch (nGlobal1) {
+        case 1:
+            PrintInteger(1);
+            break;
+        case 2:
+            {
+                int nLocal2 = 4;
+                PrintInteger(nLocal2);
+            }
+            break;
+        default:
+            PrintInteger(9);
+    }
+    if ((nLocal1 > 1 && nGlobal1 < 2) || nLocal1 == 0) {
+        PrintInteger(sub_27e(nLocal1, -1));
+    }
+    DelayCommand(1.0, PrintInteger(nLocal1));
+    ++nGlobal1;
+}
+
+// unchecked: recovered, not recompiled
+int sub_27e(int nParam1, int nParam2)
+{
+    int nLocal1 = nParam1 + nParam2;
+    if (nLocal1 > 10) {
+        return 10;
+    } else if (nLocal1 < 0) {
+        return 0;
+    }
+    return nLocal1;
+}

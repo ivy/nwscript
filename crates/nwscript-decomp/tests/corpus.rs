@@ -19,10 +19,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-/// The vanilla verified fraction must not fall below this.
-const VANILLA_FLOOR: f64 = 0.0;
-/// The module verified fraction must not fall below this.
-const MODULE_FLOOR: f64 = 0.0;
+/// The vanilla verified fraction must not fall below this. Measured: 3,972
+/// of 4,029 functions; every other one calls an engine routine with
+/// arguments the shipped nwscript.nss no longer declares, or is in one of
+/// the two Neverwinter Nights leftovers.
+const VANILLA_FLOOR: f64 = 0.985;
+/// The module verified fraction must not fall below this. Measured: 45,769
+/// of 46,511 functions; every other one calls an engine routine with
+/// arguments the shipped nwscript.nss no longer declares.
+const MODULE_FLOOR: f64 = 0.984;
 
 fn glob(pat: &str, s: &str) -> bool {
     fn go(p: &[u8], s: &[u8]) -> bool {

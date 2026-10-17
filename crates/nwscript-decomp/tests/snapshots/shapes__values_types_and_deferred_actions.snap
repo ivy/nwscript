@@ -1,0 +1,26 @@
+---
+source: crates/nwscript-decomp/tests/shapes.rs
+expression: source_of(&d)
+---
+// Recovered from NCS bytecode: 0 of 2 functions verified by recompiling.
+
+float sub_118(float fParam1);
+
+// unchecked: recovered, not recompiled
+void main()
+{
+    string sLocal1 = "a\"b";
+    object oLocal2 = OBJECT_SELF;
+    vector vLocal3 = Vector(1.0, 2.0, 3.0);
+    float fLocal4 = sub_118(vLocal3.y);
+    PrintFloat(fLocal4);
+    PrintString(sLocal1 + "c");
+    PrintInteger(!Random(4) + ~1 - 0xffffffff);
+    AssignCommand(oLocal2, PrintObject(OBJECT_INVALID));
+}
+
+// unchecked: recovered, not recompiled
+float sub_118(float fParam1)
+{
+    return fParam1 / 2.0;
+}

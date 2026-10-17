@@ -279,6 +279,12 @@ impl Printer<'_> {
                 self.block(b, depth);
                 self.out.push('\n');
             }
+            Stmt::For(i, c, st, b) => {
+                let (i, c, st) = (self.expr(i, 0), self.expr(c, 0), self.expr(st, 0));
+                let _ = write!(self.out, "{ind}for ({i}; {c}; {st}) ");
+                self.block(b, depth);
+                self.out.push('\n');
+            }
             Stmt::DoWhile(b, c) => {
                 let _ = write!(self.out, "{ind}do ");
                 self.block(b, depth);

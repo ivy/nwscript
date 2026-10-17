@@ -15,6 +15,7 @@ nwscript-diag = { workspace = true }
 
 [dev-dependencies]
 nwscript-syntax = { workspace = true }
+insta = "1.49"
 
 [lints]
 workspace = true
