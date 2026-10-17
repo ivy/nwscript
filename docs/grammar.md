@@ -345,3 +345,14 @@ Constructs the language plausibly has, from Neverwinter Nights' documentation, f
 ### Never seen, and errors
 
 These are not constructs but mistakes, and no vanilla script makes them: an assignment or increment whose target is not a variable or member (`expr.assign.target_not_lvalue` (0), `expr.postfix.target_not_lvalue` (0)), `break` outside a loop or switch `stmt.break.outside` (0), `continue` outside a loop `stmt.continue.outside_loop` (0), a required parameter after a defaulted one `param.required_after_default` (0), an include cycle `pp.include.cycle` (0) or a missing include, a `#` in the middle of a line `lex.hash_mid_line` (0), an unterminated string `lex.string.unterminated` (0), a byte above 0x7F outside comments and strings `lex.non_ascii.code` (0), a number running into an identifier `lex.number.followed_by_ident_char` (0), a function defined twice or prototyped after its definition, and a file with both entry points. Their diagnostics have no corpus file to calibrate against.
+
+## Comment directives
+
+A line comment whose text, after `//` and leading spaces, starts with `nwscript:` is a directive to `nws`; the compiler reads it as a comment like any other.
+
+```ebnf
+directive = "//" { " " } "nwscript:" { " " } "allow(" code { "," code } ")" ;
+code      = letter digit digit digit digit ;   (* a lint code such as W0001; case does not matter *)
+```
+
+A directive at the end of a line of code applies to that line; a directive alone on its line applies to the next line. It allows the lints it names on that line, and nothing else: an error cannot be allowed. No vanilla script contains one.

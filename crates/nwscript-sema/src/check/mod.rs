@@ -100,8 +100,17 @@ pub fn analyze(
     let mut items = Vec::new();
     let mut seen = HashSet::from([stem.clone()]);
     c.expand(0, includes, &mut vec![stem], &mut seen, &mut items);
+    // Structs first, so a struct named above its declaration still resolves;
+    // that use is E0327, which the compat modes accept as nwnnsscomp does.
     for (seq, (fi, item)) in items.iter().enumerate() {
-        c.declare(*fi, seq as u32, item);
+        if matches!(item, Item::Struct(_)) {
+            c.declare(*fi, seq as u32, item);
+        }
+    }
+    for (seq, (fi, item)) in items.iter().enumerate() {
+        if !matches!(item, Item::Struct(_)) {
+            c.declare(*fi, seq as u32, item);
+        }
     }
     for (seq, (fi, item)) in items.iter().enumerate() {
         c.check_item(*fi, seq as u32, item);
@@ -221,6 +230,17 @@ impl Checker<'_> {
                 let name = tok.text().to_string();
                 match self.struct_names.get(&name) {
                     Some(&(_, s)) if s < seq => Type::Struct(name),
+                    Some(&(id, _)) => {
+                        let span = self.span(fi, tok);
+                        let decl = self.structs[id.0 as usize].span;
+                        self.diags.push(
+                            Diagnostic::new(&codes::E0327, format!("`struct {name}` is used above its declaration"))
+                                .primary(span, "used here")
+                                .secondary(decl, "declared here, later")
+                                .help("move the struct's declaration above its first use; nwnnsscomp accepted this, and `--compat` does too"),
+                        );
+                        Type::Struct(name)
+                    }
                     found => {
                         let span = self.span(fi, tok);
                         let mut d =

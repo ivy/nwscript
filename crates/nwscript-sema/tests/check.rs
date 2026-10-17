@@ -169,7 +169,7 @@ fn every_semantic_code_has_an_example_that_raises_it_and_one_that_fixes_it() {
         );
         checked += 1;
     }
-    assert_eq!(checked, 24);
+    assert_eq!(checked, 26);
 }
 
 // ---- the checked form --------------------------------------------------------
@@ -295,13 +295,18 @@ fn switch_labels_fold_to_their_values() {
     for src in [
         "int G = 1; void main() { switch (1) { case G: break; } }",
         "void main() { switch (1) { case 1 + 2: break; } }",
-        "void main() { switch (1) { case 1: case 1: break; } }",
         "void main() { switch (1) { default: default: break; } }",
         "void main() { switch (1) { case 1: { case 2: break; } } }",
         "void main() { switch (1) { case \"a\": break; } }",
     ] {
         assert_eq!(codes_of(&check(src)), ["E0315"], "{src}");
     }
+    assert_eq!(
+        codes_of(&check(
+            "void main() { switch (1) { case 1: case 1: break; } }"
+        )),
+        ["E0328"]
+    );
 }
 
 #[test]

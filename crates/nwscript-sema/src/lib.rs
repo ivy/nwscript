@@ -7,6 +7,7 @@
 
 mod check;
 pub mod hir;
+pub mod lint;
 pub mod table;
 pub mod types;
 pub mod visit;

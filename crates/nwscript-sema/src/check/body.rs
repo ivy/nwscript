@@ -172,7 +172,7 @@ impl<'c, 't> Body<'c, 't> {
             let prev = prev.span;
             self.error(
                 Diagnostic::new(
-                    &codes::E0315,
+                    &codes::E0328,
                     format!("two `case` labels with the value {v}"),
                 )
                 .primary(span, "second label")

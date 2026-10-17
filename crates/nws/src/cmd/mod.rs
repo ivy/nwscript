@@ -85,6 +85,15 @@ fn levels(g: &crate::cli::Global) -> Result<Levels, Exit> {
         set(d, Level::Deny)?;
     }
     l.deny_warnings = g.deny.iter().any(|d| d.eq_ignore_ascii_case("warnings"));
+    // Strict is the default; a compat mode accepts what that compiler did.
+    l.strict = g.compat.is_none();
+    if g.compat.is_some() {
+        l.accepted = codes::NWNNSSCOMP_ACCEPTED.iter().map(|c| c.id).collect();
+    }
+    if g.compat == Some(crate::cli::Compat::Bioware) {
+        l.accepted
+            .extend(codes::BIOWARE_ACCEPTED.iter().map(|c| c.id));
+    }
     Ok(l)
 }
 

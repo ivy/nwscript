@@ -60,7 +60,15 @@ pub fn run(ctx: &Ctx, args: &CheckArgs) -> Exit {
         for i in resolver.inputs() {
             push_input(&mut env.inputs, i.clone());
         }
-        let errors = out.diagnostics.iter().filter(|d| d.is_error()).count();
+        let mut found = out.diagnostics;
+        if let Some(a) = &out.analysis {
+            found.extend(nwscript::sema::lint::lint(&a.program));
+        }
+        let found: Vec<_> = nwscript::sema::lint::apply_directives(found, &map)
+            .into_iter()
+            .filter_map(|d| ctx.levels.apply(d))
+            .collect();
+        let errors = found.iter().filter(|d| d.is_error()).count();
         if errors > 0 {
             failed += 1;
         }
@@ -74,9 +82,9 @@ pub fn run(ctx: &Ctx, args: &CheckArgs) -> Exit {
             "ok": errors == 0,
             "entry": entry,
             "errors": errors,
-            "warnings": out.diagnostics.len() - errors,
+            "warnings": found.len() - errors,
         }));
-        diags.extend(out.diagnostics);
+        diags.extend(found);
     }
     let text = if failed == 0 {
         format!("checked {}: no errors", plural(args.files.len()))

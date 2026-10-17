@@ -78,8 +78,17 @@ codes! {
     E0324 Error "a parameter without a default after one with a default";
     E0325 Error "a declaration where the language does not allow one";
     E0326 Error "an `action` argument that is not a call to a `void` function";
+    E0327 Error "a struct used above its declaration";
+    E0328 Error "two `case` labels with the same value";
     E0501 Error "the script faulted in the interpreter";
     E0502 Warning "the script stopped on an answer only the engine can give";
+    W0001 Warning "a local variable that is never read";
+    W0003 Warning "a function that is never called";
+    W0004 Warning "a local that hides a parameter, an outer local or a global";
+    W0005 Warning "a statement that is never reached";
+    W0006 Warning "arguments whose result depends on the order they are evaluated in";
+    W0007 Warning "a statement that computes a value and discards it";
+    W0008 Warning "an int converted to float in arithmetic";
 }
 
 /// Errors BioWare's own compiler accepted: the vanilla scripts were compiled
@@ -87,6 +96,16 @@ codes! {
 /// these is checked against the shipped declarations and fails. `--compat
 /// bioware` demotes exactly these; the checked program records what was
 /// written for each, so code generation needs nothing more.
+/// Lints that stay warnings in strict mode: calibration over the vanilla
+/// corpus and mods' scripts found them noise as errors (`docs/lints.md`).
+pub static STRICT_WARNINGS: &[&Code] = &[];
+
+/// Errors the Windows builds of nwnnsscomp that mods ship accept, found by
+/// compiling every mod script of the modshop build that nws rejected with
+/// it as a black box (`docs/lints.md`). `--compat nwnnsscomp` and
+/// `--compat bioware` accept them as warnings.
+pub static NWNNSSCOMP_ACCEPTED: &[&Code] = &[&E0327, &E0328];
+
 pub static BIOWARE_ACCEPTED: &[&Code] = &[&E0308, &E0309, &E0311];
 
 /// The code with this id, if registered.
