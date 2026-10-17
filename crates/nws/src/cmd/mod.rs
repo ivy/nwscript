@@ -1,5 +1,6 @@
 //! Command dispatch and the context every command shares.
 
+pub mod check;
 pub mod conformance;
 pub mod diff;
 pub mod disasm;
@@ -104,6 +105,7 @@ pub fn run(cli: Cli) -> Exit {
     match cli.command {
         Command::Explain { code } => explain::run(&ctx, &code),
         Command::Conformance(args) => conformance::run(&ctx, &args),
+        Command::Check(args) => check::run(&ctx, &args),
         Command::Disasm(args) => disasm::disasm(&ctx, &args),
         Command::Asm(args) => disasm::asm(&ctx, &args),
         Command::Run(args) => run::run(&ctx, &args),
