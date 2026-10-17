@@ -16,6 +16,8 @@
 
 Edward T. Smith's nwnnsscomp, native build (modshop's mise run nwnnsscomp:build), -v1.00
 
+Of the 133 outputs that differ from BioWare's bytes, 83 make the same engine calls with the same arguments and return the same result under the recording engine, 50 behave differently, and 0 do not run.
+
 Failed (23):
 
 - **undeclared** (3): uses a name the shipped sources do not declare: a constant BioWare's own build had (TRASK_DOOR_JAMMED), or a Neverwinter Nights function KotOR's table lacks (StartConversation, ResistSpell)
@@ -79,6 +81,8 @@ Size differences, largest clusters first:
 ## nwnnsscomp
 
 Edward T. Smith's nwnnsscomp, native build, default version
+
+Of the 527 outputs that differ from BioWare's bytes, 455 make the same engine calls with the same arguments and return the same result under the recording engine, 72 behave differently, and 0 do not run.
 
 Failed (23):
 
@@ -171,6 +175,8 @@ Size differences, largest clusters first:
 ## pykotor
 
 pykotor's built-in compiler, compile_nss(source, Game.K1), from modshop's environment (uv sync there first)
+
+Of the 1217 outputs that differ from BioWare's bytes, 753 make the same engine calls with the same arguments and return the same result under the recording engine, 440 behave differently, and 24 do not run.
 
 Failed (275):
 
@@ -639,6 +645,8 @@ Size differences, largest clusters first:
 
 nwnrs 0.0.1, nwnrs pack, --optimization O0
 
+Of the 1731 outputs that differ from BioWare's bytes, 688 make the same engine calls with the same arguments and return the same result under the recording engine, 1007 behave differently, and 36 do not run.
+
 Failed (23):
 
 - **undeclared** (3): uses a name the shipped sources do not declare: a constant BioWare's own build had (TRASK_DOOR_JAMMED), or a Neverwinter Nights function KotOR's table lacks (StartConversation, ResistSpell)
@@ -970,6 +978,8 @@ Size differences, largest clusters first:
 
 nwnrs 0.0.1, nwnrs pack, --optimization O1
 
+Of the 1731 outputs that differ from BioWare's bytes, 688 make the same engine calls with the same arguments and return the same result under the recording engine, 1007 behave differently, and 36 do not run.
+
 Failed (23):
 
 - **undeclared** (3): uses a name the shipped sources do not declare: a constant BioWare's own build had (TRASK_DOOR_JAMMED), or a Neverwinter Nights function KotOR's table lacks (StartConversation, ResistSpell)
@@ -1157,6 +1167,8 @@ Size differences, largest clusters first:
 
 nwnrs 0.0.1, nwnrs pack, --optimization O2
 
+Of the 1731 outputs that differ from BioWare's bytes, 688 make the same engine calls with the same arguments and return the same result under the recording engine, 1007 behave differently, and 36 do not run.
+
 Failed (23):
 
 - **undeclared** (3): uses a name the shipped sources do not declare: a constant BioWare's own build had (TRASK_DOOR_JAMMED), or a Neverwinter Nights function KotOR's table lacks (StartConversation, ResistSpell)
@@ -1343,6 +1355,8 @@ Size differences, largest clusters first:
 ## nwnrs-o3
 
 nwnrs 0.0.1, nwnrs pack, --optimization O3
+
+Of the 1731 outputs that differ from BioWare's bytes, 688 make the same engine calls with the same arguments and return the same result under the recording engine, 1007 behave differently, and 36 do not run.
 
 Failed (23):
 

@@ -63,6 +63,9 @@ pub struct Args {
     /// Parallel compilations. Defaults to the number of CPUs.
     #[arg(long, value_name = "N")]
     pub jobs: Option<usize>,
+    /// Skip running non-identical outputs to compare their traces.
+    #[arg(long)]
+    pub no_trace: bool,
     /// Seconds before a compilation is killed and counted as failed.
     #[arg(long, value_name = "SECS", default_value_t = 60)]
     pub timeout: u64,
@@ -147,6 +150,13 @@ pub struct Counts {
     pub samelen: usize,
     pub difflen: usize,
     pub failed: usize,
+    /// Of the outputs that are not identical: same calls, result and fault as BioWare's.
+    #[serde(default)]
+    pub trace_equal: usize,
+    #[serde(default)]
+    pub trace_different: usize,
+    #[serde(default)]
+    pub not_runnable: usize,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -260,6 +270,55 @@ struct Job<'a> {
     expected: &'a [u8],
 }
 
+/// How a non-identical output behaves next to BioWare's: both run under the
+/// recording engine and their calls, results and faults are compared.
+fn trace_class(expected: &[u8], produced: &[u8], routines: &[nwscript::vm::Routine]) -> String {
+    use nwscript::snapshot::CallRecord;
+    use nwscript::vm::{Limits, Recording, run};
+    // Behaviour does not depend on the program size record, and some compilers
+    // write it differently, so it is set to the file's length before decoding.
+    let decode = |b: &[u8]| {
+        let mut b = b.to_vec();
+        if b.len() >= 13 {
+            let len = (b.len() as u32).to_be_bytes();
+            b[9..13].copy_from_slice(&len);
+        }
+        nwscript::ncs::decode(nwscript::diag::FileId(0), &b)
+    };
+    let (Ok(want), Ok(have)) = (decode(expected), decode(produced)) else {
+        return "not-runnable: the output does not decode".into();
+    };
+    let a = run(&want, routines, &mut Recording, Limits::default());
+    let b = run(&have, routines, &mut Recording, Limits::default());
+    if let Some(f) = b.fault.as_ref().filter(|f| !f.kind.is_engine_dependent()) {
+        return format!("not-runnable: {f}");
+    }
+    let calls = |r: &nwscript::vm::Run| r.trace.iter().map(CallRecord::from).collect::<Vec<_>>();
+    let (ca, cb) = (calls(&a), calls(&b));
+    if let Some(i) = ca.iter().zip(&cb).position(|(x, y)| x != y) {
+        return format!(
+            "different: call {}: BioWare's {}, this {}",
+            i + 1,
+            ca[i],
+            cb[i]
+        );
+    }
+    if ca.len() != cb.len() {
+        return format!("different: {} calls, BioWare's {}", cb.len(), ca.len());
+    }
+    if a.result != b.result {
+        return format!(
+            "different: result {:?}, BioWare's {:?}",
+            b.result.map(|v| v.to_string()),
+            a.result.map(|v| v.to_string())
+        );
+    }
+    if a.fault.map(|f| f.to_string()) != b.fault.map(|f| f.to_string()) {
+        return "different: the runs stop differently".into();
+    }
+    "equal".into()
+}
+
 fn run_one(
     def: &[String],
     include: &Path,
@@ -267,6 +326,7 @@ fn run_one(
     job: &Job,
     work_root: &Path,
     timeout: Duration,
+    routines: Option<&[nwscript::vm::Routine]>,
 ) -> ScriptResult {
     let failed = |detail: String| ScriptResult {
         class: Class::Failed,
@@ -341,12 +401,15 @@ fn run_one(
             } else {
                 Class::Difflen
             };
+            let trace = routines
+                .filter(|_| class != Class::Identical)
+                .map(|r| trace_class(job.expected, &bytes, r));
             ScriptResult {
                 class,
                 delta: (class != Class::Identical).then_some(delta),
                 detail: None,
                 cause: None,
-                trace: None,
+                trace,
             }
         }
         _ => failed(
@@ -511,6 +574,19 @@ fn measure(args: &Args) -> Result<Report, String> {
     let work_root = std::env::temp_dir().join(format!("nws-conformance-{}", std::process::id()));
     let timeout = Duration::from_secs(args.timeout);
 
+    // The engine table for trace comparison: the corpus's own nwscript.nss.
+    let routines: Option<Vec<nwscript::vm::Routine>> = if args.no_trace {
+        None
+    } else {
+        // A corpus without nwscript.nss is compared by bytes alone.
+        std::fs::read(corpus.join("nwscript.nss"))
+            .ok()
+            .map(|bytes| {
+                let (table, _) =
+                    nwscript::sema::EngineTable::from_nwscript(nwscript::diag::FileId(0), &bytes);
+                nwscript::engine::routines(&table)
+            })
+    };
     let mut reports = Vec::new();
     for (name, def) in compilers {
         crate::working_on(format!("compiler {name}"));
@@ -535,6 +611,7 @@ fn measure(args: &Args) -> Result<Report, String> {
                             },
                             &root,
                             timeout,
+                            routines.as_deref(),
                         );
                         results.lock().expect("results").insert(script.clone(), r);
                     }
@@ -550,6 +627,12 @@ fn measure(args: &Args) -> Result<Report, String> {
         }
         let mut counts = Counts::default();
         for r in scripts.values() {
+            match r.trace.as_deref() {
+                Some("equal") => counts.trace_equal += 1,
+                Some(t) if t.starts_with("different") => counts.trace_different += 1,
+                Some(_) => counts.not_runnable += 1,
+                None => {}
+            }
             match r.class {
                 Class::Identical => counts.identical += 1,
                 Class::Samelen => counts.samelen += 1,
@@ -626,6 +709,13 @@ pub fn markdown(r: &Report) -> String {
     }
     for c in &r.compilers {
         s.push_str(&format!("\n## {}\n\n{}\n\n", c.name, c.description));
+        let traced = c.counts.trace_equal + c.counts.trace_different + c.counts.not_runnable;
+        if traced > 0 {
+            s.push_str(&format!(
+                "Of the {traced} outputs that differ from BioWare's bytes, {} make the same engine calls with the same arguments and return the same result under the recording engine, {} behave differently, and {} do not run.\n\n",
+                c.counts.trace_equal, c.counts.trace_different, c.counts.not_runnable
+            ));
+        }
         let failed: Vec<_> = c
             .scripts
             .iter()

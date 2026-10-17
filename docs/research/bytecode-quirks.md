@@ -84,6 +84,21 @@ Under an engine that answers every routine with its type's default, 158 module s
 
 Eighteen scripts fail in every compiler because the declarations they were compiled against are not the ones that shipped: ten call `AddPartyMember` or `RemovePartyMember` with an argument the shipped prototype rejects, five include `k_inc_ebonhawk`, whose forward declaration of `EBO_PlayTakeOff` disagrees with its definition, and three use names the shipped sources never declare. `conformance/known.toml` lists them by cause, and the conformance report shows the cause beside each failure.
 
+### `ActionStartConversation` had eleven parameters
+
+The shipped `nwscript.nss` declares `ActionStartConversation` with twelve parameters, the last an int defaulting to 0. BioWare's bytecode passes eleven: every call compiled by BioWare leaves the twelfth out, so those scripts were compiled when the routine had eleven. A compiler working from the shipped declaration pushes one more `CONSTI 0`, six bytes, which is the whole of the largest cluster of nwnnsscomp's different-length outputs (32 scripts, +6 bytes each). The conformance report's trace comparison shows it directly, in `k_pend_door01` for one:
+
+```text
+BioWare's   ActionStartConversation(OBJECT_INVALID, "end_trask01", 0, 0, 1, "", "", "", "", "", "")
+nwnnsscomp  ActionStartConversation(OBJECT_INVALID, "end_trask01", 0, 0, 1, "", "", "", "", "", "", 0)
+```
+
+Of the 32, 17 differ in their trace; in the other 15 the call sits on a path the recording engine does not reach. Reproducing BioWare's bytes takes the eleven-parameter declaration; the engine evidently accepts both.
+
+### Bytecode older than its source
+
+Some shipped NCS was compiled from an earlier version of the source that ships beside it. `k_pla_actmap.ncs` posts `"K_STAR_MAP Before = "` where `k_pla_actmap.nss` writes `"v3.0 - K_STAR_MAP Before = "`; `k_trg_transfail1.ncs` calls routines its source does not (see the grammar census). The `k_act_com3*` family, which includes `k_inc_generic`, makes different calls from its first, which points the same way for the include. These scripts cannot be reproduced from the shipped sources by any compiler.
+
 ### Neverwinter Nights leftovers
 
 `nw_g0_conversat` and `nw_s0_lghtnbolt` are Neverwinter Nights scripts in KotOR's BIF. Their sources call `StartConversation` and `ResistSpell`, which KotOR's engine table does not have. `nw_s0_lghtnbolt.ncs` was compiled against NWN's table: its `ACTION` numbers do not fit KotOR's signatures, and the stack-depth analysis finds a conflict at offset 909.
