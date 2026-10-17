@@ -108,6 +108,43 @@ Values cross into Lua as integers, numbers, strings (bytes, as the game stores t
 
 Numbers match by value, objects by identity, strings by bytes.
 
+## Snapshots
+
+A snapshot is a recorded run kept as data: the script's name, the engine and world it ran in, its result, and every engine call. `nws test` replays each `*.snapshot.toml` it finds and fails at the first call that differs, which makes snapshots the cheapest guard for a script that should not change behaviour.
+
+```bash
+nws --game k1 -I corpus run --world world.toml --record k_pman_comp35.snapshot.toml k_pman_comp35.ncs
+nws --game k1 -I corpus test .
+```
+
+A failing replay names the call:
+
+```text
+call 1 differs:
+  recorded: GetGlobalBoolean("MAN_PTRAP_DONE") -> 1
+  now:      GetGlobalBoolean("MAN_PTRAP_GONE") -> 0
+(the script's bytecode differs from the recording's)
+```
+
+The world file, given to `nws run --world` and kept as a snapshot's `[world]`, names objects by tag:
+
+```toml
+seed = 7
+npc_party = [1]
+party = ["player"]
+context = { speaker = "player" }
+globals_number = { DAN_JON_STATE = 1 }
+globals_boolean = { MAN_PTRAP_DONE = true }
+
+[[objects]]
+kind = 1            # OBJECT_TYPE_CREATURE
+tag = "player"
+is_pc = true
+inventory = ["ptar_sithpapers"]
+```
+
+Objects take `kind`, `tag`, `name`, `hp`, `max_hp`, `is_pc`, `dead`, `faction`, `position` and `inventory` (item tags); `context` takes `self`, `speaker`, `entering`, `exiting`, `opened_by`, `used_by`, `clicking` and `perceived`; `user_event` sets `GetUserDefinedEventNumber`. Without `--world` a snapshot records the recording engine, which answers every routine with its default.
+
 ## Constants and scripting
 
 `nws.const.NAME` is any constant `nwscript.nss` declares, such as `nws.const.NPC_HK_47`. `nws lua FILE ARGS...` runs a Lua file with the same API and `nws.args`, for work over many scripts:

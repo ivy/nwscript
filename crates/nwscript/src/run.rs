@@ -23,6 +23,15 @@ pub fn run_bytes(
     Ok((r, d))
 }
 
+/// The diagnostic for a run's fault, if it had one.
+pub fn fault_diagnostic_for(
+    r: &Run,
+    p: &nwscript_ncs::Program,
+    file: FileId,
+) -> Option<Diagnostic> {
+    r.fault.as_ref().map(|f| fault_diagnostic(f, r, p, file))
+}
+
 fn fault_diagnostic(
     f: &nwscript_vm::Fault,
     r: &Run,

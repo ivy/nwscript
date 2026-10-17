@@ -10,7 +10,7 @@ use std::rc::Rc;
 #[derive(clap::Args, Debug)]
 #[command(after_help = "\
 Examples:
-  nws --game k1 -I corpus test                      every *_test.lua below .
+  nws --game k1 -I corpus test                      every *_test.lua and *.snapshot.toml below .
   nws --game k1 -I corpus test docs/examples --filter keycard
 
 A test file declares tests with describe/it (busted style) and runs
@@ -19,7 +19,7 @@ NAME.ncs in the test file's directory, then the -I directories; nwscript.nss
 comes from --nwscript or -I. docs/testing.md is the reference.
 Exit 0 when every test passes, 3 when any fails.")]
 pub struct TestArgs {
-    /// Files or directories to search for *_test.lua; the current directory by default.
+    /// Files or directories to search for *_test.lua and *.snapshot.toml; the current directory by default.
     pub paths: Vec<PathBuf>,
     /// Run only tests whose full name contains this text.
     #[arg(long)]
@@ -89,10 +89,10 @@ fn discover(paths: &[PathBuf]) -> Vec<PathBuf> {
                         .is_some_and(|n| n.to_string_lossy().starts_with('.') || n == "target")
                 }));
             }
-        } else if p
-            .file_name()
-            .is_some_and(|n| n.to_string_lossy().ends_with("_test.lua"))
-        {
+        } else if p.file_name().is_some_and(|n| {
+            let n = n.to_string_lossy();
+            n.ends_with("_test.lua") || n.ends_with(".snapshot.toml")
+        }) {
             out.push(p);
         }
     }
@@ -107,7 +107,7 @@ pub fn test(ctx: &Ctx, args: &TestArgs) -> Exit {
     };
     let files = discover(&args.paths);
     if files.is_empty() {
-        eprintln!("error: no *_test.lua files found");
+        eprintln!("error: no *_test.lua or *.snapshot.toml files found");
         return Exit::Usage;
     }
     let (mut passed, mut failed) = (0, 0);
@@ -124,6 +124,26 @@ pub fn test(ctx: &Ctx, args: &TestArgs) -> Exit {
             Ok(h) => h,
             Err(e) => return e,
         };
+        if f.to_string_lossy().ends_with(".snapshot.toml") {
+            let name = f.display().to_string();
+            if args.filter.as_deref().is_some_and(|x| !name.contains(x)) {
+                continue;
+            }
+            let outcome = replay(&host, f);
+            println!(
+                "test {name} (snapshot) ... {}",
+                if outcome.is_ok() { "ok" } else { "FAILED" }
+            );
+            report.push(serde_json::json!({ "file": name, "name": name, "passed": outcome.is_ok(), "message": outcome.as_ref().err() }));
+            match outcome {
+                Ok(()) => passed += 1,
+                Err(e) => {
+                    failed += 1;
+                    failures.push((name, e, String::new()));
+                }
+            }
+            continue;
+        }
         match run_test_file(&host, f, args.filter.as_deref()) {
             Err(e) => {
                 println!("{}: could not load: {e}", f.display());
@@ -190,5 +210,45 @@ pub fn lua(ctx: &Ctx, args: &LuaArgs) -> Exit {
             eprintln!("error: {e}");
             Exit::Errors
         }
+    }
+}
+
+/// Replay a snapshot: run its script in its world and compare.
+fn replay(host: &Host, path: &Path) -> Result<(), String> {
+    use nwscript::snapshot::{Snapshot, compare, execute};
+    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let snap: Snapshot = toml::from_str(&text).map_err(|e| format!("not a snapshot: {e}"))?;
+    if snap.game != host.game {
+        return Err(format!(
+            "recorded with --game {}, replayed with --game {}",
+            snap.game, host.game
+        ));
+    }
+    let (found, bytes) = (host.find)(&snap.script).ok_or_else(|| {
+        format!(
+            "no compiled script `{}.ncs` beside the snapshot or in the -I directories",
+            snap.script
+        )
+    })?;
+    let mut map = SourceMap::new();
+    let program = nwscript::ncs::decode_named(found.clone(), &bytes, &mut map)
+        .map_err(|d| format!("{found}: {}", d.message))?;
+    let r = execute(
+        &program,
+        &host.routines,
+        snap.engine,
+        &snap.world,
+        nwscript::vm::Limits::default(),
+    )?;
+    match compare(&snap, &r) {
+        None => Ok(()),
+        Some(diff) => Err(format!(
+            "{diff}\n(the script's bytecode {} the recording's)",
+            if nwscript::sha256_hex(&bytes) == snap.script_sha256 {
+                "matches"
+            } else {
+                "differs from"
+            }
+        )),
     }
 }

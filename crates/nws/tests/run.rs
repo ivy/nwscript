@@ -110,3 +110,98 @@ fn docs_examples_pass() {
         .code(0)
         .stdout(predicate::str::contains("test result: ok. 15 passed"));
 }
+
+/// Record each example script as a snapshot, replay them all, then change
+/// one script and see the first differing call.
+#[test]
+#[ignore = "needs the corpus: set NWSCRIPT_CORPUS"]
+fn snapshots_round_trip_and_catch_a_change() {
+    let root = match std::env::var_os("NWSCRIPT_CORPUS") {
+        Some(p) => std::path::PathBuf::from(p),
+        None => std::path::PathBuf::from(std::env::var_os("HOME").unwrap())
+            .join(".cache/nwscript/corpus/k1"),
+    };
+    if !root.join("ncs").is_dir() {
+        eprintln!("skipping: no corpus; set NWSCRIPT_CORPUS to an extracted corpus directory");
+        return;
+    }
+    let d = std::env::temp_dir().join(format!("nws-snap-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(&d).unwrap();
+    std::fs::write(
+        d.join("world.toml"),
+        "seed = 7\nnpc_party = [1]\nparty = [\"player\"]\ncontext = { speaker = \"player\" }\nglobals_number = { DAN_JON_STATE = 1 }\nglobals_boolean = { MAN_PTRAP_DONE = true }\n[[objects]]\nkind = 1\ntag = \"player\"\nis_pc = true\ninventory = [\"ptar_sithpapers\"]\n[[objects]]\nkind = 1\ntag = \"cand\"\nposition = [3.0, 4.0, 0.0]\n",
+    )
+    .unwrap();
+    let scripts = [
+        "k_con_hk47npm",
+        "k_pman_misc59",
+        "k_pdan_drandom07",
+        "k_pman_comp35",
+        "k_ptar_sithpaper",
+        "k_con_canderpm",
+        "k_pdan_mand04",
+        "k_pman_planet77",
+        "k_ptat_canhunt",
+        "k_swg_bastila29",
+    ];
+    for s in scripts {
+        std::fs::copy(
+            root.join(format!("ncs/{s}.ncs")),
+            d.join(format!("{s}.ncs")),
+        )
+        .unwrap();
+        Command::cargo_bin("nws")
+            .unwrap()
+            .args(["--game", "k1", "-I"])
+            .arg(&root)
+            .arg("run")
+            .arg("--world")
+            .arg(d.join("world.toml"))
+            .arg("--record")
+            .arg(d.join(format!("{s}.snapshot.toml")))
+            .arg(d.join(format!("{s}.ncs")))
+            .assert()
+            .code(0);
+    }
+    Command::cargo_bin("nws")
+        .unwrap()
+        .args(["--game", "k1", "-I"])
+        .arg(&root)
+        .arg("test")
+        .arg(&d)
+        .assert()
+        .code(0)
+        .stdout(predicate::str::contains("10 passed"));
+    let asm = Command::cargo_bin("nws")
+        .unwrap()
+        .arg("disasm")
+        .arg(d.join("k_pman_comp35.ncs"))
+        .output()
+        .unwrap()
+        .stdout;
+    let changed = String::from_utf8(asm)
+        .unwrap()
+        .replace("MAN_PTRAP_DONE", "MAN_PTRAP_GONE");
+    Command::cargo_bin("nws")
+        .unwrap()
+        .args(["asm", "-", "-o"])
+        .arg(d.join("k_pman_comp35.ncs"))
+        .write_stdin(changed)
+        .assert()
+        .code(0);
+    Command::cargo_bin("nws")
+        .unwrap()
+        .args(["--game", "k1", "-I"])
+        .arg(&root)
+        .arg("test")
+        .arg(&d)
+        .assert()
+        .code(3)
+        .stdout(
+            predicate::str::contains("call 1 differs").and(predicate::str::contains(
+                "GetGlobalBoolean(\"MAN_PTRAP_GONE\")",
+            )),
+        );
+    std::fs::remove_dir_all(&d).unwrap();
+}

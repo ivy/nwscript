@@ -5,7 +5,7 @@ use crate::Exit;
 use crate::io::{display_name, read_input};
 use nwscript::Envelope;
 use nwscript::diag::SourceMap;
-use nwscript::vm::{Limits, Recording, World};
+use nwscript::snapshot::{self, EngineKind, WorldSpec};
 use std::path::PathBuf;
 
 #[derive(clap::Args, Debug)]
@@ -14,6 +14,7 @@ Examples:
   nws --game k1 --nwscript nwscript.nss run k_con_canderpm.ncs
   nws --game k1 -I corpus run --trace k_pdan_mand04.ncs
   nws --game k1 -I corpus --format json run --engine world k_ai_master.ncs
+  nws --game k1 -I corpus run --world w.toml --record k_x.snapshot.toml k_x.ncs
 
 The script runs from its entry, then the deferred actions it created
 (DelayCommand, AssignCommand, ActionDoCommand) in order. Every engine call
@@ -34,6 +35,12 @@ pub struct Args {
     /// Instructions before the run stops, deferred actions included.
     #[arg(long, default_value_t = 5_000_000)]
     pub budget: u64,
+    /// Start from this world (TOML, as a snapshot's [world]); implies --engine world.
+    #[arg(long, value_name = "FILE")]
+    pub world: Option<PathBuf>,
+    /// Write the run as a snapshot that `nws test` replays.
+    #[arg(long, value_name = "FILE.snapshot.toml")]
+    pub record: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
@@ -96,27 +103,65 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
     env.inputs
         .extend(nwscript::Resolver::inputs(&resolver).iter().cloned());
     let routines = nwscript::engine::routines(&table);
-    let limits = Limits {
-        steps: args.budget,
-        ..Limits::default()
+    let spec = match &args.world {
+        Some(p) => match std::fs::read_to_string(p)
+            .map_err(|e| e.to_string())
+            .and_then(|s| toml::from_str::<WorldSpec>(&s).map_err(|e| e.to_string()))
+        {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("error: {}: {e}", p.display());
+                return Exit::Usage;
+            }
+        },
+        None => WorldSpec {
+            seed: args.seed,
+            ..WorldSpec::default()
+        },
     };
-    let mut recording = Recording;
-    let mut world = World::new(args.seed);
-    let engine: &mut dyn nwscript::vm::Engine = match args.engine {
-        EngineArg::Recording => &mut recording,
-        EngineArg::World => &mut world,
+    let kind = if args.world.is_some() || args.engine == EngineArg::World {
+        EngineKind::World
+    } else {
+        EngineKind::Recording
     };
-    let (r, fault) = match nwscript::run::run_bytes(
-        &display_name(&args.input),
-        &bytes,
-        &routines,
-        engine,
-        limits,
-        &mut map,
-    ) {
-        Ok(x) => x,
+    let program = match nwscript::ncs::decode_named(display_name(&args.input), &bytes, &mut map) {
+        Ok(p) => p,
         Err(d) => return ctx.finish(env, "", vec![d], &map, Exit::Ok),
     };
+    let file = nwscript::diag::FileId(map.files().count() as u32 - 1);
+    let r = match snapshot::execute(
+        &program,
+        &routines,
+        kind,
+        &spec,
+        nwscript::vm::Limits {
+            steps: args.budget,
+            ..Default::default()
+        },
+    ) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return Exit::Usage;
+        }
+    };
+    let fault = nwscript::run::fault_diagnostic_for(&r, &program, file);
+    if let Some(path) = &args.record {
+        let name = args
+            .input
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let snap = snapshot::record(&name, game.name(), &bytes, kind, spec, &r);
+        let text = toml::to_string(&snap).expect("snapshots serialize");
+        match crate::io::write_output(path, text.as_bytes()) {
+            Ok(rec) => env.outputs.push(rec),
+            Err(e) => {
+                eprintln!("error: {e}");
+                return Exit::Errors;
+            }
+        }
+    }
     let mut text = String::new();
     if args.trace {
         for c in &r.trace {
