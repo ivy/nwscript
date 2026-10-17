@@ -78,6 +78,7 @@ codes! {
     E0324 Error "a parameter without a default after one with a default";
     E0325 Error "a declaration where the language does not allow one";
     E0326 Error "an `action` argument that is not a call to a `void` function";
+    E0401 Error "a program code generation cannot compile";
     E0501 Error "the script faulted in the interpreter";
     E0502 Warning "the script stopped on an answer only the engine can give";
 }
