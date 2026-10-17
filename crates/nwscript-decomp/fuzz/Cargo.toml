@@ -1,0 +1,25 @@
+[package]
+name = "nwscript-decomp-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+nwscript-diag = { path = "../../nwscript-diag" }
+nwscript-ncs = { path = "../../nwscript-ncs" }
+nwscript-sema = { path = "../../nwscript-sema" }
+nwscript-decomp = { path = ".." }
+
+# Built with `cargo +nightly fuzz` from this directory, outside the main workspace.
+[workspace]
+
+[[bin]]
+name = "decompile"
+path = "fuzz_targets/decompile.rs"
+test = false
+doc = false
+bench = false

@@ -374,3 +374,80 @@ fn module_verified_fraction() {
         all.fraction()
     );
 }
+
+/// Small, structure-preserving damage to every vanilla script (an operand
+/// nudged, two instructions swapped) is reported per function, never a panic.
+#[test]
+#[ignore = "needs the corpus; run with --ignored"]
+fn damaged_bytecode_never_panics() {
+    use nwscript_ncs::Operands as O;
+    let Some(corpus) = common::corpus() else {
+        return;
+    };
+    let table = common::table(&corpus);
+    // xorshift: the same damage on every run.
+    let mut seed: u64 = 0x9e37_79b9_7f4a_7c15;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let mut files: Vec<PathBuf> = std::fs::read_dir(corpus.join("ncs"))
+        .expect("ncs/")
+        .map(|e| e.unwrap().path())
+        .collect();
+    files.sort();
+    let mut panics = Vec::new();
+    for path in &files {
+        let bytes = std::fs::read(path).unwrap();
+        let program = nwscript_ncs::decode(nwscript_diag::FileId(0), &bytes).unwrap();
+        for _ in 0..20 {
+            let mut ins = program.instructions().to_vec();
+            let n = ins.len();
+            for _ in 0..1 + rnd() % 3 {
+                let k = rnd() as usize % n;
+                let step = |r: u64, unit: i32| unit * ((r % 5) as i32 - 2);
+                match &mut ins[k].operands {
+                    O::Stack { offset, size } => {
+                        if rnd() % 2 == 0 {
+                            *offset += step(rnd(), 4);
+                        } else {
+                            *size = (rnd() % 4) as u16 * 4;
+                        }
+                    }
+                    O::Offset(o) => *o += step(rnd(), 4),
+                    O::Jump(j) => *j += step(rnd(), 6),
+                    O::Action { routine, argc } => {
+                        if rnd() % 2 == 0 {
+                            *routine = (rnd() % 800) as u16;
+                        } else {
+                            *argc = (rnd() % 6) as u8;
+                        }
+                    }
+                    O::StoreState { locals, .. } => *locals = (rnd() % 10) as u32 * 4,
+                    O::Destruct {
+                        size,
+                        keep_offset,
+                        keep_size,
+                    } => {
+                        *size = (rnd() % 5) as u16 * 4;
+                        *keep_offset = (rnd() % 5) as u16 * 4;
+                        *keep_size = (rnd() % 3) as u16 * 4;
+                    }
+                    _ => ins.swap(k, rnd() as usize % n),
+                }
+            }
+            let damaged = nwscript_ncs::Program::new(ins);
+            let ok = std::panic::catch_unwind(|| {
+                if let Ok(d) = decompile(&damaged, &table) {
+                    let _ = d.source();
+                }
+            });
+            if ok.is_err() {
+                panics.push(path.display().to_string());
+            }
+        }
+    }
+    assert!(panics.is_empty(), "panicked on damaged {panics:?}");
+}

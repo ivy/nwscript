@@ -27,6 +27,10 @@ fn is_dup_expr(e: &Expr) -> bool {
     matches!(e, Expr::Place(Place::Var(DUP)))
 }
 
+/// More bytes of parameters or result than any function declares: such a
+/// frame is damage, not a signature.
+const MAX_FRAME: u32 = 4096;
+
 /// Where each function is and what the bytecode says about its frame.
 #[derive(Clone, Debug)]
 struct Layout {
@@ -235,9 +239,11 @@ fn layout(prog: &Program, table: &EngineTable) -> Res<Vec<Layout>> {
                 if let (Op::CpDownSp, O::Stack { offset, size }, Some(d)) =
                     (ins[i].opcode, &ins[i].operands, depths.before[i])
                 {
-                    let at = d + offset;
-                    if at < -(p as i32) {
-                        ret = ret.max((-(p as i32) - at) as u32).max(u32::from(*size));
+                    let at = i64::from(d) + i64::from(*offset);
+                    let base = -i64::from(p);
+                    if at < base {
+                        let r = u32::try_from(base - at).unwrap_or(u32::MAX);
+                        ret = ret.max(r).max(u32::from(*size));
                     }
                 }
             }
@@ -340,6 +346,12 @@ fn parse_function(sh: &mut Shared, f: usize) -> Res<Vec<Stmt>> {
     let p = l
         .params
         .ok_or("the function's stack effect could not be determined")?;
+    if p > MAX_FRAME || l.ret > MAX_FRAME {
+        return Err(format!(
+            "the function's stack effect ({p} bytes of parameters, {} of result) is beyond any script's",
+            l.ret
+        ));
+    }
     let ins = sh.ins;
     let last = l.end - 1;
     if ins[last].opcode != Op::Retn {
@@ -642,10 +654,7 @@ impl Fp<'_, '_> {
             Some(Entry {
                 size,
                 slot: Slot::Temp(e, t),
-            }) => Ok((e, t, size)),
-            Some(Entry {
-                slot: Slot::Dup, ..
-            }) => Ok((Expr::Place(Place::Var(DUP)), Some(Ty::Int), 4)),
+            }) if !has_dup(&e) => Ok((e, t, size)),
             other => {
                 if let Some(o) = other {
                     self.stack.push(o);
@@ -653,6 +662,19 @@ impl Fp<'_, '_> {
                 Err(self.at("an operation on something that is not a value"))
             }
         }
+    }
+
+    /// The left operand of a binary operator: a value, or the copy a `case`
+    /// test compares.
+    fn pop_operand(&mut self) -> Res<(Expr, Option<Ty>, u32)> {
+        if let Some(Entry {
+            slot: Slot::Dup, ..
+        }) = self.stack.last()
+        {
+            self.stack.pop();
+            return Ok((Expr::Place(Place::Var(DUP)), Some(Ty::Int), 4));
+        }
+        self.pop_temp()
     }
 
     /// Does the `RSADD` at `pc` (with `size` bytes, from `n` instructions)
@@ -1422,8 +1444,8 @@ impl Fp<'_, '_> {
                         return Err(self.at("an instruction no statement shape explains"));
                     };
                     let (r, rt, _) = self.pop_temp()?;
-                    let (l, lt, _) = self.pop_temp()?;
-                    if is_dup_expr(&r) || (is_dup_expr(&l) && b != BinOp::Eq) {
+                    let (l, lt, _) = self.pop_operand()?;
+                    if is_dup_expr(&l) && b != BinOp::Eq {
                         return Err(self.at("a copied value used other than by a case test"));
                     }
                     let (lty, rty, res) = operand_types(op, x.ty, &x.operands);
