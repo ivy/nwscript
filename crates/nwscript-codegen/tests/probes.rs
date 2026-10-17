@@ -1,5 +1,5 @@
 //! Code generation probes: small scripts whose bytecode was recorded from
-//! nwnnsscomp `-v1.00`, run as a black box. Each pins one encoding rule;
+//! nwnnsscomp in its pre-1.30 mode, run as a black box. Each pins one encoding rule;
 //! where the vanilla corpus uses the construct, its bytes agree, and where
 //! it does not, nwnnsscomp's choice is the one `docs/grammar.md` records
 //! under Unconfirmed.

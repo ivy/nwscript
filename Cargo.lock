@@ -692,7 +692,9 @@ dependencies = [
 name = "nwnnsscomp"
 version = "0.0.0"
 dependencies = [
+ "assert_cmd",
  "nwscript",
+ "predicates",
 ]
 
 [[package]]
