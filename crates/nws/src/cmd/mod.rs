@@ -39,7 +39,6 @@ impl Ctx {
 
     /// A resolver over the `-I` directories (after `first`, the input's own
     /// directory) and `--nwscript`.
-    #[expect(dead_code, reason = "the compiling commands use it")]
     pub fn resolver(&self, first: Option<std::path::PathBuf>) -> FsResolver {
         let dirs = first
             .into_iter()

@@ -11,5 +11,8 @@ repository.workspace = true
 nwscript-ncs = { workspace = true }
 nwscript-diag = { workspace = true }
 
+[dev-dependencies]
+nwscript-sema = { workspace = true }
+
 [lints]
 workspace = true

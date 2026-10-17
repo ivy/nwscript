@@ -174,3 +174,57 @@ fn corpus_pipeline() {
         &failures[..failures.len().min(10)]
     );
 }
+
+/// With the corpus's nwscript.nss, every ACTION line names its routine.
+#[test]
+#[ignore = "needs the corpus: set NWSCRIPT_CORPUS"]
+fn corpus_disasm_names_every_action() {
+    let Some(root) = corpus() else {
+        eprintln!("skipping: no corpus; set NWSCRIPT_CORPUS to an extracted corpus directory");
+        return;
+    };
+    let files = all_ncs(&root);
+    let bin = assert_cmd::cargo::cargo_bin("nws");
+    let nwscript = root.join("nwscript.nss");
+    let missing = std::sync::Mutex::new(Vec::new());
+    let actions = std::sync::atomic::AtomicUsize::new(0);
+    let next = std::sync::Mutex::new(files.iter());
+    std::thread::scope(|s| {
+        for _ in 0..std::thread::available_parallelism().map_or(4, |n| n.get()) {
+            s.spawn(|| {
+                while let Some(f) = next.lock().unwrap().next() {
+                    let out = std::process::Command::new(&bin)
+                        .arg("--nwscript")
+                        .arg(&nwscript)
+                        .arg("disasm")
+                        .arg(f)
+                        .output()
+                        .unwrap();
+                    for line in String::from_utf8_lossy(&out.stdout)
+                        .lines()
+                        .filter(|l| l.trim_start().starts_with("ACTION"))
+                    {
+                        actions.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        if !line.contains("; ") {
+                            missing
+                                .lock()
+                                .unwrap()
+                                .push(format!("{}: {line}", f.display()));
+                        }
+                    }
+                }
+            });
+        }
+    });
+    let missing = missing.into_inner().unwrap();
+    println!(
+        "names: {} ACTION lines, {} without a name",
+        actions.into_inner(),
+        missing.len()
+    );
+    assert!(
+        missing.is_empty(),
+        "{:?}",
+        &missing[..missing.len().min(10)]
+    );
+}

@@ -7,12 +7,15 @@
 //! [`Envelope`] can name each input with its hash.
 
 pub mod bytecode;
+pub mod engine;
 pub mod envelope;
 pub mod resolve;
 
 pub use envelope::{Envelope, InputRecord, OutputRecord};
 pub use nwscript_diag as diag;
 pub use nwscript_ncs as ncs;
+pub use nwscript_sema as sema;
+pub use nwscript_vm as vm;
 pub use resolve::{FsResolver, MemResolver, Resolved, Resolver};
 
 use serde::Serialize;

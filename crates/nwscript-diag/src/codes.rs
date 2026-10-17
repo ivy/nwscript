@@ -51,6 +51,8 @@ codes! {
     E0205 Error "a syntax error: the parser expected something else";
     E0206 Error "a malformed or misplaced directive";
     E0207 Error "statements or expressions nested beyond the parser's limit";
+    E0301 Error "a type name that names no type";
+    E0302 Error "an initialiser or default that is not a constant";
 }
 
 /// The code with this id, if registered.

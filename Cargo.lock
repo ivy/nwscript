@@ -715,6 +715,7 @@ version = "0.0.0"
 dependencies = [
  "nwscript-diag",
  "nwscript-ncs",
+ "nwscript-sema",
 ]
 
 [[package]]

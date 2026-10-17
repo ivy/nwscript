@@ -193,7 +193,12 @@ fn objects_party_and_variables() {
         ),
         card
     );
-    call(&mut w, "DestroyObject", Ty::Void, std::slice::from_ref(&card));
+    call(
+        &mut w,
+        "DestroyObject",
+        Ty::Void,
+        std::slice::from_ref(&card),
+    );
     assert_eq!(
         call(&mut w, "GetIsObjectValid", Ty::Int, &[card]),
         Value::Int(0)

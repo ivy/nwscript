@@ -61,9 +61,39 @@ pub fn disasm(ctx: &Ctx, args: &DisasmArgs) -> Exit {
     let mut env = Envelope::new("disasm", ctx.game);
     env.inputs.push(input);
     let mut map = SourceMap::new();
+    // Routine names come from nwscript.nss when one resolves: --nwscript,
+    // or the input's directory and -I. What reading it reports (KotOR 1's
+    // line-5145 typo) does not concern a disassembly and is not shown.
+    let dir = args
+        .input
+        .parent()
+        .filter(|_| args.input.as_os_str() != "-")
+        .map(|d| {
+            if d.as_os_str().is_empty() {
+                PathBuf::from(".")
+            } else {
+                d.to_path_buf()
+            }
+        });
+    let mut resolver = ctx.resolver(dir);
+    let mut table_map = SourceMap::new();
+    let table = nwscript::engine::load_table(&mut resolver, &mut table_map)
+        .ok()
+        .flatten()
+        .map(|(t, _)| t);
+    env.inputs
+        .extend(nwscript::Resolver::inputs(&resolver).iter().cloned());
+    let names = |r: u16| {
+        table
+            .as_ref()
+            .and_then(|t| t.functions.get(usize::from(r)))
+            .map(|f| f.name.clone())
+    };
     let opts = PrintOptions {
         raw: args.raw,
-        routine_name: None,
+        routine_name: table
+            .as_ref()
+            .map(|_| &names as &dyn Fn(u16) -> Option<String>),
     };
     let name = display_name(&args.input);
     let made = if args.cfg {

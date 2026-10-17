@@ -14,59 +14,31 @@ fn corpus() -> Option<PathBuf> {
     dir.join("ncs").is_dir().then_some(dir)
 }
 
-/// The routine table from `nwscript.nss`'s prototypes, read naively for this
-/// test; the front end's function table is the real one.
+/// The routine table from `nwscript.nss`, through the front end's reader.
 fn routines(nwscript: &Path) -> Vec<Routine> {
-    let text = String::from_utf8_lossy(&std::fs::read(nwscript).unwrap()).into_owned();
-    let ty = |t: &str| match t.trim() {
-        "void" => Ty::Void,
-        "int" | "INT" => Ty::Int,
-        "float" => Ty::Float,
-        "string" => Ty::String,
-        "object" | "OBJECT_ID" => Ty::Object,
-        "vector" => Ty::Vector,
-        "action" => Ty::Action,
-        "effect" => Ty::Engine(0),
-        "event" => Ty::Engine(1),
-        "location" => Ty::Engine(2),
-        "talent" => Ty::Engine(3),
-        other => panic!("unknown type {other}"),
+    use nwscript_sema::Type;
+    let ty = |t: &Type| match t {
+        Type::Void => Ty::Void,
+        Type::Int => Ty::Int,
+        Type::Float => Ty::Float,
+        Type::String => Ty::String,
+        Type::Object => Ty::Object,
+        Type::Vector => Ty::Vector,
+        Type::Action => Ty::Action,
+        Type::Engine(n) => Ty::Engine(*n),
+        Type::Struct(_) => Ty::Int,
     };
-    let mut out = Vec::new();
-    for line in text.lines() {
-        let line = line.trim();
-        let Some(open) = line.find('(') else { continue };
-        let head: Vec<&str> = line[..open].split_whitespace().collect();
-        if head.len() != 2 || !line.ends_with(");") || line.starts_with("//") {
-            continue;
-        }
-        let params = &line[open + 1..line.rfind(')').unwrap()];
-        let mut parts = Vec::new();
-        let (mut depth, mut start) = (0, 0);
-        for (i, c) in params.char_indices() {
-            match c {
-                '[' => depth += 1,
-                ']' => depth -= 1,
-                ',' if depth == 0 => {
-                    parts.push(&params[start..i]);
-                    start = i + 1;
-                }
-                _ => {}
-            }
-        }
-        parts.push(&params[start..]);
-        let params = parts
-            .into_iter()
-            .filter(|p| !p.trim().is_empty())
-            .map(|p| ty(p.split_whitespace().next().unwrap()))
-            .collect();
-        out.push(Routine {
-            name: head[1].to_string(),
-            params,
-            ret: ty(head[0]),
-        });
-    }
-    out
+    let (table, _) =
+        nwscript_sema::EngineTable::from_nwscript(FileId(0), &std::fs::read(nwscript).unwrap());
+    table
+        .functions
+        .iter()
+        .map(|f| Routine {
+            name: f.name.clone(),
+            params: f.params.iter().map(|p| ty(&p.ty)).collect(),
+            ret: ty(&f.ret),
+        })
+        .collect()
 }
 
 fn all_ncs(root: &Path) -> Vec<PathBuf> {
