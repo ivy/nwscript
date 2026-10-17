@@ -97,7 +97,28 @@ Of the 32, 17 differ in their trace; in the other 15 the call sits on a path the
 
 ### Bytecode older than its source
 
-Some shipped NCS was compiled from an earlier version of the source that ships beside it. `k_pla_actmap.ncs` posts `"K_STAR_MAP Before = "` where `k_pla_actmap.nss` writes `"v3.0 - K_STAR_MAP Before = "`; `k_trg_transfail1.ncs` calls routines its source does not (see the grammar census). The `k_act_com3*` family, which includes `k_inc_generic`, makes different calls from its first, which points the same way for the include. These scripts cannot be reproduced from the shipped sources by any compiler.
+Some shipped NCS was compiled from earlier versions of the sources that ship beside it, so no compiler reproduces it from them. Code generation locates the first difference in each (`crates/nwscript-codegen/tests/corpus.rs` re-derives every one), and `conformance/known.toml` names them:
+
+- **An include changed** (`stale-include`, 73 scripts). Most are globals of `k_inc_utility` missing from BioWare's bytecode: the six `SW_CONSTANT_*_HIT_*` globals (lines 37 to 42) are absent from 60 scripts, and the same names are declared again as locals inside a function at lines 818 to 823, hiding them. The rest are `k_inc_gensupport` globals, `k_inc_generic`'s `GN_TalentMasterRoutine` (the +334-byte group), `k_inc_force`'s `Sp_RunForcePowers` (`k_sp1_generic`), and `k_inc_utility`'s `UT_StarMap1VariableSet`, whose `"v3.0 - K_STAR_MAP Before = "` is the string that differs in `k_pla_actmap`.
+- **The script changed** (`stale-bytecode`, 8 scripts): `k_ptat_exitkrayt`, `k_qa`, `k_sup_droid`, `k_sup_gohawk`, `k_sup_grenade`, `k_trg_senni`, `k_trg_transfail1`, `k_trp_generic`. `k_qa.ncs` has a subroutine that calls `AddAvailableNPCByTemplate` once per NPC and has no counterpart in `k_qa.nss`.
+
+### Three eras of declarations
+
+The engine table changed while the game was being written, and the scripts carry the era each was compiled in. `ActionStartConversation` is called with eleven arguments in 51 scripts, twelve (the shipped declaration) in three (`k_ai_master`, `k_pman_27_init01`, `k_trg_transfail`), and five in `k_trg_senni` (`ACTION 204, 5`). `AddPartyMember` and `RemovePartyMember` are routines 569 and 570 in the BIF scripts that call them with an object alone (`k_act_bastadd`, `k_act_bastrmv`), routine 574 with an object alone in the module scripts `k_act_carthjoin` and `k_ptar_missjoin`, and 574 and 575 with two arguments in the shipped table. `nws compile --declarations bioware` loads an overlay of the eleven-argument `ActionStartConversation` (`crates/nwscript/src/overlays/k1-bioware.nss`), which reproduces the 51; the other eras are the stale-declarations work.
+
+### Where the sources disagree with themselves
+
+- A local hides a parameter: `GN_GetTargetedForcePower(int nDroid = FALSE)` in `k_inc_gensupport.nss` (lines 2544 and 2547) declares a local `nDroid`, so every test of `nDroid` reads the local, never the argument. Lint W0004 reports it.
+- `k_inc_force.nss` declares `Sp_GetRandomDelay`'s defaults as `(0.0, 0.75)` at line 34 and defines them as `(0.4, 1.1)` at line 266. No call omits them, so there are no reference bytes for which BioWare's compiler used; nwnnsscomp uses the prototype's, and so does `nws`.
+- `k_inc_ebonhawk.nss` repeats the prototype of `EBO_BastilaStartConversation2` (lines 11 and 15) and declares `EBO_PlayTakeOff` and `EBO_PlayLanding` as `void` (lines 19, 21) but defines them as `string` (lines 209, 243). Neither is called.
+
+### Encodings the corpus confirms
+
+- A negative number in an expression is the literal and a negation, `CONSTI 1; NEGI`, but a `case -1` label or a parameter default is folded to `CONSTI -1` or `CONSTF -1.5`.
+- An `if` without an `else` still ends its branch with a `JMP` to the very next instruction.
+- `break` and `continue` leave the locals of the blocks they leave on the stack, which is what unbalances the stack after a `case` that declared one.
+- Functions are emitted in the order the calls to them are emitted, depth first, starting from the globals routine's callees and then the entry point; arguments are pushed last first, so a callee in the last argument comes first.
+- `STORE_STATE` saves the globals' size and the current frame: return slot, parameters and locals.
 
 ### Neverwinter Nights leftovers
 

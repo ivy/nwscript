@@ -136,7 +136,8 @@ pub struct ScriptResult {
     /// Why a compilation failed: the first error line, or the timeout.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
-    /// The established cause, from the known-causes file, for a failure.
+    /// The established cause, from the known-causes file, for output that
+    /// is not identical.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cause: Option<String>,
     /// Behavioural comparison under the interpreter, for non-identical output.
@@ -621,7 +622,7 @@ fn measure(args: &Args) -> Result<Report, String> {
         let _ = std::fs::remove_dir_all(&root);
         let mut scripts: BTreeMap<String, ScriptResult> = results.into_inner().expect("results");
         for (name, r) in scripts.iter_mut() {
-            if r.class == Class::Failed {
+            if r.class != Class::Identical {
                 r.cause = cause_of(name);
             }
         }
@@ -743,6 +744,38 @@ pub fn markdown(r: &Report) -> String {
                         "  - `{name}`: {}\n",
                         res.detail.as_deref().unwrap_or("")
                     ));
+                }
+            }
+            s.push('\n');
+        }
+        let differ: Vec<_> = c
+            .scripts
+            .iter()
+            .filter(|(_, r)| matches!(r.class, Class::Difflen | Class::Samelen))
+            .collect();
+        if !differ.is_empty() {
+            s.push_str(&format!(
+                "Different output ({}), by cause:\n\n",
+                differ.len()
+            ));
+            let mut by_cause: BTreeMap<Option<&str>, Vec<&str>> = BTreeMap::new();
+            for (name, res) in differ {
+                by_cause.entry(res.cause.as_deref()).or_default().push(name);
+            }
+            for (cause, list) in by_cause.iter().rev() {
+                let names: Vec<String> = list.iter().map(|n| format!("`{n}`")).collect();
+                match cause.and_then(|c| r.causes.get(c).map(|k| (c, k))) {
+                    Some((c, k)) => s.push_str(&format!(
+                        "- **{c}** ({}): {}\n  {}\n",
+                        list.len(),
+                        k.summary,
+                        names.join(", ")
+                    )),
+                    None => s.push_str(&format!(
+                        "- **no known cause** ({}): {}\n",
+                        list.len(),
+                        names.join(", ")
+                    )),
                 }
             }
             s.push('\n');

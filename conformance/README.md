@@ -25,4 +25,6 @@ nws conformance --compiler nwnnsscomp-v100 --compiler nwnnsscomp --compiler pyko
 
 Each script is compiled in its own temporary directory with stdin closed and a timeout, and its output is classed as identical, the same length with different bytes, a different length, or failed. A failure whose cause is established in `known.toml` is shown with it. The report records each compiler's command as written, with `{env:…}` unexpanded, and the sha256 of its binary, so a committed report names no machine. `--baseline OLD.json` exits 3 when a compiler reproduces a script it reproduced before.
 
+This project's compiler is two rows: `nws`, against the shipped declarations, and `nws-bioware`, with `--declarations bioware`, which restores the routines BioWare's own scripts were compiled against (the eleven-argument `ActionStartConversation`). Build it first with `cargo build --release -p nws`. Between them they reproduce every script whose bytecode was compiled from the sources that shipped; `known.toml` names the cause of every other, and the report shows it beside each failure and each different output.
+
 nwnnsscomp hangs forever on the `nwscript.nss` BioWare shipped, which has a typo at line 5145; its templates use the corpus's `oracle/` directory, where that line is corrected.

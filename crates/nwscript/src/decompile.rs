@@ -49,3 +49,67 @@ pub fn decompile<'t>(
     }
     Ok((d, warnings))
 }
+
+/// The project's compiler as a verifier: the recovered source is checked
+/// through a resolver (for `nwscript.nss`) and compiled for a game.
+///
+/// Verification asks whether source compiles to given bytes, not whether
+/// it is good style, so no lints run and what BioWare's compiler and
+/// nwnnsscomp accepted is accepted (`--compat bioware`). The declarations
+/// are the checker's: [`crate::Declarations::BioWare`] restores the
+/// eleven-argument `ActionStartConversation` BioWare's bytecode calls.
+pub struct ProjectCompiler<R: crate::Resolver> {
+    checker: crate::Checker,
+    resolver: R,
+    game: crate::Game,
+    levels: nwscript_diag::Levels,
+}
+
+impl<R: crate::Resolver> ProjectCompiler<R> {
+    pub fn new(resolver: R, game: crate::Game, declarations: crate::Declarations) -> Self {
+        let mut levels = nwscript_diag::Levels::default();
+        levels.accepted = codes::NWNNSSCOMP_ACCEPTED
+            .iter()
+            .chain(codes::BIOWARE_ACCEPTED)
+            .map(|c| c.id)
+            .collect();
+        ProjectCompiler {
+            checker: crate::Checker::with_declarations(declarations, game),
+            resolver,
+            game,
+            levels,
+        }
+    }
+}
+
+impl<R: crate::Resolver> Compiler for ProjectCompiler<R> {
+    fn compile(&mut self, source: &[u8]) -> Result<Vec<u8>, CompileError> {
+        let mut map = SourceMap::new();
+        let out = self
+            .checker
+            .check(&mut self.resolver, &mut map, "decompiled.nss", source);
+        let main = map.files().next().map(|(id, _)| id);
+        let first_error = out
+            .diagnostics
+            .into_iter()
+            .filter_map(|d| self.levels.apply(d))
+            .find(|d| d.is_error());
+        let fail = |d: &Diagnostic| CompileError {
+            message: format!("error[{}]: {}", d.code.id, d.message),
+            line: d
+                .primary_span()
+                .filter(|s| Some(s.file) == main)
+                .map(|s| map.get(s.file).line_col(s.start).line as u32),
+        };
+        if let Some(d) = first_error {
+            return Err(fail(&d));
+        }
+        let analysis = out.analysis.ok_or_else(|| CompileError {
+            message: "no nwscript.nss to check against".into(),
+            line: None,
+        })?;
+        crate::compile::compile(&analysis.program, self.game)
+            .map(|p| nwscript_ncs::encode(&p))
+            .map_err(|d| fail(&d))
+    }
+}

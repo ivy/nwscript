@@ -139,60 +139,100 @@ impl EngineTable {
         }
 
         for f in tree.functions() {
-            let Some(name) = f.name() else { continue };
-            let span = p.span_of(f.syntax().clone());
-            let mut unresolved: Vec<(Span, String, Type)> = Vec::new();
-            let ret = f
-                .ret_type()
-                .and_then(|ty| t.resolve_type(&p, &ty, &mut unresolved))
-                .unwrap_or(Type::Void);
-            let mut params = Vec::new();
-            for prm in f.params() {
-                let ty = prm
-                    .ty()
-                    .and_then(|ty| t.resolve_type(&p, &ty, &mut unresolved))
-                    .unwrap_or(Type::Int);
-                let default = match prm.default_value().map(|e| t.const_value(&p, &e)) {
-                    Some(Ok(v)) => Some(match (&ty, v) {
-                        (Type::Float, ConstValue::Int(i)) => ConstValue::Float(i as f32),
-                        (_, v) => v,
-                    }),
-                    Some(Err(d)) => {
-                        diags.push(d);
-                        None
-                    }
-                    None => None,
-                };
-                params.push(Param {
-                    name: prm.name().map(|n| n.text().to_string()).unwrap_or_default(),
-                    ty,
-                    default,
-                });
+            if let Some(func) = t.function_decl(&p, &f, &mut diags) {
+                t.by_name
+                    .entry(func.name.clone())
+                    .or_insert(t.functions.len());
+                t.functions.push(func);
             }
-            if let Some(((first, written, guess), rest)) = unresolved.split_first() {
-                let mut d = Diagnostic::new(
-                    &codes::E0301,
-                    format!("`{}` declares types that do not exist", name.text()),
-                )
-                .primary(*first, format!("`{written}` is no type; read as `{guess}`"));
-                for (s, w, g) in rest {
-                    d = d.secondary(*s, format!("`{w}` is no type; read as `{g}`"));
-                }
-                diags.push(d.help("types are lower case: `int`, `float`, `string`, `object`, `vector`, `action`, or an engine structure").note("the routine keeps its number; the signature shown is a recovery"));
-            }
-            t.by_name
-                .entry(name.text().to_string())
-                .or_insert(t.functions.len());
-            t.functions.push(Function {
-                name: name.text().to_string(),
-                ret,
-                params,
-                recovered: !unresolved.is_empty(),
-                span,
-                doc: doc_comment(&f),
-            });
         }
         (t, diags)
+    }
+
+    /// One prototype of `nwscript.nss`, or `None` without a name.
+    fn function_decl(
+        &self,
+        p: &Parse,
+        f: &ast::FunctionDecl,
+        diags: &mut Vec<Diagnostic>,
+    ) -> Option<Function> {
+        let name = f.name()?;
+        let span = p.span_of(f.syntax().clone());
+        let mut unresolved: Vec<(Span, String, Type)> = Vec::new();
+        let ret = f
+            .ret_type()
+            .and_then(|ty| self.resolve_type(p, &ty, &mut unresolved))
+            .unwrap_or(Type::Void);
+        let mut params = Vec::new();
+        for prm in f.params() {
+            let ty = prm
+                .ty()
+                .and_then(|ty| self.resolve_type(p, &ty, &mut unresolved))
+                .unwrap_or(Type::Int);
+            let default = match prm.default_value().map(|e| self.const_value(p, &e)) {
+                Some(Ok(v)) => Some(match (&ty, v) {
+                    (Type::Float, ConstValue::Int(i)) => ConstValue::Float(i as f32),
+                    (_, v) => v,
+                }),
+                Some(Err(d)) => {
+                    diags.push(d);
+                    None
+                }
+                None => None,
+            };
+            params.push(Param {
+                name: prm.name().map(|n| n.text().to_string()).unwrap_or_default(),
+                ty,
+                default,
+            });
+        }
+        if let Some(((first, written, guess), rest)) = unresolved.split_first() {
+            let mut d = Diagnostic::new(
+                &codes::E0301,
+                format!("`{}` declares types that do not exist", name.text()),
+            )
+            .primary(*first, format!("`{written}` is no type; read as `{guess}`"));
+            for (s, w, g) in rest {
+                d = d.secondary(*s, format!("`{w}` is no type; read as `{g}`"));
+            }
+            diags.push(d.help("types are lower case: `int`, `float`, `string`, `object`, `vector`, `action`, or an engine structure").note("the routine keeps its number; the signature shown is a recovery"));
+        }
+        Some(Function {
+            name: name.text().to_string(),
+            ret,
+            params,
+            recovered: !unresolved.is_empty(),
+            span,
+            doc: doc_comment(f),
+        })
+    }
+
+    /// Replace the declarations of routines with those `bytes` declares, a
+    /// file of prototypes in `nwscript.nss`'s form. Each routine keeps its
+    /// number. This is how a profile compiles against declarations other
+    /// than the shipped ones, such as the older `ActionStartConversation`
+    /// BioWare's own scripts were compiled against. A prototype naming no
+    /// routine in the table is reported and ignored.
+    pub fn overlay(&mut self, file: FileId, bytes: &[u8]) -> Vec<Diagnostic> {
+        let p = parse(file, bytes);
+        let mut diags: Vec<Diagnostic> = p.diagnostics().to_vec();
+        for f in p.tree().functions() {
+            let Some(func) = self.function_decl(&p, &f, &mut diags) else {
+                continue;
+            };
+            match self.by_name.get(&func.name) {
+                Some(&i) => self.functions[i] = func,
+                None => diags.push(
+                    Diagnostic::new(
+                        &codes::E0304,
+                        format!("the overlay declares `{}`, which is no engine routine", func.name),
+                    )
+                    .primary(func.span, "not in nwscript.nss")
+                    .help("an overlay changes the declarations of routines nwscript.nss has; it adds none"),
+                ),
+            }
+        }
+        diags
     }
 
     /// A type as written, or `None` after a syntax error. An unknown name is

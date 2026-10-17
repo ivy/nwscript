@@ -1,7 +1,8 @@
-# Causes established for scripts no compiler can reproduce, by analysis
-# recorded in docs/research/nwnnsscomp-conformance.md. The report shows the
-# cause beside each failure; a cause is a finding about BioWare's sources,
-# not about any compiler.
+# Causes established for scripts a compiler cannot reproduce from the
+# shipped sources, by analysis recorded in docs/research/. The report shows
+# the cause beside each script that fails or differs; a cause is a finding
+# about BioWare's sources, not about any compiler. A script appears under
+# one cause.
 
 [cause.not-a-script]
 summary = "an include file with no entry point; there is nothing to compile"
@@ -18,3 +19,53 @@ scripts = [
 [cause.undeclared]
 summary = "uses a name the shipped sources do not declare: a constant BioWare's own build had (TRASK_DOOR_JAMMED), or a Neverwinter Nights function KotOR's table lacks (StartConversation, ResistSpell)"
 scripts = ["k_pend_door04", "nw_g0_conversat", "nw_s0_lghtnbolt"]
+
+[cause.conversation-eleven]
+summary = "BioWare compiled this when ActionStartConversation took eleven arguments; the shipped declaration has twelve. Identical with --declarations bioware"
+scripts = [
+  "k_bant_trig", "k_def_bandspn", "k_def_calodef", "k_hjol_userdef01", "k_pdan_elise_d",
+  "k_pdan_rapid01", "k_pdan_rapid02", "k_pdan_rapid03", "k_pdan_rapid04", "k_pdan_rapid05",
+  "k_pend_door01", "k_pend_door02", "k_pend_door03", "k_pend_door08", "k_pkas_freyyuser",
+  "k_pman_26a_area", "k_pman_28ac_init", "k_pman_at01", "k_pman_at02", "k_pman_door03",
+  "k_pman_door06", "k_pman_door07", "k_pman_door08", "k_pman_door10", "k_pman_door11",
+  "k_pman_door13", "k_pman_door14", "k_pman_door20", "k_pman_door30", "k_pman_init01",
+  "k_pman_init02", "k_pman_init03", "k_pman_init10", "k_pman_judge1_d", "k_pman_obj_asc",
+  "k_pman_obj_asc2", "k_pman_obj_ascc", "k_pman_obj_ascc2", "k_pman_obj_ascn",
+  "k_pman_osc", "k_pman_rapid01", "k_pman_rapid02", "k_pman_rapid03", "k_pman_rapid04",
+  "k_pman_rapid05", "k_pman_sitspeak", "k_pman_survive01", "k_ptar_sitharm",
+  "k_ptat_krayttran", "k_swg_xor_user", "k_trg_partyinit",
+]
+
+[cause.conversation-twelve]
+summary = "BioWare compiled this against the shipped twelve-argument ActionStartConversation, unlike most of its scripts. Identical with the shipped declarations"
+scripts = [
+  "k_ai_master", "k_pman_27_init01", "k_trg_transfail",
+]
+
+[cause.stale-include]
+summary = "BioWare's bytecode was compiled before an include it uses last changed: the first difference is in an include's globals or functions (k_inc_utility's SW_CONSTANT_* globals, k_inc_generic's GN_TalentMasterRoutine, among others)"
+scripts = [
+  "k_act_atkonend", "k_act_caloatt", "k_act_com31", "k_act_com32", "k_act_com33",
+  "k_act_com33a", "k_act_com34", "k_act_com35", "k_act_com41", "k_act_com42",
+  "k_act_com43", "k_act_com45", "k_act_comp01", "k_act_electric", "k_act_startgas",
+  "k_act_xoratt", "k_actq_com33", "k_actq_com33a", "k_actq_com34", "k_amb_enemyflee",
+  "k_amb_predator01", "k_com_compart", "k_com_comrepr", "k_con_com31", "k_con_com32",
+  "k_con_com33", "k_con_com34", "k_con_com35", "k_con_com41", "k_con_com42", "k_con_com43",
+  "k_con_com44", "k_con_com45", "k_con_comactive", "k_con_comhack", "k_con_comrep",
+  "k_con_comver31", "k_con_comver32", "k_con_comver33", "k_con_comver33a",
+  "k_con_comver34", "k_con_comver41", "k_con_comver42", "k_con_comver43", "k_con_comver44",
+  "k_con_comver45", "k_con_tokens", "k_def_rependd", "k_pla_actmap", "k_plc_tresciv",
+  "k_plc_trescorhig", "k_plc_trescorlow", "k_plc_trescormid", "k_plc_tresdrdhig",
+  "k_plc_tresdrdlow", "k_plc_tresdrdmid", "k_plc_tresmilhig", "k_plc_tresmillow",
+  "k_plc_tresmilmid", "k_plc_tresrakat", "k_plc_tresshahig", "k_plc_tresshalow",
+  "k_plc_tresshamid", "k_plc_tressndppl", "k_ptat17aa_enter", "k_ptat_gammenemy",
+  "k_sp1_generic", "k_sup_star_map", "k_trg_messengers", "k_trg_partyheart",
+  "k_trg_stealth", "k_zon_catalog", "k_zon_control",
+]
+
+[cause.stale-bytecode]
+summary = "BioWare's bytecode was compiled from an earlier version of this script's own source: the first difference is in the script, and it is a different call, constant or condition"
+scripts = [
+  "k_ptat_exitkrayt", "k_qa", "k_sup_droid", "k_sup_gohawk", "k_sup_grenade",
+  "k_trg_senni", "k_trg_transfail1", "k_trp_generic",
+]

@@ -14,3 +14,7 @@ nwscript-diag = { workspace = true }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+nwscript-syntax = { workspace = true }
+toml = "0.8"
