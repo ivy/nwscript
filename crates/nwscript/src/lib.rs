@@ -7,10 +7,12 @@
 //! [`Envelope`] can name each input with its hash.
 
 pub mod bytecode;
+pub mod check;
 pub mod engine;
 pub mod envelope;
 pub mod resolve;
 
+pub use check::{Checked, Checker};
 pub use envelope::{Envelope, InputRecord, OutputRecord};
 pub use nwscript_diag as diag;
 pub use nwscript_ncs as ncs;
