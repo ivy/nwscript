@@ -39,6 +39,10 @@ pub struct Global {
     #[arg(long, global = true, value_name = "FILE")]
     pub nwscript: Option<PathBuf>,
 
+    /// Which declarations of the engine's routines to compile against: `shipped`, the nwscript.nss found, as it is; or `bioware`, the routines BioWare's own scripts were compiled against restored where they differ (KotOR 1's eleven-argument ActionStartConversation), which the vanilla scripts need to compile to BioWare's bytes.
+    #[arg(long, global = true, value_enum, default_value_t = DeclarationsArg::Shipped)]
+    pub declarations: DeclarationsArg,
+
     /// Output format. json writes exactly one document to stdout.
     #[arg(long, global = true, value_enum, default_value_t = Format::Text)]
     pub format: Format,
@@ -68,6 +72,12 @@ pub struct Global {
 pub enum GameArg {
     K1,
     K2,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum DeclarationsArg {
+    Shipped,
+    Bioware,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]

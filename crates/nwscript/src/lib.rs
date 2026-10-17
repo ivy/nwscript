@@ -16,7 +16,7 @@ pub mod resolve;
 pub mod run;
 pub mod snapshot;
 
-pub use check::{Checked, Checker};
+pub use check::{Checked, Checker, Declarations};
 pub use envelope::{Envelope, InputRecord, OutputRecord};
 pub use nwscript_diag as diag;
 pub use nwscript_ncs as ncs;

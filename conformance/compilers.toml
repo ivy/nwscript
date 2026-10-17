@@ -53,3 +53,8 @@ include = "oracle"
 description = "nws compile, this repository's compiler, --game k1"
 command = ["{repo}/target/release/nws", "--game", "k1", "-I", "{include}", "compile", "{in}", "-o", "{out}"]
 include = "nss"
+
+[compiler.nws-bioware]
+description = "nws compile --declarations bioware: the routines BioWare's scripts were compiled against"
+command = ["{repo}/target/release/nws", "--game", "k1", "--declarations", "bioware", "-I", "{include}", "compile", "{in}", "-o", "{out}"]
+include = "nss"

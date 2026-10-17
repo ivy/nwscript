@@ -53,6 +53,15 @@ impl Ctx {
             .collect()
     }
 
+    /// A checker taking the declarations `--declarations` names.
+    pub fn checker(&self, game: Game) -> nwscript::Checker {
+        let d = match self.global.declarations {
+            crate::cli::DeclarationsArg::Shipped => nwscript::Declarations::Shipped,
+            crate::cli::DeclarationsArg::Bioware => nwscript::Declarations::BioWare,
+        };
+        nwscript::Checker::with_declarations(d, game)
+    }
+
     /// A resolver over the `-I` directories (after `first`, the input's own
     /// directory) and `--nwscript`.
     pub fn resolver(&self, first: Option<std::path::PathBuf>) -> FsResolver {
