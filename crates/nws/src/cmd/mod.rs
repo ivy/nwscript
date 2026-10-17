@@ -1,5 +1,6 @@
 //! Command dispatch and the context every command shares.
 
+pub mod check;
 pub mod conformance;
 pub mod disasm;
 mod explain;
@@ -48,7 +49,6 @@ impl Ctx {
     }
 
     /// The game profile, or a usage error naming the flag.
-    #[expect(dead_code, reason = "the compiling commands use it")]
     pub fn require_game(&self, command: &str) -> Result<Game, Exit> {
         self.game.ok_or_else(|| {
             eprintln!("error: `nws {command}` needs a game profile: pass --game k1 or --game k2");
@@ -101,6 +101,7 @@ pub fn run(cli: Cli) -> Exit {
     match cli.command {
         Command::Explain { code } => explain::run(&ctx, &code),
         Command::Conformance(args) => conformance::run(&ctx, &args),
+        Command::Check(args) => check::run(&ctx, &args),
         Command::Disasm(args) => disasm::disasm(&ctx, &args),
         Command::Asm(args) => disasm::asm(&ctx, &args),
         Command::InternalPanic => {

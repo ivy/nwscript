@@ -108,9 +108,8 @@ pub enum Command {
     /// Compile NWScript source to NCS bytecode. (not yet implemented)
     #[command(after_help = "Example:\n  nws --game k1 -I scripts compile k_my_script.nss")]
     Compile(Reserved),
-    /// Check source without writing output. (not yet implemented)
-    #[command(after_help = "Example:\n  nws --game k1 check k_my_script.nss")]
-    Check(Reserved),
+    /// Check source without writing output: syntax, names, types, calls and includes.
+    Check(crate::cmd::check::CheckArgs),
     /// Disassemble NCS bytecode into assembly text.
     Disasm(crate::cmd::disasm::DisasmArgs),
     /// Assemble assembly text into NCS bytecode.
