@@ -105,3 +105,26 @@ fn trace_without_a_table_is_skipped() {
         .code(0)
         .stdout(predicate::str::contains("trace: skipped"));
 }
+
+#[test]
+fn source_inputs_are_compiled_first() {
+    let d = setup();
+    std::fs::write(d.join("s.nss"), "void main() { PrintInteger(3); }\r\n").unwrap();
+    // b.ncs prints 3 as well, and the compiler lays main out the same way.
+    Command::cargo_bin("nws")
+        .unwrap()
+        .args(["--game", "k1", "diff", "--level", "trace"])
+        .arg(d.join("b.ncs"))
+        .arg(d.join("s.nss"))
+        .assert()
+        .code(0);
+    std::fs::write(d.join("broken.nss"), "void main() { Nope(); }\r\n").unwrap();
+    Command::cargo_bin("nws")
+        .unwrap()
+        .args(["--game", "k1", "diff"])
+        .arg(d.join("b.ncs"))
+        .arg(d.join("broken.nss"))
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("does not compile"));
+}

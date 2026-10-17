@@ -15,8 +15,10 @@ Examples:
   nws --game k1 -I corpus diff old.ncs new.ncs
   nws diff --level bytes old.ncs new.ncs
   nws --game k1 -I corpus diff --level trace --engine world old.ncs new.ncs
+  nws --game k1 -I corpus --compat bioware diff k_act_mispaz.ncs k_act_mispaz.nss
 
-Without --level all three are compared: bytes; instructions, with every jump
+Either input may be source (.nss), compiled first as `nws compile` would with
+the same flags. Without --level all three are compared: bytes; instructions, with every jump
 resolved to the instruction it reaches; and the trace of engine calls under
 the recording engine (which needs nwscript.nss through --nwscript or -I).
 Exit 0 when the scripts are the same at every level compared, 3 otherwise.")]
@@ -55,10 +57,50 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
     let mut load = |p: &PathBuf| -> Result<(Vec<u8>, nwscript::ncs::Program), Exit> {
         crate::working_on(display_name(p));
         if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("nss")) {
-            eprintln!(
-                "error: `nws diff` compares compiled bytecode (.ncs) until the compiler lands"
-            );
-            return Err(Exit::Usage);
+            // Source is compiled first, as `nws compile` would with the same flags.
+            let game = ctx.require_game("diff")?;
+            let (src, rec) = read_input(p, "source").map_err(|e| {
+                eprintln!("error: {e}");
+                Exit::Usage
+            })?;
+            env.inputs.push(rec);
+            let dir = p.parent().map(|d| {
+                if d.as_os_str().is_empty() {
+                    PathBuf::from(".")
+                } else {
+                    d.to_path_buf()
+                }
+            });
+            let mut resolver = ctx.resolver(dir);
+            let out = ctx
+                .checker(game)
+                .check(&mut resolver, &mut map, &display_name(p), &src);
+            env.inputs
+                .extend(nwscript::Resolver::inputs(&resolver).iter().cloned());
+            let diags = ctx.linted(out.analysis.as_ref(), out.diagnostics, &map);
+            let compiled = match (&out.analysis, nwscript::diag::has_errors(&diags)) {
+                (Some(a), false) => {
+                    nwscript::compile::compile(&a.program, game).map_err(|d| vec![d])
+                }
+                _ => Err(diags.into_iter().filter(|d| d.is_error()).collect()),
+            };
+            return match compiled {
+                Ok(program) => Ok((nwscript::ncs::encode(&program), program)),
+                Err(ds) => {
+                    for d in &ds {
+                        eprint!(
+                            "{}",
+                            nwscript::diag::render::render(
+                                d,
+                                &map,
+                                nwscript::diag::render::Color::Never
+                            )
+                        );
+                    }
+                    eprintln!("error: {} does not compile", display_name(p));
+                    Err(Exit::Errors)
+                }
+            };
         }
         let (bytes, rec) = read_input(p, "bytecode").map_err(|e| {
             eprintln!("error: {e}");
