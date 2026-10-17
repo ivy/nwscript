@@ -421,6 +421,8 @@ pub struct Object {
     /// An `OBJECT_TYPE_*`: 1 creature, 2 item, 4 trigger, 8 door, 32 waypoint, 64 placeable.
     pub kind: i32,
     pub tag: String,
+    /// The blueprint the object was made from.
+    pub resref: String,
     pub name: String,
     pub area: i32,
     pub position: [f32; 3],
