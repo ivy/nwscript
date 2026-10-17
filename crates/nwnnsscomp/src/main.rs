@@ -26,7 +26,8 @@
 //! print as `FILE(LINE): Error: MESSAGE` when stdout is not a terminal, the
 //! shape installers read; exit 0 on success, 1 on any error.
 
-use nwscript::diag::{Diagnostic, Levels, SourceMap, codes, render};
+use nwscript::diag::{Diagnostic, SourceMap, render};
+use nwscript::modes::Mode;
 use nwscript::{Checker, FsResolver, Game};
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -239,16 +240,12 @@ fn main() -> ExitCode {
     );
     let mut checker = Checker::new();
     let out = checker.check(&mut resolver, &mut map, &name, &bytes);
-    let mut levels = Levels::default();
-    levels.accepted = codes::NWNNSSCOMP_ACCEPTED.iter().map(|c| c.id).collect();
-    let mut diags = out.diagnostics;
-    if let Some(a) = &out.analysis {
-        diags.extend(nwscript::sema::lint::lint(&a.program));
-    }
-    let mut diags: Vec<Diagnostic> = nwscript::sema::lint::apply_directives(diags, &map)
-        .into_iter()
-        .filter_map(|d| levels.apply(d))
-        .collect();
+    let mut diags = nwscript::modes::finish(
+        out.analysis.as_ref(),
+        out.diagnostics,
+        &map,
+        &Mode::Nwnnsscomp.levels(),
+    );
     let target = args
         .output
         .clone()

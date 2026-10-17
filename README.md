@@ -29,6 +29,8 @@ Not yet measured. The table is generated from the conformance report.
 
 Nothing is released yet. The design is in [`docs/prd.md`](docs/prd.md).
 
+From a checkout, `cargo build --release -p nws -p nwnnsscomp` builds the command and the nwnnsscomp-compatible shim, and `maturin build --release -m crates/nwscript-py/Cargo.toml` builds the Python module (`import nwscript`; its functions are documented in [`crates/nwscript-py/src/lib.rs`](crates/nwscript-py/src/lib.rs)).
+
 ## Licence
 
 ISC. See [`LICENSE`](LICENSE).

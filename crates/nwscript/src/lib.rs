@@ -13,6 +13,7 @@ pub mod compile;
 pub mod decompile;
 pub mod engine;
 pub mod envelope;
+pub mod modes;
 pub mod resolve;
 pub mod run;
 pub mod snapshot;
