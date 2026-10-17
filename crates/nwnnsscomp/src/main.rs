@@ -17,6 +17,11 @@
 //! | `-q` | quiet |
 //! | `-e -l -r -s -x -t# -p DIR` | accepted and ignored, with a warning |
 //!
+//! A first argument naming a `.exe` is skipped: pykotor's
+//! `PYKOTOR_NWNNSSCOMP_LAUNCHER` runs `<launcher> <the mod's nwnnsscomp.exe>
+//! <flags>`, so this binary can be that launcher and stand in for the
+//! Windows compiler without Wine.
+//!
 //! The game profile is `NWS_GAME` (`k1` or `k2`), `k1` when unset. Errors
 //! print as `FILE(LINE): Error: MESSAGE` when stdout is not a terminal, the
 //! shape installers read; exit 0 on success, 1 on any error.
@@ -46,6 +51,10 @@ fn usage() -> ExitCode {
 
 fn parse(argv: &[String]) -> Result<Args, String> {
     let mut a = Args::default();
+    let argv = match argv.first() {
+        Some(first) if first.to_ascii_lowercase().ends_with(".exe") => &argv[1..],
+        _ => argv,
+    };
     let mut it = argv.iter().peekable();
     let value = |it: &mut std::iter::Peekable<std::slice::Iter<String>>, flag: &str| {
         it.next()

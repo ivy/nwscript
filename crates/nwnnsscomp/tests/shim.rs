@@ -145,3 +145,22 @@ fn unknown_flags_and_missing_input_are_usage_errors() {
     shim(&d).args(["-z", "a.nss"]).assert().code(2);
     shim(&d).args(["-c"]).assert().code(2);
 }
+
+#[test]
+fn as_pykotors_launcher_the_exe_argument_is_skipped() {
+    let d = dir("l");
+    std::fs::create_dir_all(d.join("out")).unwrap();
+    shim(&d)
+        .args([
+            "/mods/tslpatchdata/nwnnsscomp.exe",
+            "-c",
+            "a.nss",
+            "-o",
+            "out/a.ncs",
+            "-i",
+            "inc",
+        ])
+        .assert()
+        .code(0);
+    assert!(d.join("out/a.ncs").is_file());
+}
