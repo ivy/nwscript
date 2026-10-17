@@ -205,3 +205,75 @@ fn snapshots_round_trip_and_catch_a_change() {
         );
     std::fs::remove_dir_all(&d).unwrap();
 }
+
+/// Code generation never sees the mode: every vanilla script accepted in
+/// two modes compiles to the same bytes in both.
+#[test]
+#[ignore = "needs the corpus: set NWSCRIPT_CORPUS"]
+fn modes_never_change_the_bytes() {
+    let root = match std::env::var_os("NWSCRIPT_CORPUS") {
+        Some(p) => std::path::PathBuf::from(p),
+        None => std::path::PathBuf::from(std::env::var_os("HOME").unwrap())
+            .join(".cache/nwscript/corpus/k1"),
+    };
+    if !root.join("nss").is_dir() {
+        eprintln!("skipping: no corpus; set NWSCRIPT_CORPUS to an extracted corpus directory");
+        return;
+    }
+    let mut sources: Vec<std::path::PathBuf> = std::fs::read_dir(root.join("nss"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.file_name().is_some_and(|n| n != "nwscript.nss"))
+        .collect();
+    sources.sort();
+    let base = std::env::temp_dir().join(format!("nws-modes-{}", std::process::id()));
+    let modes: [&[&str]; 4] = [
+        &[],
+        &[
+            "--allow", "W0001", "--allow", "W0003", "--allow", "W0004", "--allow", "W0005",
+            "--allow", "W0007", "--allow", "W0008",
+        ],
+        &["--compat", "nwnnsscomp"],
+        &["--compat", "bioware"],
+    ];
+    let mut outs = Vec::new();
+    for (i, m) in modes.iter().enumerate() {
+        let dir = base.join(i.to_string());
+        std::fs::create_dir_all(&dir).unwrap();
+        Command::cargo_bin("nws")
+            .unwrap()
+            .args(["--game", "k1"])
+            .args(*m)
+            .arg("-I")
+            .arg(root.join("nss"))
+            .arg("compile")
+            .arg("--out-dir")
+            .arg(&dir)
+            .args(&sources)
+            .output()
+            .unwrap();
+        outs.push(dir);
+    }
+    let (mut compared, mut pairs) = (0, 0);
+    for s in &sources {
+        let name = format!("{}.ncs", s.file_stem().unwrap().to_string_lossy());
+        let got: Vec<Option<Vec<u8>>> = outs
+            .iter()
+            .map(|d| std::fs::read(d.join(&name)).ok())
+            .collect();
+        for a in 0..got.len() {
+            for b in a + 1..got.len() {
+                if let (Some(x), Some(y)) = (&got[a], &got[b]) {
+                    pairs += 1;
+                    assert_eq!(x, y, "{name} differs between modes {a} and {b}");
+                }
+            }
+        }
+        compared += usize::from(got.iter().filter(|g| g.is_some()).count() >= 2);
+    }
+    println!(
+        "modes: {compared} scripts compiled in two or more modes, {pairs} pairs, all identical"
+    );
+    assert!(compared > 1700);
+    std::fs::remove_dir_all(&base).unwrap();
+}
