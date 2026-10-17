@@ -491,3 +491,29 @@ fn engine_structures_are_types() {
         Some("did you mean `effect`? Type names are case-sensitive")
     );
 }
+
+#[test]
+fn an_overlay_changes_a_routines_declaration_and_keeps_its_number() {
+    let mut t = table();
+    let (n, _) = t.function("AddPartyMember").unwrap();
+    let diags = t.overlay(
+        FileId(2000),
+        b"int AddPartyMember(object oCreature);\r\nvoid NotARoutine();\r\n",
+    );
+    assert_eq!(
+        diags.iter().map(|d| d.code.id).collect::<Vec<_>>(),
+        ["E0304"]
+    );
+    assert_eq!(t.function("AddPartyMember").unwrap().0, n);
+    let src = "void main() { AddPartyMember(GetObjectByTag(\"bastila\")); }";
+    let a = analyze(
+        "t.nss",
+        parse(FileId(0), src.as_bytes()),
+        &t,
+        &mut ParsedIncludes::new(),
+    );
+    assert!(a.diagnostics.is_empty(), "{}", show(&a.diagnostics));
+    let c = call_of(expr_of(&body(&a.program, "main")[0]));
+    assert_eq!(c.callee, Callee::Engine(n));
+    assert_eq!(c.args.len(), 1);
+}
