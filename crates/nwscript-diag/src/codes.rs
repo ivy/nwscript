@@ -35,6 +35,7 @@ macro_rules! codes {
 
 codes! {
     E0001 Error "an input file could not be read";
+    E0002 Error "no nwscript.nss to read the engine's declarations from";
     E0101 Error "not an NCS V1.0 file";
     E0102 Error "the NCS program size record is missing or wrong";
     E0103 Error "unknown NCS opcode";
@@ -53,7 +54,38 @@ codes! {
     E0207 Error "statements or expressions nested beyond the parser's limit";
     E0301 Error "a type name that names no type";
     E0302 Error "an initialiser or default that is not a constant";
+    E0303 Error "a name that is not declared";
+    E0304 Error "a call to a function that is not declared";
+    E0305 Error "a value of the wrong type";
+    E0306 Error "a call to a script function with the wrong number of arguments";
+    E0307 Error "a name used before its declaration";
+    E0308 Error "a call to an engine routine with the wrong number of arguments";
+    E0309 Error "an argument of the wrong type to an engine routine";
+    E0310 Error "an assignment or increment of something that is not a variable";
+    E0311 Error "a function definition whose return type disagrees with its prototype";
+    E0312 Error "a function definition whose parameters disagree with its prototype";
+    E0313 Error "a name declared twice";
+    E0314 Error "`break` or `continue` outside a loop or switch";
+    E0315 Error "a malformed `case` or `default` label";
+    E0316 Error "a function that can end without returning its value";
+    E0317 Error "a `return` with a value in a `void` function, or without one in another";
+    E0318 Error "a malformed entry point";
+    E0319 Error "an include file that cannot be found";
+    E0320 Error "an include file that includes itself";
+    E0321 Error "a member that does not exist";
+    E0322 Error "a call to a function that is declared but never defined";
+    E0323 Error "a type that is not allowed here";
+    E0324 Error "a parameter without a default after one with a default";
+    E0325 Error "a declaration where the language does not allow one";
+    E0326 Error "an `action` argument that is not a call to a `void` function";
 }
+
+/// Errors BioWare's own compiler accepted: the vanilla scripts were compiled
+/// against declarations that did not ship, so a script that needs one of
+/// these is checked against the shipped declarations and fails. `--compat
+/// bioware` demotes exactly these; the checked program records what was
+/// written for each, so code generation needs nothing more.
+pub static BIOWARE_ACCEPTED: &[&Code] = &[&E0308, &E0309, &E0311];
 
 /// The code with this id, if registered.
 pub fn lookup(id: &str) -> Option<&'static Code> {
