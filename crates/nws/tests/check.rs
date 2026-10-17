@@ -110,3 +110,55 @@ fn check_needs_a_game() {
         .code(2)
         .stderr(predicate::str::contains("--game"));
 }
+
+#[test]
+fn compile_writes_bytecode_and_assembly_and_goes_on_past_errors() {
+    let d = dir(
+        "compile",
+        &[
+            (
+                "ok.nss",
+                "#include \"k_inc_one\"\r\nvoid main() { PrintInteger(One()); }\r\n",
+            ),
+            ("bad.nss", "void main() { PrintInteger(\"x\"); }\r\n"),
+        ],
+    );
+    let out = d.join("out");
+    let res = nws()
+        .args(["--game", "k1", "--format", "json", "compile"])
+        .arg(d.join("bad.nss"))
+        .arg(d.join("ok.nss"))
+        .arg("--out-dir")
+        .arg(&out)
+        .args(["--emit", "ncs,asm"])
+        .output()
+        .unwrap();
+    assert_eq!(res.status.code(), Some(1));
+    let doc: serde_json::Value = serde_json::from_slice(&res.stdout).unwrap();
+    assert_eq!(doc["result"]["files"][0]["ok"], false);
+    assert_eq!(doc["result"]["files"][1]["ok"], true);
+    assert_eq!(doc["outputs"].as_array().unwrap().len(), 2);
+    let roles: Vec<&str> = doc["inputs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["role"].as_str().unwrap())
+        .collect();
+    assert_eq!(roles, ["source", "nwscript", "source", "include"]);
+    let ncs = std::fs::read(out.join("ok.ncs")).unwrap();
+    assert!(ncs.starts_with(b"NCS V1.0"));
+    let asm = std::fs::read_to_string(out.join("ok.asm")).unwrap();
+    assert!(asm.contains("JSR"), "{asm}");
+    assert!(!out.join("bad.ncs").exists());
+}
+
+#[test]
+fn compile_a_library_is_e0401() {
+    let d = dir("library", &[("lib.nss", "int F() { return 1; }\r\n")]);
+    nws()
+        .args(["--game", "k1", "compile"])
+        .arg(d.join("lib.nss"))
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("error[E0401]"));
+}

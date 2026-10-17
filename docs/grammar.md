@@ -342,6 +342,22 @@ Constructs the language plausibly has, from Neverwinter Nights' documentation, f
 - `#define` outside `nwscript.nss`, a `#define` with no value, `#include` with an extension, angle brackets or trailing text, an include reached twice along include chains, a space after `#`, and any other directive `pp.other` (0).
 - The `itemproperty` type, which is KotOR 2's fifth engine structure `lex.keyword.itemproperty` (0).
 
+### Encodings taken from nwnnsscomp
+
+Where the corpus has no reference bytes, `nwscript-codegen` emits what nwnnsscomp `-v1.00` emits for the same source, observed by compiling probe scripts with it as a black box. Each is pinned by a test in `crates/nwscript-codegen/tests/probes.rs`.
+
+- `continue` jumps without removing the locals of the blocks it leaves: in `while` to the jump back, after the body's cleanup; in `do` to the condition; in `for` to the step.
+- `for` with no condition tests a constant: `CONSTI 1`, `JZ` past the loop. A declaration as the initialiser is rejected by nwnnsscomp; `nws` accepts it and removes the variable after the loop.
+- `?:` is the condition, `JZ` to the second branch, the first branch, `JMP` past the second.
+- An assignment used as a value leaves the value on the stack after its `CPDOWNSP`, so chained assignment stores the same value twice.
+- Unary `+` emits nothing.
+- `++` and `--` on a struct field or vector component read the value as any member is read, the whole variable then a `DESTRUCT`, and change it with `INCISP`/`DECISP` at the member's offset; prefix changes before reading, postfix after.
+- A vector literal is three `CONSTF`, `x` first. nwnnsscomp rejects a negated element in one.
+- Vector `==` and `!=` are `EQUALTT 12` and `NEQUALTT 12`.
+- A struct parameter or return value takes one `RSADD` per field, and a member of a call's result is read with `DESTRUCT`.
+- A struct declaration makes a globals routine, `SAVEBP`, `JSR` to the entry point, `RESTOREBP`, even when the script declares no global.
+- Functions called from global initialisers come before the entry point in the bytecode.
+
 ### Never seen, and errors
 
 These are not constructs but mistakes, and no vanilla script makes them: an assignment or increment whose target is not a variable or member (`expr.assign.target_not_lvalue` (0), `expr.postfix.target_not_lvalue` (0)), `break` outside a loop or switch `stmt.break.outside` (0), `continue` outside a loop `stmt.continue.outside_loop` (0), a required parameter after a defaulted one `param.required_after_default` (0), an include cycle `pp.include.cycle` (0) or a missing include, a `#` in the middle of a line `lex.hash_mid_line` (0), an unterminated string `lex.string.unterminated` (0), a byte above 0x7F outside comments and strings `lex.non_ascii.code` (0), a number running into an identifier `lex.number.followed_by_ident_char` (0), a function defined twice or prototyped after its definition, and a file with both entry points. Their diagnostics have no corpus file to calibrate against.

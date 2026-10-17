@@ -15,6 +15,35 @@ use std::sync::Arc;
 pub struct Checker {
     tables: HashMap<String, (Arc<[u8]>, Arc<EngineTable>)>,
     parses: HashMap<String, (Arc<[u8]>, Parse)>,
+    overlay: Option<(&'static str, &'static str)>,
+}
+
+/// Which declarations of the engine's routines a script is compiled
+/// against.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Declarations {
+    /// The `nwscript.nss` the resolver finds, as it is.
+    #[default]
+    Shipped,
+    /// The shipped file with the routines BioWare's own scripts were
+    /// compiled against restored where they differ, as their bytecode
+    /// shows. The vanilla scripts compile to BioWare's bytes only with
+    /// these.
+    BioWare,
+}
+
+impl Declarations {
+    /// The overlay for `game`: its name and the prototypes it replaces.
+    pub fn overlay(self, game: crate::Game) -> Option<(&'static str, &'static str)> {
+        match (self, game) {
+            (Declarations::Shipped, _) => None,
+            (Declarations::BioWare, crate::Game::K1) => Some((
+                "<k1-bioware overlay>",
+                include_str!("overlays/k1-bioware.nss"),
+            )),
+            (Declarations::BioWare, crate::Game::K2) => None,
+        }
+    }
 }
 
 /// One script's outcome: the analysis, `None` when there was no
@@ -22,11 +51,21 @@ pub struct Checker {
 pub struct Checked {
     pub analysis: Option<Analysis>,
     pub diagnostics: Vec<Diagnostic>,
+    /// The engine table the script was checked against.
+    pub table: Option<Arc<EngineTable>>,
 }
 
 impl Checker {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// A checker whose engine tables take these declarations.
+    pub fn with_declarations(declarations: Declarations, game: crate::Game) -> Self {
+        Checker {
+            overlay: declarations.overlay(game),
+            ..Self::default()
+        }
     }
 
     /// Check the script `name` with contents `bytes`, finding its includes
@@ -49,7 +88,13 @@ impl Checker {
                 Some((b, t)) if *b == r.bytes => t.clone(),
                 _ => {
                     let f = map.add(r.path.clone(), r.bytes.clone());
-                    let t = Arc::new(EngineTable::from_nwscript(f, &r.bytes).0);
+                    let mut t = EngineTable::from_nwscript(f, &r.bytes).0;
+                    if let Some((name, text)) = self.overlay {
+                        let o = map.add(name, text.as_bytes().to_vec());
+                        // A prototype the file lacks is no routine to replace.
+                        let _ = t.overlay(o, text.as_bytes());
+                    }
+                    let t = Arc::new(t);
                     self.tables.insert(r.path, (r.bytes, t.clone()));
                     t
                 }
@@ -63,6 +108,7 @@ impl Checker {
                 return Checked {
                     analysis: None,
                     diagnostics,
+                    table: None,
                 };
             }
             Err(e) => {
@@ -74,6 +120,7 @@ impl Checker {
                 return Checked {
                     analysis: None,
                     diagnostics,
+                    table: None,
                 };
             }
         };
@@ -86,6 +133,7 @@ impl Checker {
         Checked {
             diagnostics: analysis.diagnostics.clone(),
             analysis: Some(analysis),
+            table: Some(table),
         }
     }
 }
@@ -168,5 +216,29 @@ mod tests {
         let out = Checker::new().check(&mut r, &mut map, "t.nss", b"void main() { }");
         assert!(out.analysis.is_none());
         assert_eq!(out.diagnostics[0].code.id, "E0002");
+    }
+
+    #[test]
+    fn bioware_declarations_restore_the_eleven_argument_conversation() {
+        let ns = "int FALSE = 0;\r\nint CONVERSATION_TYPE_CINEMATIC = 0;\r\nvoid ActionStartConversation(object oObjectToConverse, string sDialogResRef = \"\", int bPrivateConversation = FALSE, int nConversationType = CONVERSATION_TYPE_CINEMATIC, int bIgnoreStartRange = FALSE, string sNameObjectToIgnore1 = \"\", string sNameObjectToIgnore2 = \"\", string sNameObjectToIgnore3 = \"\", string sNameObjectToIgnore4 = \"\", string sNameObjectToIgnore5 = \"\", string sNameObjectToIgnore6 = \"\", int bUseLeader = FALSE);\r\n";
+        let src = b"void main() { ActionStartConversation(OBJECT_SELF); }";
+        let argc = |d: Declarations| {
+            let mut r = MemResolver::new().with("nwscript.nss", ns);
+            let mut map = SourceMap::new();
+            let out = Checker::with_declarations(d, crate::Game::K1)
+                .check(&mut r, &mut map, "t.nss", src);
+            assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+            let p =
+                crate::compile::compile(&out.analysis.unwrap().program, crate::Game::K1).unwrap();
+            p.instructions()
+                .iter()
+                .find_map(|i| match i.operands {
+                    nwscript_ncs::Operands::Action { argc, .. } => Some(argc),
+                    _ => None,
+                })
+                .unwrap()
+        };
+        assert_eq!(argc(Declarations::Shipped), 12);
+        assert_eq!(argc(Declarations::BioWare), 11);
     }
 }

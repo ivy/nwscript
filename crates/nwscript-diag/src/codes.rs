@@ -80,6 +80,7 @@ codes! {
     E0326 Error "an `action` argument that is not a call to a `void` function";
     E0327 Error "a struct used above its declaration";
     E0328 Error "two `case` labels with the same value";
+    E0401 Error "a program code generation cannot compile";
     E0501 Error "the script faulted in the interpreter";
     E0502 Warning "the script stopped on an answer only the engine can give";
     W0001 Warning "a local variable that is never read";

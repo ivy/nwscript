@@ -4,7 +4,7 @@ use super::Ctx;
 use crate::Exit;
 use crate::io::{display_name, read_input};
 use nwscript::diag::SourceMap;
-use nwscript::{Checker, Envelope, InputRecord, Resolver};
+use nwscript::{Envelope, InputRecord, Resolver};
 use std::path::{Path, PathBuf};
 
 #[derive(clap::Args, Debug)]
@@ -40,7 +40,7 @@ pub fn run(ctx: &Ctx, args: &CheckArgs) -> Exit {
     };
     let mut env = Envelope::new("check", Some(game));
     let mut map = SourceMap::new();
-    let mut checker = Checker::new();
+    let mut checker = ctx.checker(game);
     let mut diags = Vec::new();
     let mut files = Vec::new();
     let mut failed = 0;
@@ -60,14 +60,8 @@ pub fn run(ctx: &Ctx, args: &CheckArgs) -> Exit {
         for i in resolver.inputs() {
             push_input(&mut env.inputs, i.clone());
         }
-        let mut found = out.diagnostics;
-        if let Some(a) = &out.analysis {
-            found.extend(nwscript::sema::lint::lint(&a.program));
-        }
-        let found: Vec<_> = nwscript::sema::lint::apply_directives(found, &map)
-            .into_iter()
-            .filter_map(|d| ctx.levels.apply(d))
-            .collect();
+        // A file's status counts what remains after lints, directives and levels.
+        let found = ctx.linted(out.analysis.as_ref(), out.diagnostics, &map);
         let errors = found.iter().filter(|d| d.is_error()).count();
         if errors > 0 {
             failed += 1;

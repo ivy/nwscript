@@ -1,6 +1,7 @@
 //! Command dispatch and the context every command shares.
 
 pub mod check;
+pub mod compile;
 pub mod conformance;
 pub mod diff;
 pub mod disasm;
@@ -40,6 +41,39 @@ impl Ctx {
             .collect();
         self.out.emit(env, text, &diags, map);
         if has_errors(&diags) { Exit::Errors } else { ok }
+    }
+
+    /// Apply the lint levels to diagnostics, dropping what they allow. A
+    /// command that decides something by the errors that remain, such as
+    /// whether to compile a file, decides on these.
+    pub fn leveled(&self, diags: Vec<Diagnostic>) -> Vec<Diagnostic> {
+        diags
+            .into_iter()
+            .filter_map(|d| self.levels.apply(d))
+            .collect()
+    }
+
+    /// A file's diagnostics with its lints added, comment directives
+    /// applied, and the lint levels applied: what decides its status.
+    pub fn linted(
+        &self,
+        analysis: Option<&nwscript::sema::Analysis>,
+        mut diags: Vec<Diagnostic>,
+        map: &SourceMap,
+    ) -> Vec<Diagnostic> {
+        if let Some(a) = analysis {
+            diags.extend(nwscript::sema::lint::lint(&a.program));
+        }
+        self.leveled(nwscript::sema::lint::apply_directives(diags, map))
+    }
+
+    /// A checker taking the declarations `--declarations` names.
+    pub fn checker(&self, game: Game) -> nwscript::Checker {
+        let d = match self.global.declarations {
+            crate::cli::DeclarationsArg::Shipped => nwscript::Declarations::Shipped,
+            crate::cli::DeclarationsArg::Bioware => nwscript::Declarations::BioWare,
+        };
+        nwscript::Checker::with_declarations(d, game)
     }
 
     /// A resolver over the `-I` directories (after `first`, the input's own
@@ -115,6 +149,7 @@ pub fn run(cli: Cli) -> Exit {
         Command::Explain { code } => explain::run(&ctx, &code),
         Command::Conformance(args) => conformance::run(&ctx, &args),
         Command::Check(args) => check::run(&ctx, &args),
+        Command::Compile(args) => compile::run(&ctx, &args),
         Command::Disasm(args) => disasm::disasm(&ctx, &args),
         Command::Asm(args) => disasm::asm(&ctx, &args),
         Command::Run(args) => run::run(&ctx, &args),
