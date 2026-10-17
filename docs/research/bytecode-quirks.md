@@ -64,6 +64,13 @@ Fourteen module scripts call engine routines with arguments the shipped `nwscrip
 - `k_act_carthjoin`, in eleven Taris module capsules, and `k_ptar_missjoin` (`tar_m04aa_s`) call routine 574 with an object alone. The shipped declaration is `int AddPartyMember(int nNPC, object oCreature)`; the source-level failures of `k_act_*rmv` and `k_act_bastadd` in the conformance report are the same change seen from the other side.
 - `k_plev_corpse1`, in two Leviathan capsules, calls routine 700 with an object and an int. The shipped routine 700 is `void ActionBarkString(int strRef)`, one argument.
 
+The decompiler finds more of the same, as calls that pass fewer arguments than the shipped prototype declares even counting its defaults: a compiler working from the shipped table pushes the defaults, so BioWare's table had fewer parameters when these were compiled.
+
+- `ShowPartySelectionGUI` with one argument (three declared), in 18 module functions.
+- `ActionStartConversation` with five, in six module functions, as in `k_trg_senni`.
+- `EndGame` with none (one declared), `StartNewModule` with four (eight), `PlayPazaak` with four (five).
+- `StartCreditSequence` with two arguments where one is declared (`stunt_57_s/k_creditsplay`, `ACTION 518, 2` at offset 31).
+
 The interpreter reports these as argument mismatches rather than machine faults (`FaultKind::ArgumentMismatch`).
 
 ### Division by a defaulted zero
@@ -74,7 +81,7 @@ Under an engine that answers every routine with its type's default, 158 module s
 
 ### `nwscript.nss` line 5145
 
-`void SetAvailableNPCId(INT nNPC, OBJECT_ID oidNPC);` has its types in capitals. nwnnsscomp loops forever on it instead of reporting an error, which is why the corpus carries an `oracle/` copy with the line corrected. The line still counts as a prototype: an engine routine's number in `ACTION` is its position among the prototypes from zero, and this one is number 767. No vanilla script calls it, so the slot has no reference bytes.
+`void SetAvailableNPCId(INT nNPC, OBJECT_ID oidNPC);` has its types in capitals. nwnnsscomp loops forever on it instead of reporting an error, which is why the corpus carries an `oracle/` copy with the line corrected. The line still counts as a prototype: an engine routine's number in `ACTION` is its position among the prototypes from zero, and this one is number 767. No vanilla pair calls it; the module script `modules/danm13_s/k_pdan_13_area.ncs` does, with `ACTION 767, 2` at offsets 4789 and 4833, which are the slot's only reference bytes: two arguments, as the line declares.
 
 ### Engine routine numbers are prototype positions
 
@@ -116,6 +123,10 @@ The engine table changed while the game was being written, and the scripts carry
 
 - A negative number in an expression is the literal and a negation, `CONSTI 1; NEGI`, but a `case -1` label or a parameter default is folded to `CONSTI -1` or `CONSTF -1.5`.
 - An `if` without an `else` still ends its branch with a `JMP` to the very next instruction.
+- A `return` with a value copies the value down to the return slot, pops everything above the parameters with one `MOVSP`, and jumps to the function's epilogue (`MOVSP` of the parameters, `RETN`); the `MOVSP` of the enclosing block's locals that follows is never reached.
+- A vector literal is three `CONSTF`, x first: `modules/tat_m17mg_s/onfire.ncs` passes `[20.0, 0.0, 0.0]` to `SWMG_SetPlayerTunnelPos` as `CONSTF 20.0; CONSTF 0.0; CONSTF 0.0` (offsets 574 to 586).
+- A component of a vector is read by pushing the whole vector and keeping one float with `DESTRUCT 12, offset, 4`, whether the vector is a variable or a call's result: `modules/m12ab_s/k_heartbeat.ncs` reads `SWMG_GetPlayerOffset().z` as `ACTION 641, 0; DESTRUCT 12, 8, 4`.
+- `0xffffffff` compiles to `CONSTI -1`, so the decompiler writes a negative integer that is not a folded default in hex: written `-1`, it would recompile to `CONSTI 1; NEGI`.
 - `break` and `continue` leave the locals of the blocks they leave on the stack, which is what unbalances the stack after a `case` that declared one.
 - Functions are emitted in the order the calls to them are emitted, depth first, starting from the globals routine's callees and then the entry point; arguments are pushed last first, so a callee in the last argument comes first.
 - `STORE_STATE` saves the globals' size and the current frame: return slot, parameters and locals.
