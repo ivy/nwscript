@@ -118,9 +118,8 @@ pub enum Command {
     /// Recover source from bytecode, verified by recompiling. (not yet implemented)
     #[command(after_help = "Example:\n  nws --game k1 decompile k_my_script.ncs")]
     Decompile(Reserved),
-    /// Run a script under the recording engine. (not yet implemented)
-    #[command(after_help = "Example:\n  nws --game k1 run k_my_script.ncs --trace")]
-    Run(Reserved),
+    /// Run a script under the recording engine or the world model.
+    Run(crate::cmd::run::Args),
     /// Run Lua tests and recorded snapshots. (not yet implemented)
     #[command(after_help = "Example:\n  nws --game k1 test tests/")]
     Test(Reserved),

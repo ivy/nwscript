@@ -3,6 +3,7 @@
 pub mod conformance;
 pub mod disasm;
 mod explain;
+pub mod run;
 
 use crate::Exit;
 use crate::cli::{Cli, Command, GameArg};
@@ -48,7 +49,6 @@ impl Ctx {
     }
 
     /// The game profile, or a usage error naming the flag.
-    #[expect(dead_code, reason = "the compiling commands use it")]
     pub fn require_game(&self, command: &str) -> Result<Game, Exit> {
         self.game.ok_or_else(|| {
             eprintln!("error: `nws {command}` needs a game profile: pass --game k1 or --game k2");
@@ -103,6 +103,7 @@ pub fn run(cli: Cli) -> Exit {
         Command::Conformance(args) => conformance::run(&ctx, &args),
         Command::Disasm(args) => disasm::disasm(&ctx, &args),
         Command::Asm(args) => disasm::asm(&ctx, &args),
+        Command::Run(args) => run::run(&ctx, &args),
         Command::InternalPanic => {
             crate::working_on("the internal-panic command");
             panic!("deliberate panic requested by `nws internal-panic`")

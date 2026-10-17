@@ -53,6 +53,8 @@ codes! {
     E0207 Error "statements or expressions nested beyond the parser's limit";
     E0301 Error "a type name that names no type";
     E0302 Error "an initialiser or default that is not a constant";
+    E0501 Error "the script faulted in the interpreter";
+    E0502 Warning "the script stopped on an answer only the engine can give";
 }
 
 /// The code with this id, if registered.

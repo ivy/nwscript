@@ -10,6 +10,7 @@ pub mod bytecode;
 pub mod engine;
 pub mod envelope;
 pub mod resolve;
+pub mod run;
 
 pub use envelope::{Envelope, InputRecord, OutputRecord};
 pub use nwscript_diag as diag;

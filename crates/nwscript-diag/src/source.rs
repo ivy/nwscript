@@ -52,6 +52,9 @@ pub struct LineCol {
 pub struct SourceFile {
     pub name: String,
     pub bytes: Arc<[u8]>,
+    /// True for bytecode and other files that are not text: a diagnostic
+    /// shows an offset into them, not a snippet.
+    pub binary: bool,
     line_starts: Vec<usize>,
 }
 
@@ -70,6 +73,7 @@ impl SourceFile {
             name: name.into(),
             bytes,
             line_starts,
+            binary: false,
         }
     }
 
@@ -125,6 +129,13 @@ impl SourceMap {
     pub fn add(&mut self, name: impl Into<String>, bytes: impl Into<Arc<[u8]>>) -> FileId {
         self.files.push(SourceFile::new(name, bytes));
         FileId(self.files.len() as u32 - 1)
+    }
+
+    /// Add a file that is not text, such as NCS bytecode.
+    pub fn add_binary(&mut self, name: impl Into<String>, bytes: impl Into<Arc<[u8]>>) -> FileId {
+        let id = self.add(name, bytes);
+        self.files[id.0 as usize].binary = true;
+        id
     }
 
     pub fn get(&self, id: FileId) -> &SourceFile {

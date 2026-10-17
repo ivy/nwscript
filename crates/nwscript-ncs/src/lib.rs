@@ -120,7 +120,7 @@ pub fn decode_named(
     bytes: &[u8],
     sources: &mut SourceMap,
 ) -> Result<Program, Diagnostic> {
-    let file = sources.add(name.into(), bytes.to_vec());
+    let file = sources.add_binary(name.into(), bytes.to_vec());
     decode(file, bytes)
 }
 

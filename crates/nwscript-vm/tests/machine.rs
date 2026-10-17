@@ -234,3 +234,119 @@ fn faults() {
         FaultKind::BadStackOffset(_)
     ));
 }
+
+#[test]
+fn remaining_forms() {
+    // Floats and vectors through every arithmetic form.
+    assert_eq!(
+        int("    CONSTF 2.0\n    NEGF\n    CONSTF -2.0\n    EQUALFF"),
+        1
+    );
+    assert_eq!(
+        int("    CONSTF 1.5\n    CONSTF 2.5\n    ADDFF\n    CONSTF 4.0\n    EQUALFF"),
+        1
+    );
+    assert_eq!(
+        int("    CONSTF 5.0\n    CONSTI 2\n    SUBFI\n    CONSTF 3.0\n    EQUALFF"),
+        1
+    );
+    assert_eq!(
+        int("    CONSTI 5\n    CONSTF 2.0\n    MULIF\n    CONSTF 10.0\n    EQUALFF"),
+        1
+    );
+    assert_eq!(
+        int("    CONSTF 1.0\n    CONSTF 4.0\n    DIVFF\n    CONSTF 0.25\n    EQUALFF"),
+        1
+    );
+    assert_eq!(
+        int(
+            "    CONSTF 1.0\n    CONSTF 2.0\n    LTFF\n    CONSTF 2.0\n    CONSTF 2.0\n    LEQFF\n    LOGANDII"
+        ),
+        1
+    );
+    assert_eq!(
+        int(
+            "    CONSTF 3.0\n    CONSTF 2.0\n    GEQFF\n    CONSTF 2.0\n    CONSTF 2.0\n    NEQUALFF\n    NOTI\n    BOOLANDII"
+        ),
+        1
+    );
+    assert_eq!(
+        int(
+            "    CONSTI 3\n    CONSTI 2\n    GTII\n    CONSTI 2\n    CONSTI 3\n    LEQII\n    LOGANDII"
+        ),
+        1
+    );
+    assert_eq!(int("    CONSTI 2\n    CONSTI 3\n    LTII"), 1);
+    let v =
+        |x: f32, y: f32, z: f32| format!("    CONSTF {x:?}\n    CONSTF {y:?}\n    CONSTF {z:?}\n");
+    assert_eq!(
+        int(&format!(
+            "{}{}    SUBVV\n{}    EQUALTT 12",
+            v(3.0, 3.0, 3.0),
+            v(1.0, 2.0, 3.0),
+            v(2.0, 1.0, 0.0)
+        )),
+        1
+    );
+    assert_eq!(
+        int(&format!(
+            "    CONSTF 2.0\n{}    MULFV\n{}    EQUALTT 12",
+            v(1.0, 2.0, 3.0),
+            v(2.0, 4.0, 6.0)
+        )),
+        1
+    );
+    assert_eq!(
+        int(&format!(
+            "{}    CONSTF 2.0\n    DIVVF\n{}    NEQUALTT 12\n    NOTI",
+            v(2.0, 4.0, 6.0),
+            v(1.0, 2.0, 3.0)
+        )),
+        1
+    );
+    // Every reservation type, objects and engine structures.
+    assert_eq!(
+        int(
+            "    RSADDF\n    RSADDS\n    RSADDO\n    RSADDE2\n    CPTOPSP -4, 4\n    EQUALEE2\n    CPDOWNSP -16, 4\n    MOVSP -12"
+        ),
+        1
+    );
+    assert_eq!(int("    RSADDE0\n    RSADDE0\n    NEQUALEE0\n    NOTI"), 1);
+    assert_eq!(int("    CONSTO 0\n    CONSTO 0\n    EQUALOO"), 1);
+    assert_eq!(int("    CONSTS \"a\"\n    CONSTS \"b\"\n    NEQUALSS"), 1);
+    assert_eq!(int("    NOP\n    CONSTI 1"), 1);
+}
+
+#[test]
+fn bp_relative_decrement() {
+    let text = "    RSADDI\n    JSR glob\n    RETN\nglob:\n    CONSTI 10\n    SAVEBP\n    JSR main\n    RESTOREBP\n    CPTOPSP -4, 4\n    CPDOWNSP -12, 4\n    MOVSP -8\n    RETN\nmain:\n    DECIBP -4\n    DECIBP -4\n    RETN\n";
+    let r = run(
+        &assemble(text),
+        &routines(),
+        &mut Recording,
+        Limits::default(),
+    );
+    assert_eq!(r.fault, None, "{:?}", r.history);
+    assert_eq!(r.result, Some(Value::Int(8)));
+}
+
+#[test]
+fn store_state_all_is_reported_unsupported() {
+    let r = cond("    STORE_STATEALL\n    CONSTI 0");
+    assert_eq!(
+        r.fault.unwrap().kind,
+        FaultKind::Unsupported("STORE_STATEALL")
+    );
+}
+
+/// Every opcode appears in a program in this file.
+#[test]
+fn every_opcode_is_exercised() {
+    let src = include_str!("machine.rs");
+    let missing: Vec<&str> = nwscript_ncs::Opcode::ALL
+        .iter()
+        .map(|o| o.name())
+        .filter(|n| !src.contains(&format!("    {n}")) && !src.contains(&format!("\"{n}")))
+        .collect();
+    assert!(missing.is_empty(), "no test runs {missing:?}");
+}

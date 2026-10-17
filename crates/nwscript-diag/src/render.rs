@@ -66,14 +66,16 @@ impl miette::Diagnostic for Adapter<'_> {
     }
 }
 
-/// Render one diagnostic as text. miette draws one file per diagnostic, so
-/// labels in other files than the primary one become notes with a location.
+/// Render one diagnostic as text. miette draws one text file per
+/// diagnostic, so labels in other files, and every label in a binary file,
+/// become notes with a location; notes follow the drawing as `= note:` lines.
 pub fn render(d: &Diagnostic, map: &SourceMap, color: Color) -> String {
     let primary_file = d
         .primary_span()
         .or_else(|| d.labels.first().map(|l| l.span))
-        .map(|s| s.file);
-    let mut notes = d.notes.clone();
+        .map(|s| s.file)
+        .filter(|f| !map.get(*f).binary);
+    let mut notes = Vec::new();
     let mut labels = Vec::new();
     for l in &d.labels {
         let f = map.get(l.span.file);
@@ -86,19 +88,23 @@ pub fn render(d: &Diagnostic, map: &SourceMap, color: Color) -> String {
             } else {
                 LabeledSpan::new_with_span(l.message.clone(), span)
             });
+        } else if f.binary {
+            let what = l
+                .message
+                .as_deref()
+                .filter(|m| !m.is_empty())
+                .map(|m| format!(" ({m})"))
+                .unwrap_or_default();
+            notes.push(format!("at {} offset {}{what}", f.name, l.span.start));
         } else {
             let lc = f.line_col(l.span.start);
             let what = l.message.as_deref().unwrap_or("related");
             notes.push(format!("{what}: {}:{}:{}", f.name, lc.line, lc.col));
         }
     }
-    let mut footer: Vec<String> = Vec::new();
-    if let Some(h) = &d.help {
-        footer.push(h.clone());
-    }
-    footer.extend(notes.into_iter().map(|n| format!("note: {n}")));
-    footer.push(format!(
-        "note: run `nws explain {}` for the full explanation",
+    notes.extend(d.notes.iter().cloned());
+    notes.push(format!(
+        "run `nws explain {}` for the full explanation",
         d.code.id
     ));
     let adapter = Adapter {
@@ -108,7 +114,7 @@ pub fn render(d: &Diagnostic, map: &SourceMap, color: Color) -> String {
             NamedSource::new(f.name.clone(), f.display_text())
         }),
         labels,
-        footer: Some(footer.join("\n")),
+        footer: d.help.clone(),
     };
     let theme = match color {
         Color::Always => GraphicalTheme::unicode(),
@@ -119,5 +125,8 @@ pub fn render(d: &Diagnostic, map: &SourceMap, color: Color) -> String {
         .with_width(100)
         .render_report(&mut out, &adapter)
         .expect("rendering to a String cannot fail");
+    for n in notes {
+        out.push_str(&format!("  = note: {n}\n"));
+    }
     out
 }

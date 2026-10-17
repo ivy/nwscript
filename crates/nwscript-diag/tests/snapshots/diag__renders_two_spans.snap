@@ -14,4 +14,4 @@ E0001
  4 │     int n = 1;
    ╰────
   help: did you mean `GetFirstPC`?
-        note: run `nws explain E0001` for the full explanation
+  = note: run `nws explain E0001` for the full explanation

@@ -69,7 +69,6 @@ fn reserved_commands_say_not_yet_implemented() {
         "compile",
         "check",
         "decompile",
-        "run",
         "test",
         "diff",
         "fn",
