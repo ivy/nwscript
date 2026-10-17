@@ -25,6 +25,8 @@ This project is a clean-room implementation: it reads no other compiler's source
 Not yet measured. The table is generated from the conformance report.
 <!-- conformance:end -->
 
+The decompiler's verified fraction for each KotOR 1 module is in [`docs/decompiler.md`](docs/decompiler.md).
+
 ## Usage
 
 Nothing is released yet. The design is in [`docs/prd.md`](docs/prd.md).

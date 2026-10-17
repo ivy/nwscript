@@ -183,6 +183,56 @@ fn bytecode_without_an_entry_stub_is_e0601() {
 }
 
 #[test]
+fn a_directory_is_reported_by_subdirectory() {
+    let d = dir("report");
+    let ncs = setup(&d);
+    for sub in ["mods/a", "mods/b"] {
+        std::fs::create_dir_all(d.join(sub)).unwrap();
+        std::fs::copy(&ncs, d.join(sub).join("x.ncs")).unwrap();
+    }
+    std::fs::write(d.join("y.asm"), "    CONSTI 1\n    RETN\n").unwrap();
+    nws()
+        .arg("asm")
+        .arg(d.join("y.asm"))
+        .arg("-o")
+        .arg(d.join("mods/b/y.ncs"))
+        .assert()
+        .success();
+    let out = nws()
+        .args(["--game", "k1", "--format", "json", "-I"])
+        .arg(&d)
+        .args(["decompile", "--markdown"])
+        .arg(d.join("r.md"))
+        .arg(d.join("mods"))
+        .assert()
+        .code(0)
+        .get_output()
+        .stdout
+        .clone();
+    let v: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    let rows = v["result"]["directories"].as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0]["directory"], "a");
+    assert_eq!(rows[0]["verified"], 1);
+    assert_eq!(rows[1]["scripts"], 2);
+    assert_eq!(rows[1]["failed"], 1);
+    assert_eq!(v["result"]["total"]["whole"], 2);
+    let md = std::fs::read_to_string(d.join("r.md")).unwrap();
+    assert!(
+        md.contains("| `b` | 2 | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 100.00% |"),
+        "{md}"
+    );
+    // A script that failed to decompile is not a verified one.
+    nws()
+        .args(["--game", "k1", "-I"])
+        .arg(&d)
+        .args(["decompile", "--strict"])
+        .arg(d.join("mods"))
+        .assert()
+        .code(3);
+}
+
+#[test]
 #[ignore = "needs the corpus (NWSCRIPT_CORPUS)"]
 fn a_vanilla_script_verifies_with_bioware_declarations() {
     let corpus = std::env::var_os("NWSCRIPT_CORPUS")

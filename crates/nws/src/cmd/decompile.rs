@@ -14,8 +14,12 @@ use crate::io::{display_name, read_input, write_output};
 use nwscript::Envelope;
 use nwscript::decompile::{CompileError, Compiler, Status};
 use nwscript::diag::SourceMap;
+use nwscript::sema::EngineTable;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 #[derive(clap::Args, Debug)]
@@ -27,6 +31,7 @@ Examples:
   nws --game k1 decompile --strict x.ncs                          exit 3 unless every function verifies
   nws -I scripts decompile --no-verify x.ncs                      skip recompiling
   nws -I oracle decompile --compiler ~/bin/nwnnsscomp x.ncs       verify with nwnnsscomp
+  nws --game k1 -I scripts decompile modules/ --markdown r.md     a report by directory
 
 Each function is recompiled and compared with the original bytes; a comment
 above it says `verified`, `unverified` with the first offset that differs, or
@@ -41,9 +46,18 @@ reads the bytecode with too). nwscript.nss comes from -I or --nwscript.
 the directory holding nwscript.nss; it never returns on KotOR 1's shipped
 nwscript.nss, so point it at a copy with line 5145 corrected (the corpus's
 oracle/ directory). In JSON mode result.functions[] has each function's
-name, status and offset, and result.verified the count.")]
+name, status and offset, and result.verified the count.
+
+Given a directory, every .ncs file under it is decompiled and verified and
+nothing is written but a report: one row per directory holding scripts, with
+its scripts, the scripts verified whole, and its functions by status
+(verified, unverified, not recovered, unchecked). A script with no entry
+point the decompiler recognises counts as failed. --format json puts the
+rows in result.directories and the sums in result.total; --markdown FILE
+also writes them as a table; --strict exits 3 unless every function
+verifies.")]
 pub struct Args {
-    /// The NCS file, or - for stdin.
+    /// The NCS file, a directory of them for a report by directory, or - for stdin.
     pub input: PathBuf,
     /// Write the source here instead of stdout.
     #[arg(short, long, value_name = "FILE")]
@@ -60,6 +74,9 @@ pub struct Args {
     /// Seconds before an nwnnsscomp compilation is abandoned.
     #[arg(long, value_name = "SECS", default_value_t = 30)]
     pub timeout: u64,
+    /// With a directory: also write the report as a markdown table.
+    #[arg(long, value_name = "FILE")]
+    pub markdown: Option<PathBuf>,
 }
 
 /// nwnnsscomp as a verifier: compiles in a scratch directory with `-v1.00`.
@@ -139,7 +156,90 @@ impl Drop for Nwnnsscomp {
     }
 }
 
+/// The engine table, read with the declarations the bytecode is verified
+/// against.
+fn engine_table(ctx: &Ctx, resolver: &mut nwscript::FsResolver) -> Result<EngineTable, Exit> {
+    let mut table_map = SourceMap::new();
+    let mut table = match nwscript::engine::load_table(resolver, &mut table_map) {
+        Ok(Some((t, _))) => t,
+        Ok(None) => {
+            eprintln!(
+                "error: decompiling needs nwscript.nss for the engine routines: pass -I DIR or --nwscript FILE"
+            );
+            return Err(Exit::Usage);
+        }
+        Err(e) => {
+            eprintln!("error: reading nwscript.nss: {e}");
+            return Err(Exit::Errors);
+        }
+    };
+    if let Some((name, text)) = ctx.game.and_then(|g| ctx.declarations().overlay(g)) {
+        let file = table_map.add(name, text.as_bytes().to_vec());
+        let _ = table.overlay(file, text.as_bytes());
+    }
+    Ok(table)
+}
+
+/// The compiler verification uses, or none with `--no-verify`. `work`
+/// names nwnnsscomp's scratch directory, one per concurrent verifier.
+fn verifier(
+    ctx: &Ctx,
+    args: &Args,
+    dir: Option<PathBuf>,
+    nwscript_path: Option<&Path>,
+    work: &str,
+) -> Result<Option<Box<dyn Compiler>>, Exit> {
+    if args.no_verify {
+        return Ok(None);
+    }
+    let Some(bin) = args.compiler.clone() else {
+        let Some(game) = ctx.game else {
+            eprintln!(
+                "error: verification compiles for a game: pass --game k1 or --game k2, or skip it with --no-verify"
+            );
+            return Err(Exit::Usage);
+        };
+        return Ok(Some(Box::new(nwscript::decompile::ProjectCompiler::new(
+            ctx.resolver(dir),
+            game,
+            ctx.declarations(),
+        ))));
+    };
+    let include = nwscript_path
+        .and_then(Path::parent)
+        .map(|p| {
+            if p.as_os_str().is_empty() {
+                Path::new(".")
+            } else {
+                p
+            }
+        })
+        .unwrap_or(Path::new("."))
+        .to_path_buf();
+    let include = std::fs::canonicalize(&include).unwrap_or(include);
+    Ok(Some(Box::new(Nwnnsscomp {
+        bin,
+        include,
+        work: std::env::temp_dir().join(format!("nws-decompile-{}-{work}", std::process::id())),
+        timeout: Duration::from_secs(args.timeout),
+    })))
+}
+
+fn nwscript_path(resolver: &nwscript::FsResolver) -> Option<PathBuf> {
+    nwscript::Resolver::inputs(resolver)
+        .iter()
+        .find(|i| i.role == "nwscript")
+        .map(|i| PathBuf::from(&i.path))
+}
+
 pub fn run(ctx: &Ctx, args: &Args) -> Exit {
+    if args.input.is_dir() {
+        return report(ctx, args);
+    }
+    if args.markdown.is_some() {
+        eprintln!("error: --markdown writes a report, which takes a directory");
+        return Exit::Usage;
+    }
     crate::working_on(display_name(&args.input));
     let (bytes, input) = match read_input(&args.input, "bytecode") {
         Ok(x) => x,
@@ -162,69 +262,17 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
             }
         });
     let mut resolver = ctx.resolver(dir.clone());
-    let mut table_map = SourceMap::new();
-    let mut table = match nwscript::engine::load_table(&mut resolver, &mut table_map) {
-        Ok(Some((t, _))) => t,
-        Ok(None) => {
-            eprintln!(
-                "error: decompiling needs nwscript.nss for the engine routines: pass -I DIR or --nwscript FILE"
-            );
-            return Exit::Usage;
-        }
-        Err(e) => {
-            eprintln!("error: reading nwscript.nss: {e}");
-            return Exit::Errors;
-        }
+    let table = match engine_table(ctx, &mut resolver) {
+        Ok(t) => t,
+        Err(e) => return e,
     };
-    // The bytecode is read with the declarations it is verified against.
-    if let Some((name, text)) = ctx.game.and_then(|g| ctx.declarations().overlay(g)) {
-        let file = table_map.add(name, text.as_bytes().to_vec());
-        let _ = table.overlay(file, text.as_bytes());
-    }
-    let nwscript_path = nwscript::Resolver::inputs(&resolver)
-        .iter()
-        .find(|i| i.role == "nwscript")
-        .map(|i| PathBuf::from(&i.path));
+    let nwscript_path = nwscript_path(&resolver);
     env.inputs
         .extend(nwscript::Resolver::inputs(&resolver).iter().cloned());
-
-    let mut verifier: Option<Box<dyn Compiler>> = None;
-    if !args.no_verify && args.compiler.is_none() {
-        let Some(game) = ctx.game else {
-            eprintln!(
-                "error: verification compiles for a game: pass --game k1 or --game k2, or skip it with --no-verify"
-            );
-            return Exit::Usage;
-        };
-        verifier = Some(Box::new(nwscript::decompile::ProjectCompiler::new(
-            ctx.resolver(dir.clone()),
-            game,
-            ctx.declarations(),
-        )));
-    }
-    if !args.no_verify
-        && let Some(bin) = args.compiler.clone()
-    {
-        let include = nwscript_path
-            .as_deref()
-            .and_then(Path::parent)
-            .map(|p| {
-                if p.as_os_str().is_empty() {
-                    Path::new(".")
-                } else {
-                    p
-                }
-            })
-            .unwrap_or(Path::new("."))
-            .to_path_buf();
-        let include = std::fs::canonicalize(&include).unwrap_or(include);
-        verifier = Some(Box::new(Nwnnsscomp {
-            bin,
-            include,
-            work: std::env::temp_dir().join(format!("nws-decompile-{}", std::process::id())),
-            timeout: Duration::from_secs(args.timeout),
-        }));
-    }
+    let mut verifier = match verifier(ctx, args, dir, nwscript_path.as_deref(), "0") {
+        Ok(v) => v,
+        Err(e) => return e,
+    };
 
     let mut map = SourceMap::new();
     let name = display_name(&args.input);
@@ -293,4 +341,233 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
         Exit::Ok
     };
     ctx.finish(env, &shown, warnings, &map, ok)
+}
+
+/// One directory's functions by status.
+#[derive(Clone, Default, Debug, serde::Serialize)]
+struct Tally {
+    scripts: usize,
+    /// Scripts whose every function verified.
+    whole: usize,
+    /// Scripts with no entry point the decompiler recognises.
+    failed: usize,
+    functions: usize,
+    verified: usize,
+    unverified: usize,
+    not_recovered: usize,
+    unchecked: usize,
+}
+
+impl Tally {
+    fn add(&mut self, o: &Tally) {
+        self.scripts += o.scripts;
+        self.whole += o.whole;
+        self.failed += o.failed;
+        self.functions += o.functions;
+        self.verified += o.verified;
+        self.unverified += o.unverified;
+        self.not_recovered += o.not_recovered;
+        self.unchecked += o.unchecked;
+    }
+
+    fn percent(&self) -> String {
+        if self.functions == 0 {
+            "-".into()
+        } else {
+            format!(
+                "{:.2}%",
+                self.verified as f64 * 100.0 / self.functions as f64
+            )
+        }
+    }
+}
+
+/// Every `.ncs` under `root`, sorted, each with the directory it is
+/// tallied under, relative to `root` and `/`-separated.
+fn scripts(root: &Path) -> Vec<(String, PathBuf)> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&d) else {
+            continue;
+        };
+        for e in entries.filter_map(Result::ok) {
+            let p = e.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if p.extension().is_some_and(|x| x.eq_ignore_ascii_case("ncs")) {
+                let rel = d.strip_prefix(root).unwrap_or(&d);
+                let group = rel
+                    .components()
+                    .map(|c| c.as_os_str().to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join("/");
+                out.push((if group.is_empty() { ".".into() } else { group }, p));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+fn one(path: &Path, table: &EngineTable, verifier: Option<&mut dyn Compiler>) -> Tally {
+    let mut t = Tally {
+        scripts: 1,
+        ..Tally::default()
+    };
+    let Ok(bytes) = std::fs::read(path) else {
+        t.failed = 1;
+        return t;
+    };
+    let mut map = SourceMap::new();
+    let name = path.display().to_string();
+    let Ok((d, _)) = nwscript::decompile::decompile(&name, &bytes, table, verifier, &mut map)
+    else {
+        t.failed = 1;
+        return t;
+    };
+    for f in &d.functions {
+        t.functions += 1;
+        match f.status {
+            Status::Verified => t.verified += 1,
+            Status::Unverified { .. } => t.unverified += 1,
+            Status::NotRecovered { .. } => t.not_recovered += 1,
+            Status::Unchecked => t.unchecked += 1,
+        }
+    }
+    if t.verified == t.functions {
+        t.whole = 1;
+    }
+    t
+}
+
+fn markdown(rows: &BTreeMap<String, Tally>, total: &Tally) -> String {
+    let mut s = String::from(
+        "| Directory | Scripts | Verified whole | Failed | Functions | Verified | Unverified | Not recovered | Unchecked | Verified fraction |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n",
+    );
+    let mut row = |name: &str, t: &Tally| {
+        s.push_str(&format!(
+            "| {name} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+            t.scripts,
+            t.whole,
+            t.failed,
+            t.functions,
+            t.verified,
+            t.unverified,
+            t.not_recovered,
+            t.unchecked,
+            t.percent()
+        ));
+    };
+    for (g, t) in rows {
+        row(&format!("`{g}`"), t);
+    }
+    row("**total**", total);
+    s
+}
+
+/// A directory of bytecode: decompile and verify each script in parallel,
+/// and report the functions by status for each directory.
+fn report(ctx: &Ctx, args: &Args) -> Exit {
+    if args.output.is_some() {
+        eprintln!(
+            "error: a directory is reported on, not decompiled to a file; -o takes a single NCS file"
+        );
+        return Exit::Usage;
+    }
+    let root = &args.input;
+    let mut env = Envelope::new("decompile", ctx.game);
+    let mut resolver = ctx.resolver(None);
+    let table = match engine_table(ctx, &mut resolver) {
+        Ok(t) => t,
+        Err(e) => return e,
+    };
+    let nwscript_path = nwscript_path(&resolver);
+    env.inputs
+        .extend(nwscript::Resolver::inputs(&resolver).iter().cloned());
+    // Fail on a bad command line before starting the workers.
+    if let Err(e) = verifier(ctx, args, None, nwscript_path.as_deref(), "check") {
+        return e;
+    }
+    let jobs = scripts(root);
+    let rows: Mutex<BTreeMap<String, Tally>> = Mutex::new(BTreeMap::new());
+    let next = AtomicUsize::new(0);
+    let workers = std::thread::available_parallelism().map_or(4, |n| n.get());
+    std::thread::scope(|s| {
+        for w in 0..workers {
+            let (rows, next, jobs, table, nwscript_path) =
+                (&rows, &next, &jobs, &table, &nwscript_path);
+            s.spawn(move || {
+                let Ok(mut v) = verifier(ctx, args, None, nwscript_path.as_deref(), &w.to_string())
+                else {
+                    return;
+                };
+                loop {
+                    let i = next.fetch_add(1, Ordering::Relaxed);
+                    let Some((group, path)) = jobs.get(i) else {
+                        break;
+                    };
+                    crate::working_on(display_name(path));
+                    let t = one(
+                        path,
+                        table,
+                        v.as_mut().map(|v| &mut **v as &mut dyn Compiler),
+                    );
+                    rows.lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .entry(group.clone())
+                        .or_default()
+                        .add(&t);
+                }
+            });
+        }
+    });
+    let rows = rows.into_inner().unwrap_or_else(|e| e.into_inner());
+    let mut total = Tally::default();
+    for t in rows.values() {
+        total.add(t);
+    }
+    if let Some(p) = &args.markdown {
+        match write_output(p, markdown(&rows, &total).as_bytes()) {
+            Ok(rec) => env.outputs.push(rec),
+            Err(e) => {
+                eprintln!("error: {e}");
+                return Exit::Errors;
+            }
+        }
+    }
+    env.result = serde_json::json!({
+        "directories": rows
+            .iter()
+            .map(|(g, t)| {
+                let mut v = serde_json::to_value(t).unwrap_or_default();
+                v["directory"] = g.clone().into();
+                v
+            })
+            .collect::<Vec<_>>(),
+        "total": total,
+    });
+    let mut text = format!(
+        "{:<28} {:>7} {:>7} {:>9} {:>9} {:>10}\n",
+        "directory", "scripts", "whole", "functions", "verified", "fraction"
+    );
+    for (g, t) in rows
+        .iter()
+        .chain(std::iter::once((&"total".to_string(), &total)))
+    {
+        text.push_str(&format!(
+            "{g:<28} {:>7} {:>7} {:>9} {:>9} {:>10}\n",
+            t.scripts,
+            t.whole,
+            t.functions,
+            t.verified,
+            t.percent()
+        ));
+    }
+    let ok = if args.strict && (total.verified != total.functions || total.failed > 0) {
+        Exit::Different
+    } else {
+        Exit::Ok
+    };
+    ctx.finish(env, &text, Vec::new(), &SourceMap::new(), ok)
 }
