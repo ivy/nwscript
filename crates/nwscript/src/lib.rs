@@ -12,6 +12,7 @@ pub mod compare;
 pub mod compile;
 pub mod engine;
 pub mod envelope;
+pub mod modes;
 pub mod resolve;
 pub mod run;
 pub mod snapshot;

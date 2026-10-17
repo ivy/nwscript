@@ -14,6 +14,7 @@ use crate::Exit;
 use crate::cli::{Cli, Command, GameArg};
 use crate::output::Output;
 use nwscript::diag::{Diagnostic, Level, Levels, SourceMap, codes, has_errors};
+use nwscript::modes::Mode;
 use nwscript::{Envelope, FsResolver, Game};
 
 /// What every command receives: the profile, lint levels, and where output goes.
@@ -43,28 +44,15 @@ impl Ctx {
         if has_errors(&diags) { Exit::Errors } else { ok }
     }
 
-    /// Apply the lint levels to diagnostics, dropping what they allow. A
-    /// command that decides something by the errors that remain, such as
-    /// whether to compile a file, decides on these.
-    pub fn leveled(&self, diags: Vec<Diagnostic>) -> Vec<Diagnostic> {
-        diags
-            .into_iter()
-            .filter_map(|d| self.levels.apply(d))
-            .collect()
-    }
-
     /// A file's diagnostics with its lints added, comment directives
     /// applied, and the lint levels applied: what decides its status.
     pub fn linted(
         &self,
         analysis: Option<&nwscript::sema::Analysis>,
-        mut diags: Vec<Diagnostic>,
+        diags: Vec<Diagnostic>,
         map: &SourceMap,
     ) -> Vec<Diagnostic> {
-        if let Some(a) = analysis {
-            diags.extend(nwscript::sema::lint::lint(&a.program));
-        }
-        self.leveled(nwscript::sema::lint::apply_directives(diags, map))
+        nwscript::modes::finish(analysis, diags, map, &self.levels)
     }
 
     /// A checker taking the declarations `--declarations` names.
@@ -120,14 +108,14 @@ fn levels(g: &crate::cli::Global) -> Result<Levels, Exit> {
     }
     l.deny_warnings = g.deny.iter().any(|d| d.eq_ignore_ascii_case("warnings"));
     // Strict is the default; a compat mode accepts what that compiler did.
-    l.strict = g.compat.is_none();
-    if g.compat.is_some() {
-        l.accepted = codes::NWNNSSCOMP_ACCEPTED.iter().map(|c| c.id).collect();
+    let base = match g.compat {
+        None => Mode::Strict,
+        Some(crate::cli::Compat::Nwnnsscomp) => Mode::Nwnnsscomp,
+        Some(crate::cli::Compat::Bioware) => Mode::Bioware,
     }
-    if g.compat == Some(crate::cli::Compat::Bioware) {
-        l.accepted
-            .extend(codes::BIOWARE_ACCEPTED.iter().map(|c| c.id));
-    }
+    .levels();
+    l.strict = base.strict;
+    l.accepted = base.accepted;
     Ok(l)
 }
 
