@@ -125,9 +125,8 @@ pub enum Command {
     /// Compare two scripts by bytes, instructions and trace. (not yet implemented)
     #[command(after_help = "Example:\n  nws --game k1 diff old.ncs new.ncs")]
     Diff(Reserved),
-    /// Look up an engine function. (not yet implemented)
-    #[command(after_help = "Example:\n  nws --game k1 fn GetGlobalNumber")]
-    Fn(Reserved),
+    /// Look up an engine routine in nwscript.nss.
+    Fn(crate::cmd::fnlookup::Args),
     /// Measure compilers against the vanilla corpus.
     Conformance(Box<crate::cmd::conformance::Args>),
     /// Run a Lua script against the library.

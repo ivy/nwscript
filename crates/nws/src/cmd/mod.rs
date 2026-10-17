@@ -3,6 +3,7 @@
 pub mod conformance;
 pub mod disasm;
 mod explain;
+pub mod fnlookup;
 pub mod run;
 pub mod test;
 
@@ -105,6 +106,7 @@ pub fn run(cli: Cli) -> Exit {
         Command::Disasm(args) => disasm::disasm(&ctx, &args),
         Command::Asm(args) => disasm::asm(&ctx, &args),
         Command::Run(args) => run::run(&ctx, &args),
+        Command::Fn(args) => fnlookup::run(&ctx, &args),
         Command::Test(args) => test::test(&ctx, &args),
         Command::Lua(args) => test::lua(&ctx, &args),
         Command::InternalPanic => {
