@@ -8,6 +8,11 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+nwscript-vm = { workspace = true }
+nwscript-ncs = { workspace = true }
+nwscript-sema = { workspace = true }
+nwscript-diag = { workspace = true }
+mlua = { version = "0.12", features = ["lua54", "vendored"] }
 nwscript = { workspace = true }
 
 [lints]

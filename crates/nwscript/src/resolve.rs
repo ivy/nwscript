@@ -64,7 +64,7 @@ impl FsResolver {
 }
 
 /// The entry of `dir` named `file`, ignoring ASCII case.
-fn find_ci(dir: &Path, file: &str) -> Option<PathBuf> {
+pub fn find_ci(dir: &Path, file: &str) -> Option<PathBuf> {
     let exact = dir.join(file);
     if exact.is_file() {
         return Some(exact);

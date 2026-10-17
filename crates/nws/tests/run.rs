@@ -83,3 +83,30 @@ fn run_needs_a_game_and_a_table() {
         .code(2)
         .stderr(predicate::str::contains("nwscript.nss"));
 }
+
+/// The ten example tests in docs/examples pass against the corpus.
+#[test]
+#[ignore = "needs the corpus: set NWSCRIPT_CORPUS"]
+fn docs_examples_pass() {
+    let root = match std::env::var_os("NWSCRIPT_CORPUS") {
+        Some(p) => std::path::PathBuf::from(p),
+        None => std::path::PathBuf::from(std::env::var_os("HOME").unwrap())
+            .join(".cache/nwscript/corpus/k1"),
+    };
+    if !root.join("ncs").is_dir() {
+        eprintln!("skipping: no corpus; set NWSCRIPT_CORPUS to an extracted corpus directory");
+        return;
+    }
+    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/examples");
+    Command::cargo_bin("nws")
+        .unwrap()
+        .args(["--game", "k1", "-I"])
+        .arg(&root)
+        .arg("-I")
+        .arg(root.join("ncs"))
+        .arg("test")
+        .arg(examples)
+        .assert()
+        .code(0)
+        .stdout(predicate::str::contains("test result: ok. 15 passed"));
+}

@@ -120,9 +120,8 @@ pub enum Command {
     Decompile(Reserved),
     /// Run a script under the recording engine or the world model.
     Run(crate::cmd::run::Args),
-    /// Run Lua tests and recorded snapshots. (not yet implemented)
-    #[command(after_help = "Example:\n  nws --game k1 test tests/")]
-    Test(Reserved),
+    /// Run Lua tests.
+    Test(crate::cmd::test::TestArgs),
     /// Compare two scripts by bytes, instructions and trace. (not yet implemented)
     #[command(after_help = "Example:\n  nws --game k1 diff old.ncs new.ncs")]
     Diff(Reserved),
@@ -131,9 +130,8 @@ pub enum Command {
     Fn(Reserved),
     /// Measure compilers against the vanilla corpus.
     Conformance(Box<crate::cmd::conformance::Args>),
-    /// Run a Lua script against the library. (not yet implemented)
-    #[command(after_help = "Example:\n  nws --game k1 lua survey.lua")]
-    Lua(Reserved),
+    /// Run a Lua script against the library.
+    Lua(crate::cmd::test::LuaArgs),
     /// Format NWScript source. (not yet implemented)
     #[command(after_help = "Example:\n  nws fmt k_my_script.nss")]
     Fmt(Reserved),
