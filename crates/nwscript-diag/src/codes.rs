@@ -55,6 +55,8 @@ codes! {
     E0302 Error "an initialiser or default that is not a constant";
     E0501 Error "the script faulted in the interpreter";
     E0502 Warning "the script stopped on an answer only the engine can give";
+    E0601 Error "bytecode without an entry point the decompiler recognises";
+    E0602 Warning "a decompiled function is not verified";
 }
 
 /// The code with this id, if registered.

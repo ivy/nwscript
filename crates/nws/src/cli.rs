@@ -115,9 +115,8 @@ pub enum Command {
     Disasm(crate::cmd::disasm::DisasmArgs),
     /// Assemble assembly text into NCS bytecode.
     Asm(crate::cmd::disasm::AsmArgs),
-    /// Recover source from bytecode, verified by recompiling. (not yet implemented)
-    #[command(after_help = "Example:\n  nws --game k1 decompile k_my_script.ncs")]
-    Decompile(Reserved),
+    /// Recover source from bytecode, each function verified by recompiling.
+    Decompile(crate::cmd::decompile::Args),
     /// Run a script under the recording engine or the world model.
     Run(crate::cmd::run::Args),
     /// Run Lua tests.
