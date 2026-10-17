@@ -122,9 +122,8 @@ pub enum Command {
     Run(crate::cmd::run::Args),
     /// Run Lua tests.
     Test(crate::cmd::test::TestArgs),
-    /// Compare two scripts by bytes, instructions and trace. (not yet implemented)
-    #[command(after_help = "Example:\n  nws --game k1 diff old.ncs new.ncs")]
-    Diff(Reserved),
+    /// Compare two scripts by bytes, instructions and trace.
+    Diff(crate::cmd::diff::Args),
     /// Look up an engine routine in nwscript.nss.
     Fn(crate::cmd::fnlookup::Args),
     /// Measure compilers against the vanilla corpus.

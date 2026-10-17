@@ -1,6 +1,7 @@
 //! Command dispatch and the context every command shares.
 
 pub mod conformance;
+pub mod diff;
 pub mod disasm;
 mod explain;
 pub mod fnlookup;
@@ -107,6 +108,7 @@ pub fn run(cli: Cli) -> Exit {
         Command::Asm(args) => disasm::asm(&ctx, &args),
         Command::Run(args) => run::run(&ctx, &args),
         Command::Fn(args) => fnlookup::run(&ctx, &args),
+        Command::Diff(args) => diff::run(&ctx, &args),
         Command::Test(args) => test::test(&ctx, &args),
         Command::Lua(args) => test::lua(&ctx, &args),
         Command::InternalPanic => {

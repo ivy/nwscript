@@ -7,6 +7,7 @@
 //! [`Envelope`] can name each input with its hash.
 
 pub mod bytecode;
+pub mod compare;
 pub mod engine;
 pub mod envelope;
 pub mod resolve;
