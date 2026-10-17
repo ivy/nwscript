@@ -185,6 +185,8 @@ pub enum Expr {
         func: usize,
         args: Vec<Expr>,
     },
+    /// Component `n` of a vector value that is not a variable: `f().x`.
+    Member(Box<Expr>, usize),
     Unary(UnOp, Box<Expr>),
     Binary(BinOp, Box<Expr>, Box<Expr>),
     Assign(Place, Box<Expr>),

@@ -141,6 +141,36 @@ pub fn decompile<'t>(program: &Program, table: &'t EngineTable) -> Result<Decomp
     })
 }
 
+/// The engine calls in a byte range whose argument count is not what the
+/// table declares: bytecode compiled against an older `nwscript.nss`,
+/// which a compiler reading this one cannot reproduce.
+fn stale_calls(p: &Program, table: &EngineTable, start: u32, end: u32) -> String {
+    let mut seen: Vec<(u16, u8)> = Vec::new();
+    for (at, x) in p.iter() {
+        if at < start || at >= end {
+            continue;
+        }
+        if let nwscript_ncs::Operands::Action { routine, argc } = x.operands
+            && let Some(f) = table.functions.get(usize::from(routine))
+            && usize::from(argc) != f.params.len()
+            && !seen.contains(&(routine, argc))
+        {
+            seen.push((routine, argc));
+        }
+    }
+    seen.iter()
+        .map(|&(r, argc)| {
+            let f = &table.functions[usize::from(r)];
+            format!(
+                "the bytecode passes {} {argc} arguments where nwscript.nss declares {}, so it was compiled against an older declaration",
+                f.name,
+                f.params.len()
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
 /// How many times verification sets a function aside that does not
 /// compile and tries the rest again.
 const COMPILE_RETRIES: usize = 8;
@@ -253,18 +283,20 @@ impl Decompiled<'_> {
             if matches!(f.status, Status::NotRecovered { .. }) {
                 continue;
             }
+            let stale = stale_calls(original, self.table, f.start, f.end);
             if let Some((_, msg)) = rejected.iter().find(|r| r.0 == i) {
-                f.status = Status::Unverified {
-                    at: None,
-                    detail: format!("does not compile: {msg}"),
-                };
+                let mut detail = format!("does not compile: {msg}");
+                if !stale.is_empty() {
+                    detail = format!("{detail}; {stale}");
+                }
+                f.status = Status::Unverified { at: None, detail };
                 continue;
             }
             f.status = match results.get(i) {
                 Some(verify::Compared::Same) => Status::Verified,
                 Some(verify::Compared::DiffersAt(at)) => Status::Unverified {
                     at: Some(*at),
-                    detail: String::new(),
+                    detail: stale,
                 },
                 _ => Status::Unverified {
                     at: None,

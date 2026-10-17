@@ -403,6 +403,10 @@ impl Printer<'_> {
                 }
                 (format!("{}({})", f.name, self.args(&args[..n])), PRIMARY)
             }
+            Expr::Member(x, n) => (
+                format!("{}.{}", self.expr(x, 14), ["x", "y", "z"][(*n).min(2)]),
+                14,
+            ),
             Expr::Unary(op, x) => {
                 let sym = match op {
                     UnOp::Neg => "-",
@@ -472,7 +476,7 @@ fn mentions(s: &Script, e: &Expr, v: VarId) -> bool {
         Expr::Engine { args, .. } | Expr::User { args, .. } => {
             args.iter().any(|a| mentions(s, a, v))
         }
-        Expr::Unary(_, x) => mentions(s, x, v),
+        Expr::Unary(_, x) | Expr::Member(x, _) => mentions(s, x, v),
         Expr::Binary(_, l, r) => mentions(s, l, v) || mentions(s, r, v),
         Expr::Assign(p, x) => place(p) || mentions(s, x, v),
         Expr::IncDec { place: p, .. } => place(p),

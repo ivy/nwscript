@@ -157,9 +157,13 @@ fn sema_size(t: &nwscript_sema::Type) -> Option<u32> {
 fn action_effect(table: &EngineTable, routine: u16, argc: u8) -> Option<i32> {
     let f = table.functions.get(usize::from(routine))?;
     let mut e = sema_size(&f.ret)? as i32;
-    for p in f.params.get(..usize::from(argc))? {
+    let argc = usize::from(argc);
+    for p in f.params.iter().take(argc) {
         e -= sema_size(&p.ty)? as i32;
     }
+    // Arguments past the declaration (bytecode compiled against an older
+    // one) are taken to be one stack element each.
+    e -= 4 * argc.saturating_sub(f.params.len()) as i32;
     Some(e)
 }
 
@@ -837,7 +841,10 @@ impl Fp<'_, '_> {
                     let n =
                         u32::try_from(-o).map_err(|_| self.at("a MOVSP that grows the stack"))?;
                     // `return;` with locals: pop everything above the frame, jump out.
-                    if self.is_return_jump(start + 1) && n == self.bytes_above(self.frame) && n > 0
+                    if start + 1 < limit
+                        && self.is_return_jump(start + 1)
+                        && n == self.bytes_above(self.frame)
+                        && n > 0
                     {
                         self.pc = start + 2;
                         out.push(Stmt::Return(None));
@@ -1323,17 +1330,9 @@ impl Fp<'_, '_> {
                     self.pc = pc;
                     let inc = x.opcode == Op::IncISp;
                     let v = self.var_at(*off, 4)?;
+                    let off = *off;
                     self.incdec(v, inc, pc, |y| {
-                        matches!(
-                            (y.opcode, &y.operands),
-                            (
-                                Op::CpTopSp,
-                                O::Stack {
-                                    offset: -4,
-                                    size: 4
-                                }
-                            )
-                        ) && *off == -4
+                        matches!((y.opcode, &y.operands), (Op::CpTopSp, O::Stack { offset, size: 4 }) if *offset == off)
                     })?;
                 }
                 (Op::IncIBp | Op::DecIBp, O::Offset(off)) => {
@@ -1360,7 +1359,23 @@ impl Fp<'_, '_> {
                 ) => {
                     let (e, _, s) = self.pop_temp()?;
                     let whole = match &e {
-                        Expr::Place(Place::Var(v)) if s == u32::from(*size) => *v,
+                        Expr::Place(Place::Var(v))
+                            if s == u32::from(*size) && self.sh.parts.contains_key(v) =>
+                        {
+                            *v
+                        }
+                        // A component of a vector value: `f().x`.
+                        _ if s == 12 && *size == 12 && *keep_size == 4 && keep_offset % 4 == 0 => {
+                            self.pc = pc + 1;
+                            self.push(
+                                4,
+                                Slot::Temp(
+                                    Expr::Member(Box::new(e), usize::from(*keep_offset / 4)),
+                                    Some(Ty::Float),
+                                ),
+                            );
+                            continue;
+                        }
                         _ => {
                             self.pc = pc;
                             return Err(self.at("a DESTRUCT of something that is not a variable"));
@@ -1524,12 +1539,9 @@ impl Fp<'_, '_> {
             .functions
             .get(usize::from(routine))
             .ok_or_else(|| self.at("a call to an engine routine nwscript.nss does not declare"))?;
-        let params = f
-            .params
-            .get(..usize::from(argc))
-            .ok_or_else(|| self.at("an engine call with more arguments than its declaration"))?;
+        let declared = f.params.len().min(usize::from(argc));
         let mut args = Vec::new();
-        for p in params {
+        for p in &f.params[..declared] {
             let need =
                 sema_size(&p.ty).ok_or_else(|| self.at("an engine parameter of unknown size"))?;
             if p.ty == nwscript_sema::Type::Action {
@@ -1558,6 +1570,14 @@ impl Fp<'_, '_> {
             let _ = t;
             args.push(e);
         }
+        // Arguments past the declaration: whatever single values the bytecode pushed.
+        for _ in declared..usize::from(argc) {
+            let (e, _, s) = self.pop_temp()?;
+            if s != 4 {
+                return Err(self.at("an engine call with more arguments than its declaration"));
+            }
+            args.push(e);
+        }
         let call = Expr::Engine { routine, args };
         match sema_size(&f.ret) {
             Some(0) => Ok(Some(call)),
@@ -1575,8 +1595,9 @@ impl Fp<'_, '_> {
         if n < 3 {
             return None;
         }
+        // x was pushed first.
         let mut v = [0.0; 3];
-        for (k, e) in self.stack[n - 3..].iter().rev().enumerate() {
+        for (k, e) in self.stack[n - 3..].iter().enumerate() {
             match e.slot {
                 Slot::Temp(Expr::Float(f), _) => v[k] = f,
                 _ => return None,
@@ -1695,7 +1716,7 @@ fn has_dup(e: &Expr) -> bool {
     match e {
         Expr::Place(Place::Var(v)) => *v == DUP,
         Expr::Engine { args, .. } | Expr::User { args, .. } => args.iter().any(has_dup),
-        Expr::Unary(_, x) | Expr::Assign(_, x) => has_dup(x),
+        Expr::Unary(_, x) | Expr::Assign(_, x) | Expr::Member(x, _) => has_dup(x),
         Expr::Binary(_, l, r) => has_dup(l) || has_dup(r),
         _ => false,
     }
@@ -1840,7 +1861,7 @@ fn visit_calls(body: &[Stmt], f: &mut impl FnMut(usize, &[Expr])) {
                 args.iter().for_each(|a| expr(a, f));
             }
             Expr::Engine { args, .. } => args.iter().for_each(|a| expr(a, f)),
-            Expr::Unary(_, x) | Expr::Assign(_, x) => expr(x, f),
+            Expr::Unary(_, x) | Expr::Assign(_, x) | Expr::Member(x, _) => expr(x, f),
             Expr::Binary(_, l, r) => {
                 expr(l, f);
                 expr(r, f);
