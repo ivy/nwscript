@@ -847,7 +847,7 @@ impl Checker<'_> {
                 functions: self.functions,
                 entry,
             },
-            diagnostics: self.diags,
+            diagnostics: self.diags.into_iter().map(with_articles).collect(),
         }
     }
 
@@ -940,4 +940,34 @@ fn levenshtein(a: &[u8], b: &[u8]) -> usize {
         }
     }
     d[a.len() * w + b.len()]
+}
+
+/// Messages name types in code spans after "a": `a `{t}``. Make the article
+/// agree with the type, so "a `int`" reads "an `int`".
+fn with_articles(mut d: Diagnostic) -> Diagnostic {
+    fn fix(s: &str) -> String {
+        let mut out = String::with_capacity(s.len());
+        let mut rest = s;
+        while let Some(i) = rest.find("a `") {
+            let word = i == 0 || !rest.as_bytes()[i - 1].is_ascii_alphanumeric();
+            let vowel = rest[i + 3..]
+                .chars()
+                .next()
+                .is_some_and(|c| "aeiou".contains(c));
+            out.push_str(&rest[..i]);
+            out.push_str(if word && vowel { "an `" } else { "a `" });
+            rest = &rest[i + 3..];
+        }
+        out.push_str(rest);
+        out
+    }
+    d.message = fix(&d.message);
+    for l in &mut d.labels {
+        if let Some(m) = &l.message {
+            l.message = Some(fix(m));
+        }
+    }
+    d.help = d.help.as_deref().map(fix);
+    d.notes = d.notes.iter().map(|n| fix(n)).collect();
+    d
 }
