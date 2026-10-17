@@ -35,6 +35,7 @@ Read only the file the task needs, from this skill's `references/` directory:
 - **The game's own scripts need `--declarations bioware`** to compile to BioWare's bytes: most were compiled against an older `ActionStartConversation`, and without it they compile, but six bytes longer per call.
 - **`--format json` writes exactly one document to stdout**; parse it instead of scraping text. Exit codes: 0 ok, 1 errors, 2 bad invocation, 3 a comparison or test found a difference.
 - **A trace is the recording engine's view.** Calls no model answers are marked unmodelled; their results are defaults, not what the game would return. Say so when a conclusion rests on one.
+- **One resref, several scripts.** The same script name can be different scripts in the BIF and in modules; a loose file in `Override` replaces every one. Check before installing (`workflow.md`, step 5).
 - **The module scripts ship without source.** Decompile them; the comment above each function says whether it was verified by recompiling to the original bytes.
 
 ## Examples

@@ -12,11 +12,14 @@ use std::rc::Rc;
 Examples:
   nws --game k1 -I corpus test                      every *_test.lua and *.snapshot.toml below .
   nws --game k1 -I corpus test docs/examples --filter keycard
+  nws test --reference                              the API: worlds, objects, runs, assertions
 
 A test file declares tests with describe/it (busted style) and runs
 compiled scripts with nws.script(name):run(world). Scripts are found as
 NAME.ncs in the test file's directory, then the -I directories; nwscript.nss
-comes from --nwscript or -I. docs/testing.md is the reference.
+comes from --nwscript or -I. `nws test --reference` prints the reference;
+assertions are `assert.equal`, `assert.is_true` and the others it lists,
+not busted's `assert.are.*`.
 Exit 0 when every test passes, 3 when any fails.")]
 pub struct TestArgs {
     /// Files or directories to search for *_test.lua and *.snapshot.toml; the current directory by default.
@@ -24,6 +27,9 @@ pub struct TestArgs {
     /// Run only tests whose full name contains this text.
     #[arg(long)]
     pub filter: Option<String>,
+    /// Print the reference for tests and Lua scripts, and exit.
+    #[arg(long)]
+    pub reference: bool,
 }
 
 #[derive(clap::Args, Debug)]
@@ -32,7 +38,9 @@ Example:
   nws --game k1 -I corpus lua survey.lua extra args
 
 The script gets the same nws module as tests, with nws.args holding the
-arguments after its name.")]
+arguments after its name. nws.script(NAME) finds NAME.ncs in the Lua file's
+directory, then the -I directories; nwscript.nss comes from --nwscript or
+-I. `nws test --reference` documents the module.")]
 pub struct LuaArgs {
     /// The Lua file to run.
     pub script: PathBuf,
@@ -47,9 +55,7 @@ fn host(ctx: &Ctx, game: nwscript::Game, base: &Path) -> Result<Host, Exit> {
     let table = match nwscript::engine::load_table(&mut resolver, &mut map) {
         Ok(Some((t, _))) => t,
         Ok(None) => {
-            eprintln!(
-                "error: the tests need the game's nwscript.nss: pass --nwscript FILE or -I DIR"
-            );
+            eprintln!("error: Lua needs the game's nwscript.nss: pass --nwscript FILE or -I DIR");
             return Err(Exit::Usage);
         }
         Err(e) => {
@@ -101,6 +107,10 @@ fn discover(paths: &[PathBuf]) -> Vec<PathBuf> {
 }
 
 pub fn test(ctx: &Ctx, args: &TestArgs) -> Exit {
+    if args.reference {
+        print!("{}", nwscript_lua::REFERENCE);
+        return Exit::Ok;
+    }
     let game = match ctx.require_game("test") {
         Ok(g) => g,
         Err(e) => return e,

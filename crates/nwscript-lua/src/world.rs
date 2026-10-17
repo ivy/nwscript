@@ -140,7 +140,7 @@ impl LObject {
             }
             other => {
                 return Err(mlua::Error::runtime(format!(
-                    "objects have no field `{other}`; docs/testing.md lists them"
+                    "objects have no field `{other}`; `nws test --reference` lists them"
                 )));
             }
         }

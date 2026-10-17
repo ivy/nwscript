@@ -5,8 +5,12 @@
 //! script runs against is a [`World`](nwscript_vm::World) whose routines a
 //! test can replace one by one: `w.engine.GetReputation = function(a, b)
 //! return 100 end` answers that routine for that world, and the call counts
-//! as modelled. `docs/testing.md` is the reference; `lua/nws.lua` declares
+//! as modelled. `testing.md` beside this crate is the reference, printed by `nws test --reference` ([`REFERENCE`]); `lua/nws.lua` declares
 //! the API for editors.
+
+/// The reference for tests and Lua scripts: worlds, objects, runs,
+/// assertions and snapshots.
+pub const REFERENCE: &str = include_str!("../testing.md");
 
 mod convert;
 mod runner;

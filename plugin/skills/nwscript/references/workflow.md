@@ -26,7 +26,10 @@ Before compiling for real, prove the change: `testing.md`. At the least, compare
 nws --game k1 -I DIR diff OLD.ncs NEW.nss
 ```
 
-`diff` compiles a `.nss` input first and compares bytes, instructions and the trace of engine calls; for a behaviour change, the trace difference should be exactly the change intended.
+`diff` compiles a `.nss` input first and compares bytes, instructions and the trace of engine calls, reporting the first difference at each level. Read it with care:
+
+- `trace: same` does not mean the behaviour is the same. The recording engine answers with defaults, so a change that only matters for other replies (a credit threshold, when gold reads as 0) leaves the trace unchanged. A test that supplies those replies (`testing.md`) is the evidence for a behaviour change.
+- Only the first difference per level is shown, at a 0-based offset. To show that nothing else changed, compare the disassemblies: `nws disasm OLD.ncs` and `nws disasm NEW.ncs`, then an ordinary `diff` of the two.
 
 ## 4. Compile
 
@@ -38,4 +41,8 @@ nws --game k1 -I DIR compile FILE.nss -o FILE.ncs
 
 ## 5. Install
 
-`nws` has no install command. A changed script usually ships as a loose `.ncs` with the same resref in the game's `Override` folder, which the game loads ahead of its own copies; a script that must go inside a module, or a mod others will install, goes through an installer such as TSLPatcher or HoloPatcher. Ask before writing into a game folder, and keep the original so the change can be undone.
+`nws` has no install command. A changed script usually ships as a loose `.ncs` with the same resref in the game's `Override` folder, which the game loads ahead of its own copies: all of them, in every module.
+
+**Check for a name clash first.** Different scripts can share a resref: `k_pman_misc59` in `scripts.bif` is a credits check, and the `k_pman_misc59` in two Manaan modules is another script entirely. Find every copy (the extracted corpus's `ncs/` and each `modules/NAME/`) and compare them (`nws diff`); if any copy is a different script, a loose file in `Override` replaces it too and breaks it. Install such a script into the module that runs it instead, with an installer such as TSLPatcher or HoloPatcher, or give the new script a new resref and point the caller at it.
+
+Ask before writing into a game folder, and keep the original so the change can be undone.

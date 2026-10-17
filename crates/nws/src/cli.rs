@@ -43,7 +43,7 @@ pub struct Global {
     #[arg(long, global = true, value_enum, default_value_t = DeclarationsArg::Shipped)]
     pub declarations: DeclarationsArg,
 
-    /// A file of prototypes applied after --declarations, in nwscript.nss's form: each replaces the routine of its name, or with `// nwscript: routine N` above it is routine N. Repeatable, applied in order. conformance/overlays/ holds the ones inferred from BioWare's bytecode.
+    /// A file of prototypes applied after --declarations, in nwscript.nss's form: each replaces the routine of its name, or with `// nwscript: routine N` above it is routine N. Repeatable, applied in order. The nwscript repository's conformance/overlays/ holds the ones inferred from BioWare's bytecode.
     #[arg(long, global = true, value_name = "FILE")]
     pub overlay: Vec<PathBuf>,
 

@@ -34,7 +34,7 @@ end)
 
 `nws.world({ seed = N })` makes an empty world: a module object, no area, nobody in the party, and a random generator seeded with N (0 by default). Scripts run against it change it, and a test reads it back.
 
-The world answers the engine routines `docs/engine-model.md` lists, about nine in ten of the calls KotOR 1's scripts make. Every other routine returns its type's default (0, 0.0, `""`, `OBJECT_INVALID`, a null structure) and the run records it as unmodelled. A test can answer any routine itself: `w.engine.NAME = function(args...) return value end` replaces `NAME` in that world, and its replies count as modelled. Arguments arrive as Lua values (below) in the routine's parameter order; the return is converted to the routine's return type.
+The world answers the engine routines `nws fn NAME` says it models (the repository's `docs/engine-model.md` lists them all), about nine in ten of the calls KotOR 1's scripts make. Every other routine returns its type's default (0, 0.0, `""`, `OBJECT_INVALID`, a null structure) and the run records it as unmodelled. A test can answer any routine itself: `w.engine.NAME = function(args...) return value end` replaces `NAME` in that world, and its replies count as modelled. Arguments arrive as Lua values (below) in the routine's parameter order; the return is converted to the routine's return type.
 
 | Field | What |
 | --- | --- |

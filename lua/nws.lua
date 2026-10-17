@@ -1,7 +1,7 @@
 ---@meta
 -- Type annotations for the `nws` Lua API, for lua-language-server.
 -- Point your editor's Lua.workspace.library at this directory.
--- The reference is docs/testing.md.
+-- The reference is crates/nwscript-lua/testing.md, printed by `nws test --reference`.
 
 ---@class nws
 ---@field game string the game profile, "k1" or "k2"

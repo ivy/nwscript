@@ -98,6 +98,7 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
             "prototype": prototype(f, &table),
             "doc": f.doc,
             "recovered": f.recovered,
+            "world_model": model(&f.name),
         })
     };
     let matched: Vec<(usize, &Function)> = match (&args.name, &args.grep) {
@@ -164,7 +165,24 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
                 ""
             }
         ));
+        if args.name.is_some() {
+            text.push_str(&match model(&f.name) {
+                Some(m) => format!("// world model (run --engine world, tests): {m}\n"),
+                None => format!(
+                    "// world model: not modelled; it returns its type's default, and a test answers it with w.engine.{} = function(...) return value end\n",
+                    f.name
+                ),
+            });
+        }
     }
     env.result = serde_json::json!({ "matches": matched.iter().map(|(n, f)| entry(*n, f)).collect::<Vec<_>>() });
     ctx.finish(env, &text, Vec::new(), &map, Exit::Ok)
+}
+
+/// What the world model does for the routine `name`, if it models it.
+fn model(name: &str) -> Option<&'static str> {
+    nwscript::vm::world::MODELS
+        .iter()
+        .find(|(n, _, _)| *n == name)
+        .map(|(_, _, what)| *what)
 }
