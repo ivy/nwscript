@@ -65,7 +65,7 @@ fn unknown_lint_code_is_a_usage_error() {
 
 #[test]
 fn reserved_commands_say_not_yet_implemented() {
-    for c in ["compile", "decompile", "fmt", "lsp"] {
+    for c in ["decompile", "fmt", "lsp"] {
         nws()
             .arg(c)
             .assert()

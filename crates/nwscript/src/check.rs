@@ -22,6 +22,8 @@ pub struct Checker {
 pub struct Checked {
     pub analysis: Option<Analysis>,
     pub diagnostics: Vec<Diagnostic>,
+    /// The engine table the script was checked against.
+    pub table: Option<Arc<EngineTable>>,
 }
 
 impl Checker {
@@ -63,6 +65,7 @@ impl Checker {
                 return Checked {
                     analysis: None,
                     diagnostics,
+                    table: None,
                 };
             }
             Err(e) => {
@@ -74,6 +77,7 @@ impl Checker {
                 return Checked {
                     analysis: None,
                     diagnostics,
+                    table: None,
                 };
             }
         };
@@ -86,6 +90,7 @@ impl Checker {
         Checked {
             diagnostics: analysis.diagnostics.clone(),
             analysis: Some(analysis),
+            table: Some(table),
         }
     }
 }

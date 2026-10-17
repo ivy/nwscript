@@ -9,6 +9,7 @@
 pub mod bytecode;
 pub mod check;
 pub mod compare;
+pub mod compile;
 pub mod engine;
 pub mod envelope;
 pub mod resolve;

@@ -46,3 +46,10 @@ include = "oracle"
 description = "nwnrs 0.0.1, nwnrs pack, --optimization O3"
 command = ["{env:NWNRS}", "pack", "-f", "-j", "1", "--langspec", "{include}/nwscript.nss", "--include-dir", "{include}", "--optimization", "O3", "{in}", "{out}"]
 include = "oracle"
+
+# This project's compiler. Build it first: `cargo build --release -p nws`.
+# It reads the nwscript.nss BioWare shipped, typo and all, from `nss`.
+[compiler.nws]
+description = "nws compile, this repository's compiler, --game k1"
+command = ["{repo}/target/release/nws", "--game", "k1", "-I", "{include}", "compile", "{in}", "-o", "{out}"]
+include = "nss"
