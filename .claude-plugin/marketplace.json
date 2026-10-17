@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "nwscript",
+  "description": "The Claude Code plugin for nws, the NWScript toolchain, from the nwscript repository.",
+  "owner": {
+    "name": "Ivy Evans"
+  },
+  "plugins": [
+    {
+      "name": "nwscript",
+      "source": "./plugin",
+      "description": "NWScript for KotOR with nws: write, check, test and compile scripts, read diagnostics, and learn from the game's own scripts by decompiling them.",
+      "category": "development"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "nwscript",
+  "description": "NWScript for KotOR with nws: write, check, test and compile scripts, read diagnostics, and learn from the game's own scripts by decompiling them.",
+  "author": {
+    "name": "Ivy Evans"
+  },
+  "license": "ISC",
+  "keywords": [
+    "nwscript",
+    "kotor",
+    "modding",
+    "compiler",
+    "decompiler"
+  ]
+}
