@@ -274,6 +274,16 @@ fn object_methods(lua: &Lua) -> mlua::Result<Table> {
     set_add!("feat", feats);
     set_add!("affect", spell_effects);
     t.set(
+        "level",
+        lua.create_function(|_, (o, class, levels): (AnyUserData, i32, i32)| {
+            let o = o.borrow::<LObject>()?;
+            if let Some(x) = o.w.borrow_mut().objects.get_mut(&o.id) {
+                x.classes.insert(class, levels);
+            }
+            Ok(())
+        })?,
+    )?;
+    t.set(
         "talent",
         lua.create_function(|_, (o, category, kind, id): (AnyUserData, i32, i32, i32)| {
             let o = o.borrow::<LObject>()?;

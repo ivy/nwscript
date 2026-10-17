@@ -6,7 +6,7 @@ use nwscript_sema::EngineTable;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-const NWSCRIPT: &str = "int NPC_PEBBLE = 7;\r\nint GetGold(object o);\r\nobject GetFirstPC();\r\nvoid PrintString(string s);\r\nint GetGlobalNumber(string s);\r\n";
+const NWSCRIPT: &str = "int NPC_PEBBLE = 7;\r\nint GetGold(object o);\r\nobject GetFirstPC();\r\nvoid PrintString(string s);\r\nint GetGlobalNumber(string s);\r\nint GetHitDice(object o);\r\n";
 
 fn host(scripts: &[(&str, &str)]) -> Host {
     let (table, _) = EngineTable::from_nwscript(FileId(0), NWSCRIPT.as_bytes());
@@ -43,12 +43,15 @@ fn host(scripts: &[(&str, &str)]) -> Host {
 /// int StartingConditional() { PrintString("x"); return GetGold(GetFirstPC()) < 500; }
 const RICH: &str = "    RSADDI\n    JSR sc\n    RETN\nsc:\n    CONSTS \"x\"\n    ACTION 2, 1\n    ACTION 1, 0\n    ACTION 0, 1\n    CONSTI 500\n    LTII\n    CPDOWNSP -8, 4\n    MOVSP -4\n    RETN\n";
 
+/// int StartingConditional() { return GetHitDice(GetFirstPC()); }
+const LEVEL: &str = "    RSADDI\n    JSR sc\n    RETN\nsc:\n    ACTION 1, 0\n    ACTION 4, 1\n    CPDOWNSP -8, 4\n    MOVSP -4\n    RETN\n";
+
 fn run_lua(test: &str) -> Vec<nwscript_lua::TestOutcome> {
     let dir = std::env::temp_dir().join(format!("nws-lua-{}-{}", std::process::id(), test.len()));
     std::fs::create_dir_all(&dir).unwrap();
     let f = dir.join("x_test.lua");
     std::fs::write(&f, test).unwrap();
-    run_test_file(&host(&[("rich", RICH)]), &f, None).unwrap()
+    run_test_file(&host(&[("rich", RICH), ("level", LEVEL)]), &f, None).unwrap()
 }
 
 #[test]
@@ -140,6 +143,25 @@ fn globals_and_objects_round_trip() {
           assert.equal(item, o.inventory[1])
           assert.equal(o, w:object("PEBBLE"))
           assert.is_true(o:valid())
+        end)
+    "#,
+    );
+    assert!(out.iter().all(|o| o.passed), "{out:?}");
+}
+
+#[test]
+fn class_levels_make_a_creatures_level() {
+    let out = run_lua(
+        r#"
+        it("sums the classes", function()
+          local w = nws.world()
+          local pc = w:create("creature", "pc", { is_pc = true })
+          w.party = { pc }
+          pc:level(0, 7)
+          pc:level(3, 5)
+          local run = nws.script("level"):run(w)
+          assert.equal(12, run:calls("GetHitDice")[1].ret)
+          assert.modelled(run)
         end)
     "#,
     );

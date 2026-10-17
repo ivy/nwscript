@@ -6,7 +6,7 @@ The fastest way to write a script the game accepts is to read how BioWare wrote 
 
 - KotOR 1's global scripts have source (`scripts.bif`): search it by the routine or constant you need. Prefixes say what a script is: `k_con_` dialog conditionals and `k_act_` dialog actions shared across the game, `k_def_` default creature events, `k_inc_` includes, `k_ai_master` the combat AI. Most of the rest are `k_p` and a planet (`k_pman_` Manaan, `k_pdan_` Dantooine, `k_ptat_` Tatooine) followed by a short subject.
 - Module scripts have bytecode only: decompile them (below). A whole module at once: give `decompile` the directory, which reports how many functions verified per directory; then decompile the files of interest one by one.
-- `nws fn NAME` prints an engine routine's declaration and BioWare's comment on it; `nws fn --grep WORD` searches names and comments.
+- `nws -I DIR fn NAME` prints an engine routine's declaration and BioWare's comment on it; `nws fn --grep WORD` searches names and comments.
 
 ## Decompile
 

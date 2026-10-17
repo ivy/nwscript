@@ -135,6 +135,11 @@ function Object:learn(spell) end
 ---@param feat integer
 function Object:feat(feat) end
 
+---The creature has this many levels in a CLASS_TYPE_*; GetHitDice is their sum.
+---@param class integer
+---@param levels integer
+function Object:level(class, levels) end
+
 ---The object is under this spell's effect.
 ---@param spell integer
 function Object:affect(spell) end

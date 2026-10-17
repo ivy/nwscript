@@ -82,7 +82,7 @@ They read or change the world: its objects, variables, party, context and genera
 | `GetIsDead` | true when the creature is dead |
 | `GetRacialType` | the creature's `RACIAL_TYPE_*` |
 | `GetGender` | the creature's `GENDER_*` |
-| `GetHitDice` | the creature's total level |
+| `GetHitDice` | the creature's total level, the sum of its class levels |
 | `GetLevelByClass` | the creature's levels in the class |
 | `GetStandardFaction` | the object's `STANDARD_FACTION_*` |
 | `GetIsEnemy` | true when the two objects' factions are listed as enemies in the world |

@@ -15,6 +15,7 @@ allowed-tools:
 - `nws --version` must work. If it does not, `nws` is not installed: build it from a checkout (`cargo build --release -p nws`) or ask the user where it is.
 - Every command that compiles or runs needs `--game k1` (or `k2`); there is no default.
 - `nwscript.nss` and includes are found in the script's own directory, then each `-I DIR` in order. Point `-I` at a directory holding the game's `nwscript.nss` and the includes the script uses (`k_inc_*`).
+- `nws fn` needs `nwscript.nss` too: `nws -I DIR fn NAME`.
 - `nws <command> --help` is the manual for each command, with examples. Read it rather than guessing flags; this skill does not repeat it.
 - Never write into the game folder unless the user asked for the install step.
 

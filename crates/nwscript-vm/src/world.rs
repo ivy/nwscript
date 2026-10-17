@@ -227,7 +227,11 @@ pub const MODELS: &[(&str, Kind, &str)] = &[
         "the creature's `RACIAL_TYPE_*`",
     ),
     ("GetGender", Kind::State, "the creature's `GENDER_*`"),
-    ("GetHitDice", Kind::State, "the creature's total level"),
+    (
+        "GetHitDice",
+        Kind::State,
+        "the creature's total level, the sum of its class levels",
+    ),
     (
         "GetLevelByClass",
         Kind::State,

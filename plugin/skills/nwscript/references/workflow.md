@@ -16,7 +16,7 @@ Edit the `.nss`, then:
 nws --game k1 -I DIR check FILE.nss
 ```
 
-Fix every error before going on; `diagnostics.md` covers reading them. `nws fn NAME` and `nws fn --grep WORD` find an engine routine and its parameters; the comment above it in `nwscript.nss` is the game's own documentation.
+Fix every error before going on; `diagnostics.md` covers reading them. `nws -I DIR fn NAME` and `nws -I DIR fn --grep WORD` find an engine routine and its parameters; the comment above it in `nwscript.nss` is the game's own documentation.
 
 ## 3. Test
 

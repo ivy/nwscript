@@ -3,12 +3,12 @@
 `nws test` runs tests written in Lua against compiled NWScript. A test builds a small world, runs a script in it under the interpreter, and checks what the script returned and which engine routines it called with what. No game runs; a test takes milliseconds.
 
 ```bash
-nws --game k1 -I "$NWSCRIPT_CORPUS" -I "$NWSCRIPT_CORPUS/ncs" test docs/examples
+nws --game k1 -I DIR test tests/
 ```
 
 `nws test` finds every `*_test.lua` under the paths it is given (the current directory by default). A script named in a test is found as `NAME.ncs` in the test file's directory, then in each `-I` directory; the game's `nwscript.nss` comes from `--nwscript` or an `-I` directory. It exits 0 when every test passes and 3 when any fails, printing each failure's message and the trace of the last script it ran. `--filter TEXT` runs only tests whose name contains the text.
 
-The examples in [`examples/`](examples/) test ten of KotOR 1's scripts and are the quickest way to learn the API. Editors with lua-language-server complete the API from [`../lua/nws.lua`](../lua/nws.lua).
+In the nwscript repository, [`docs/examples/`](../../docs/examples/) tests ten of KotOR 1's scripts and is the quickest way to learn the API (`nws --game k1 -I CORPUS -I CORPUS/ncs test docs/examples`), and editors with lua-language-server complete the API from [`lua/nws.lua`](../../lua/nws.lua).
 
 ## A test
 
@@ -34,11 +34,11 @@ end)
 
 `nws.world({ seed = N })` makes an empty world: a module object, no area, nobody in the party, and a random generator seeded with N (0 by default). Scripts run against it change it, and a test reads it back.
 
-The world answers the engine routines `nws fn NAME` says it models (the repository's `docs/engine-model.md` lists them all), about nine in ten of the calls KotOR 1's scripts make. Every other routine returns its type's default (0, 0.0, `""`, `OBJECT_INVALID`, a null structure) and the run records it as unmodelled. A test can answer any routine itself: `w.engine.NAME = function(args...) return value end` replaces `NAME` in that world, and its replies count as modelled. Arguments arrive as Lua values (below) in the routine's parameter order; the return is converted to the routine's return type.
+The world answers the engine routines `nws fn NAME` says it models (the nwscript repository's [`docs/engine-model.md`](../../docs/engine-model.md) lists them all), about nine in ten of the calls KotOR 1's scripts make. Every other routine returns its type's default (0, 0.0, `""`, `OBJECT_INVALID`, a null structure) and the run records it as unmodelled. A test can answer any routine itself: `w.engine.NAME = function(args...) return value end` replaces `NAME` in that world, and its replies count as modelled. Arguments arrive as Lua values (below) in the routine's parameter order; the return is converted to the routine's return type.
 
 | Field | What |
 | --- | --- |
-| `w.globals.NAME` | a global variable: an integer is a global number, a boolean a global boolean, a string a global string; `nil` removes it |
+| `w.globals.NAME` | a global variable: an integer is a global number, a boolean a global boolean, a string a global string; `nil` removes it, and an unset one reads as 0, `FALSE` or `""` |
 | `w.engine.NAME` | a Lua function answering the engine routine `NAME` |
 | `w.self` | `OBJECT_SELF` for the script |
 | `w.speaker` | `GetPCSpeaker()` |
@@ -74,6 +74,7 @@ Objects compare equal when they are the same object, and every field below can b
 | --- | --- |
 | `o:give(tag)` | a new item with that tag in the inventory |
 | `o:equip(slot, tag)` | a new item in an `INVENTORY_SLOT_*` |
+| `o:level(class, levels)` | the creature has that many levels in a `CLASS_TYPE_*`; its total is its level (`GetHitDice`, `GetLevelByClass`) |
 | `o:learn(spell)`, `o:feat(feat)`, `o:affect(spell)` | the creature knows a spell, has a feat, or is under a spell's effect |
 | `o:talent(category, type, id)` | a talent for `GetCreatureTalentRandom` and `GetCreatureTalentBest` |
 | `o:set_local(index, value)` | a local boolean or number at the index |
