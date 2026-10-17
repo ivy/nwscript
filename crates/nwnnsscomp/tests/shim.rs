@@ -63,6 +63,21 @@ fn holopatcher_form_with_output() {
 }
 
 #[test]
+fn launcher_form_finds_nwscript_beside_the_exe() {
+    // A TSLPatcher mod keeps nwscript.nss beside nwnnsscomp.exe and its
+    // scripts in a subdirectory, which is all the launcher form passes.
+    let d = dir("x");
+    std::fs::create_dir_all(d.join("mod2")).unwrap();
+    std::fs::copy(d.join("a.nss"), d.join("mod2/a.nss")).unwrap();
+    std::fs::copy(d.join("inc/k_inc_x.nss"), d.join("mod2/k_inc_x.nss")).unwrap();
+    shim(&d)
+        .args(["inc/nwnnsscomp.exe", "-c", "mod2/a.nss", "-o", "mod2/a.ncs"])
+        .assert()
+        .code(0);
+    assert!(d.join("mod2/a.ncs").is_file());
+}
+
+#[test]
 fn errors_in_the_installer_shape() {
     let d = dir("e");
     shim(&d)

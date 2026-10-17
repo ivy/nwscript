@@ -20,7 +20,9 @@
 //! A first argument naming a `.exe` is skipped: pykotor's
 //! `PYKOTOR_NWNNSSCOMP_LAUNCHER` runs `<launcher> <the mod's nwnnsscomp.exe>
 //! <flags>`, so this binary can be that launcher and stand in for the
-//! Windows compiler without Wine.
+//! Windows compiler without Wine. That `.exe`'s directory is searched last
+//! for includes and `nwscript.nss`, where the Windows compiler finds the
+//! `nwscript.nss` installers ship beside it.
 //!
 //! The game profile is `NWS_GAME` (`k1` or `k2`), `k1` when unset. Errors
 //! print as `FILE(LINE): Error: MESSAGE` when stdout is not a terminal, the
@@ -39,6 +41,8 @@ struct Args {
     input: Option<PathBuf>,
     output: Option<PathBuf>,
     includes: Vec<PathBuf>,
+    /// The directory of the `.exe` this binary stands in for.
+    exe_dir: Option<PathBuf>,
     quiet: bool,
 }
 
@@ -53,7 +57,13 @@ fn usage() -> ExitCode {
 fn parse(argv: &[String]) -> Result<Args, String> {
     let mut a = Args::default();
     let argv = match argv.first() {
-        Some(first) if first.to_ascii_lowercase().ends_with(".exe") => &argv[1..],
+        Some(first) if first.to_ascii_lowercase().ends_with(".exe") => {
+            a.exe_dir = Path::new(first)
+                .parent()
+                .filter(|d| !d.as_os_str().is_empty())
+                .map(Path::to_path_buf);
+            &argv[1..]
+        }
         _ => argv,
     };
     let mut it = argv.iter().peekable();
@@ -235,6 +245,7 @@ fn main() -> ExitCode {
     let mut resolver = FsResolver::new(
         std::iter::once(dir)
             .chain(args.includes.iter().cloned())
+            .chain(args.exe_dir.iter().cloned())
             .collect(),
         None,
     );
