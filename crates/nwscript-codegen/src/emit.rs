@@ -39,8 +39,9 @@ impl Emitter {
         self.items.push(Item::Jump(opcode, to));
     }
 
-    /// Resolve the labels. Every label jumped to must have been placed.
-    pub fn finish(self) -> Program {
+    /// Resolve the labels, and give each label's file offset. Every label
+    /// jumped to must have been placed.
+    pub fn finish(self) -> (Program, Vec<u32>) {
         let mut at = vec![u32::MAX; self.labels as usize];
         let mut offset = nwscript_ncs::CODE_START;
         for item in &self.items {
@@ -71,6 +72,6 @@ impl Emitter {
                 Item::Label(_) => {}
             }
         }
-        Program::new(out)
+        (Program::new(out), at)
     }
 }

@@ -41,6 +41,15 @@ pub enum Profile {
 /// [`ExprKind::Error`]: a program whose only errors are in
 /// [`codes::BIOWARE_ACCEPTED`] qualifies.
 pub fn generate(program: &Program, profile: Profile) -> Result<nwscript_ncs::Program, Diagnostic> {
+    generate_with_layout(program, profile).map(|(p, _)| p)
+}
+
+/// [`generate`], and the file offset where each function's code starts, in
+/// the order of the bytecode.
+pub fn generate_with_layout(
+    program: &Program,
+    profile: Profile,
+) -> Result<(nwscript_ncs::Program, Vec<(FuncId, u32)>), Diagnostic> {
     let _ = profile;
     let Some(entry) = program.entry else {
         return Err(Diagnostic::new(
@@ -51,7 +60,15 @@ pub fn generate(program: &Program, profile: Profile) -> Result<nwscript_ncs::Pro
     };
     let mut g = Gen::new(program);
     g.program(entry)?;
-    Ok(g.e.finish())
+    let labels: Vec<(FuncId, Label)> = g.fn_labels.iter().map(|(f, l)| (*f, *l)).collect();
+    let (code, at) = g.e.finish();
+    let mut layout: Vec<(FuncId, u32)> = labels
+        .into_iter()
+        .map(|(f, l)| (f, at[l.0 as usize]))
+        .filter(|(_, o)| *o != u32::MAX)
+        .collect();
+    layout.sort_by_key(|(_, o)| *o);
+    Ok((code, layout))
 }
 
 /// Where a variable lives.

@@ -735,6 +735,7 @@ dependencies = [
  "nwscript-ncs",
  "nwscript-sema",
  "nwscript-syntax",
+ "toml",
 ]
 
 [[package]]
