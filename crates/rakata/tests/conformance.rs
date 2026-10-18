@@ -270,9 +270,9 @@ fn members_are_classified_by_their_own_format_and_the_rest_counted_as_no_reader(
     put(
         &root,
         "modules/m.box",
-        &boxed(&[("a.rev", b"abc"), ("b.pad", b"x\0\0"), ("c.tga", b"GFF ")]),
+        &boxed(&[("a.rev", b"abc"), ("b.pad", b"x\0\0"), ("c.wav", b"GFF ")]),
     );
-    put(&root, "Override/loose.tga", b"GFF ");
+    put(&root, "Override/loose.wav", b"GFF ");
     put(&root, "Override/noext", b"");
     let report = run(&root, &registry(), &Known::default(), 1).unwrap();
     assert_eq!(by_name(&report, "box").counts.identical, 1);
@@ -285,7 +285,7 @@ fn members_are_classified_by_their_own_format_and_the_rest_counted_as_no_reader(
     );
     assert_eq!(by_name(&report, "padded").counts.equal, 1);
     assert_eq!(report.no_reader.total, 3);
-    assert_eq!(report.no_reader.by_extension["tga"], 2);
+    assert_eq!(report.no_reader.by_extension["wav"], 2);
     assert_eq!(report.no_reader.by_extension["(none)"], 1);
     // chitin.key, the box, its three members, the two loose files.
     assert_eq!(report.files, 7);
@@ -299,7 +299,7 @@ fn members_are_classified_by_their_own_format_and_the_rest_counted_as_no_reader(
 #[test]
 fn archives_built_in_memory_are_identical_and_their_members_listed() {
     let root = tree("archives");
-    let utc = ResId::parse("p_bastila.tga").unwrap();
+    let utc = ResId::parse("p_bastila.wav").unwrap();
     let mut rim = Rim::new();
     rim.add(utc, b"GFF V3.2".to_vec()).unwrap();
     put(&root, "modules/danm13.rim", &rim.to_bytes().unwrap());
@@ -349,7 +349,7 @@ fn archives_built_in_memory_are_identical_and_their_members_listed() {
         a.counts.identical, 8,
         "seven files and the RIM inside the .mod"
     );
-    assert_eq!(report.no_reader.by_extension["tga"], 2);
+    assert_eq!(report.no_reader.by_extension["wav"], 2);
     let l = by_name(&report, "lip");
     assert_eq!(
         (l.counts.files, l.counts.identical),

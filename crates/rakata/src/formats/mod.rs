@@ -6,6 +6,7 @@ mod archive;
 mod gff;
 mod lip;
 mod lyt;
+mod texture;
 mod tlk;
 mod twoda;
 
@@ -13,5 +14,6 @@ pub use archive::Archive;
 pub use gff::Gff;
 pub use lip::Lip;
 pub use lyt::{Lyt, Vis};
+pub use texture::{Tga, Tpc, Txi};
 pub use tlk::Tlk;
 pub use twoda::TwoDa;

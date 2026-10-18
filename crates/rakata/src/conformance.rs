@@ -262,6 +262,9 @@ impl Registry {
         r.register(Box::new(crate::formats::Lip));
         r.register(Box::new(crate::formats::Lyt));
         r.register(Box::new(crate::formats::Vis));
+        r.register(Box::new(crate::formats::Tpc));
+        r.register(Box::new(crate::formats::Txi));
+        r.register(Box::new(crate::formats::Tga));
         r.register(Box::new(crate::formats::TwoDa));
         r.register(Box::new(crate::formats::Gff));
         r
