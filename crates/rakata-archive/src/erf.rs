@@ -103,7 +103,10 @@ impl<'a> Erf<'a> {
         let build_day = r.u32("the header", 0x24)?;
         let description_strref = r.u32("the header", 0x28)?;
 
-        let mut descriptions = Vec::with_capacity(string_count);
+        // Each description takes at least eight bytes: no more than that
+        // many fit in what follows the offset, whatever the count says.
+        let room = bytes.len().saturating_sub(strings) / 8;
+        let mut descriptions = Vec::with_capacity(string_count.min(room));
         let mut at = strings;
         for _ in 0..string_count {
             let language = r.u32("the description strings", at)?;
