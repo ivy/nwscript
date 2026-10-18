@@ -197,7 +197,7 @@ A mesh's MDX block is `vertex count × stride` bytes at the offset at 324, one v
 | 0x20 | normal | 3 |
 | 0x80 | tangent space | 9 |
 
-The bits and the offsets agree in every mesh: an offset is -1 exactly when its bit is clear. The layouts in vanilla, by flags and stride, with mesh counts:
+The bits and the offsets agree in every mesh: an offset is -1 exactly when its bit is clear. A skin mesh's first texture coordinates run the other way in V from a trimesh's: drawn with a texture uploaded top row first, a trimesh's V is flipped and a skin's is used as stored, which draws `pmhc01`'s face upright where the trimesh's flip inverts it (observed in a renderer; why the two kinds differ is not established). The layouts in vanilla, by flags and stride, with mesh counts:
 
 | Flags | Stride | Attributes, at offsets | Meshes |
 | --- | --- | --- | --- |
@@ -349,7 +349,7 @@ Reference projects read: none.
 
 Measured: on 2026-10-18, every count above comes from the vanilla KotOR 1 install under `$RAKATA_GAME_K1`, first with short Python scripts reading the headers, nodes, mesh headers, faces, index lists, controllers, skin headers, animation headers and MDX blocks of every model the KEY's BIFs, `rims/`, `modules/` and `patch.erf` hold, then with `crates/rakata-mdl/tests/vanilla.rs`, which parses every one of them, prints the node kinds, classifications, MDX layouts, flag counts, controllers by type, compressed keys, skins and their bind transforms, resolves every supermodel chain, and reads every model `end_m01aa` uses (`RAKATA_GAME_K1=… cargo test -p rakata-mdl --test vanilla -- --nocapture`). The compressed orientation's partition, its agreement with uncompressed copies and its scale were measured by the Python scripts over the 2,832 models of distinct names (one copy of each name the BIFs and RIMs hold). The layout was measured by Python scripts that list every structure each model's headers reach and check that they tile the model data and fall in the order above, and is confirmed by `crates/rakata-mdl/tests/vanilla.rs`, which writes every vanilla model back from `rakata_mdl::ModelFile` and compares bytes, and by `rakata conformance --only mdl`.
 
-Observed in a renderer: the winding and the undrawn AABB nodes, from the OdysseyUE runtime drawing the Endar Spire (`end_m01aa`) from these structures and comparing with the game.
+Observed in a renderer: the winding, the undrawn AABB nodes and the skin meshes' texture coordinates, from the OdysseyUE runtime drawing the Endar Spire (`end_m01aa`) from these structures and comparing with the game.
 
 Date: 2026-10-18.
 
