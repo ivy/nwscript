@@ -133,14 +133,122 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
         .collect();
     assert_eq!(
         commands,
-        ["install", "explain"],
+        ["install", "explain", "conformance"],
         "--help lists commands not yet built"
     );
-    for cmd in ["explain", "install"] {
+    for cmd in ["install", "explain", "conformance"] {
         let out = rakata().args([cmd, "--help"]).output().unwrap();
         assert!(
             String::from_utf8_lossy(&out.stdout).contains("Example"),
-            "{cmd}"
+            "{cmd} --help has no example"
         );
     }
+}
+
+/// A tree with a valid empty `chitin.key`, in a fresh temporary directory.
+fn install(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("rakata-cli-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("Override")).unwrap();
+    std::fs::write(
+        dir.join("chitin.key"),
+        rakata_archive::Key::new().to_bytes().unwrap(),
+    )
+    .unwrap();
+    dir
+}
+
+#[test]
+fn conformance_without_a_game_is_a_usage_error_naming_the_flag() {
+    rakata()
+        .arg("conformance")
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("--game"));
+}
+
+#[test]
+fn conformance_over_a_directory_that_is_not_an_install_reports_re0501() {
+    let dir = std::env::temp_dir().join(format!("rakata-cli-noinstall-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    rakata()
+        .args(["--game", dir.to_str().unwrap(), "conformance"])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("RE0501"));
+}
+
+#[test]
+fn conformance_with_an_unknown_format_is_a_usage_error() {
+    let dir = install("only");
+    rakata()
+        .args([
+            "--game",
+            dir.to_str().unwrap(),
+            "conformance",
+            "--only",
+            "gff",
+        ])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("no format `gff`"));
+}
+
+#[test]
+fn conformance_writes_one_envelope_and_the_report_files() {
+    let dir = install("json");
+    let report = dir.join("report.json");
+    let md = dir.join("report.md");
+    let out = rakata()
+        .args([
+            "--game",
+            dir.to_str().unwrap(),
+            "--format",
+            "json",
+            "conformance",
+            "--only",
+            "archive",
+            "--report",
+            report.to_str().unwrap(),
+            "--markdown",
+            md.to_str().unwrap(),
+            "--known",
+            dir.join("absent.toml").to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let mut docs =
+        serde_json::Deserializer::from_slice(&out.stdout).into_iter::<serde_json::Value>();
+    let doc = docs.next().unwrap().unwrap();
+    assert!(
+        docs.next().is_none(),
+        "more than one JSON document on stdout"
+    );
+    assert_eq!(doc["command"], "conformance");
+    assert_eq!(doc["game"], dir.to_str().unwrap());
+    assert_eq!(doc["result"]["formats"][0]["name"], "archive");
+    assert_eq!(doc["result"]["formats"][0]["counts"]["identical"], 1);
+    assert_eq!(doc["result"]["files"], 1);
+    let written: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&report).unwrap()).unwrap();
+    assert_eq!(written["files"], 1);
+    let text = std::fs::read_to_string(&md).unwrap();
+    assert!(text.starts_with("# Round-trip conformance"), "{text}");
+    assert!(text.contains("| `archive` | 1 | 1 | 0 | 0 | |"), "{text}");
+}
+
+#[test]
+fn conformance_text_mode_prints_the_summary() {
+    let dir = install("text");
+    rakata()
+        .args(["--game", dir.to_str().unwrap(), "conformance"])
+        .assert()
+        .code(0)
+        .stdout(predicate::str::contains("| Format | Files | Identical |"));
 }

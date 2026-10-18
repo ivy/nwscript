@@ -14,6 +14,7 @@ Examples:
                                            the same for the installer's second option, as JSON
   rakata explain RE0001                    explain a diagnostic code
   rakata --format json explain RE0001      the same, as one JSON document
+  rakata conformance --game DIR            round-trip every file of an install
 
 Exit codes: 0 success, 1 errors reported, 2 bad invocation,
 3 a comparison found a difference, 101 internal error.";
@@ -89,4 +90,6 @@ pub enum Command {
         /// The code, such as RE0001; case does not matter.
         code: String,
     },
+    /// Read, write and compare every file of an install, per format.
+    Conformance(crate::cmd::ConformanceArgs),
 }
