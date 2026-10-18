@@ -1,0 +1,693 @@
+# Findings `rakata dialog lint` accepts: the dialogue, the module it was
+# linted in (none for a global dialogue), where (E3, R0, E3>R4, start>E0)
+# and the code. Written by `rakata dialog lint --write-known`.
+
+[[finding]]
+dialog = "dan13_cort.dlg"
+module = "danm13"
+at = "E1"
+code = "RW1102"
+
+[[finding]]
+dialog = "dan13_cort.dlg"
+module = "danm13"
+at = "E2"
+code = "RW1102"
+
+[[finding]]
+dialog = "dan13_cort.dlg"
+module = "danm13"
+at = "E3"
+code = "RW1102"
+
+[[finding]]
+dialog = "dan13_cort.dlg"
+module = "danm13"
+at = "R11"
+code = "RW1102"
+
+[[finding]]
+dialog = "dan13_crattis.dlg"
+module = "danm13"
+at = "start>E19"
+code = "RW1106"
+
+[[finding]]
+dialog = "dan13_deesra.dlg"
+module = "danm13"
+at = "E13>R17"
+code = "RW1106"
+
+[[finding]]
+dialog = "dan13_deesra.dlg"
+module = "danm13"
+at = "E13>R59"
+code = "RW1106"
+
+[[finding]]
+dialog = "dan13_deesra.dlg"
+module = "danm13"
+at = "E13>R60"
+code = "RW1106"
+
+[[finding]]
+dialog = "dan13_deesra.dlg"
+module = "danm13"
+at = "E19>R17"
+code = "RW1106"
+
+[[finding]]
+dialog = "dan13_deesra.dlg"
+module = "danm13"
+at = "E1>R17"
+code = "RW1106"
+
+[[finding]]
+dialog = "dan13_deesra.dlg"
+module = "danm13"
+at = "E48>R59"
+code = "RW1106"
+
+[[finding]]
+dialog = "dan13_deesra.dlg"
+module = "danm13"
+at = "E48>R60"
+code = "RW1106"
+
+[[finding]]
+dialog = "dan13_karal.dlg"
+module = "danm13"
+at = "start>E2"
+code = "RW1106"
+
+[[finding]]
+dialog = "dan13_tareelok.dlg"
+module = "danm13"
+at = "E0>R21"
+code = "RW1102"
+
+[[finding]]
+dialog = "dan13_tareelok.dlg"
+module = "danm13"
+at = "E13>R21"
+code = "RW1102"
+
+[[finding]]
+dialog = "dan13_tareelok.dlg"
+module = "danm13"
+at = "E2>R21"
+code = "RW1102"
+
+[[finding]]
+dialog = "dan13_tareelok.dlg"
+module = "danm13"
+at = "start>E0"
+code = "RW1102"
+
+[[finding]]
+dialog = "dan13_tareelok.dlg"
+module = "danm13"
+at = "start>E1"
+code = "RW1102"
+
+[[finding]]
+dialog = "dan13_tareelok.dlg"
+module = "danm13"
+at = "start>E22"
+code = "RW1102"
+
+[[finding]]
+dialog = "dan13_tareelok.dlg"
+module = "danm13"
+at = "start>E24"
+code = "RW1102"
+
+[[finding]]
+dialog = "dan14_nemo.dlg"
+module = "danm14aa"
+at = "E26>R40"
+code = "RW1102"
+
+[[finding]]
+dialog = "end_carth001.dlg"
+module = "end_m01ab"
+at = "E10"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_comp01.dlg"
+module = "end_m01aa"
+at = "E4"
+code = "RW1102"
+
+[[finding]]
+dialog = "end_comp01.dlg"
+module = "end_m01aa"
+at = "E5"
+code = "RW1102"
+
+[[finding]]
+dialog = "end_comp01.dlg"
+module = "end_m01aa"
+at = "R1"
+code = "RW1102"
+
+[[finding]]
+dialog = "end_comp01.dlg"
+module = "end_m01aa"
+at = "start>E6"
+code = "RW1102"
+
+[[finding]]
+dialog = "end_levelup.dlg"
+module = "end_m01aa"
+at = "E1"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_pop01.dlg"
+module = "end_m01aa"
+at = "E0"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_pop01.dlg"
+module = "end_m01aa"
+at = "E1"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_pop02.dlg"
+module = "end_m01aa"
+at = "E3"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_pop03.dlg"
+module = "end_m01aa"
+at = "E0"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_pop03.dlg"
+module = "end_m01aa"
+at = "E2"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_pop03.dlg"
+module = "end_m01aa"
+at = "E3"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_pop03.dlg"
+module = "end_m01aa"
+at = "E4"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E10"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E11"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E12"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E13"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E14"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E15"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E18"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E19"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E20"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E21"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E26"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E27"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E28"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E36"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E37"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E40"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E41"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E42"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E46"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E47"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E48"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E51"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E52"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E53"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E7"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E8"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "E9"
+code = "RW1110"
+
+[[finding]]
+dialog = "end_trask01.dlg"
+module = "end_m01aa"
+at = "R45"
+code = "RW1102"
+
+[[finding]]
+dialog = "k_hdroid1_dialog.dlg"
+at = "E0"
+code = "RW1108"
+
+[[finding]]
+dialog = "kas22_wookcut_01.dlg"
+module = "kas_m22ab"
+at = "E1"
+code = "RW1102"
+
+[[finding]]
+dialog = "kas22_wookcut_01.dlg"
+module = "kas_m22ab"
+at = "E2"
+code = "RW1102"
+
+[[finding]]
+dialog = "kas22_wookfht_01.dlg"
+module = "kas_m22ab"
+at = "start>E8"
+code = "RW1102"
+
+[[finding]]
+dialog = "kas22_wookfht_01.dlg"
+module = "kas_m22ab"
+at = "start>E9"
+code = "RW1102"
+
+[[finding]]
+dialog = "kas23_worrroz_01.dlg"
+module = "kas_m23ac"
+at = "R69>E72"
+code = "RW1102"
+
+[[finding]]
+dialog = "lev40_aacompdlg.dlg"
+module = "lev_m40aa"
+at = "E9>R31"
+code = "RW1102"
+
+[[finding]]
+dialog = "lev40_aacompdlg.dlg"
+module = "lev_m40aa"
+at = "E9>R44"
+code = "RW1102"
+
+[[finding]]
+dialog = "man26_droid.dlg"
+module = "manm26ab"
+at = "E0"
+code = "RW1108"
+
+[[finding]]
+dialog = "man26_gonto.dlg"
+module = "danm13"
+at = "start>E31"
+code = "RW1106"
+
+[[finding]]
+dialog = "man26_gonto.dlg"
+module = "manm26aa"
+at = "start>E31"
+code = "RW1106"
+
+[[finding]]
+dialog = "man26_gonto.dlg"
+module = "manm26aa"
+at = "start>E37"
+code = "RW1102"
+
+[[finding]]
+dialog = "man26_gonto.dlg"
+module = "manm26aa"
+at = "start>E38"
+code = "RW1102"
+
+[[finding]]
+dialog = "man26_gonto.dlg"
+module = "manm26aa"
+at = "start>E41"
+code = "RW1102"
+
+[[finding]]
+dialog = "man26_jolan.dlg"
+module = "manm26ac"
+at = "R20>E13"
+code = "RW1106"
+
+[[finding]]
+dialog = "man26_repint.dlg"
+module = "manm26ae"
+at = "E0>R0"
+code = "RW1106"
+
+[[finding]]
+dialog = "man26_sithdip.dlg"
+module = "manm26ab"
+at = "start>E11"
+code = "RW1106"
+
+[[finding]]
+dialog = "man26_sithdip.dlg"
+module = "manm26ab"
+at = "start>E13"
+code = "RW1106"
+
+[[finding]]
+dialog = "man26_trial.dlg"
+module = "manm26aa"
+at = "R12>E13"
+code = "RW1102"
+
+[[finding]]
+dialog = "man26_tyvark.dlg"
+module = "manm26ae"
+at = "start>E14"
+code = "RW1106"
+
+[[finding]]
+dialog = "man26_yortal.dlg"
+module = "manm26ab"
+at = "start>E23"
+code = "RW1106"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m12aa"
+at = "start>E16"
+code = "RW1106"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m40ad"
+at = "E0>R0"
+code = "RW1102"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m40ad"
+at = "E0>R1"
+code = "RW1102"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m40ad"
+at = "E0>R2"
+code = "RW1102"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m40ad"
+at = "E0>R3"
+code = "RW1102"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m40ad"
+at = "E0>R4"
+code = "RW1102"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m40ad"
+at = "E0>R5"
+code = "RW1102"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m40ad"
+at = "E0>R6"
+code = "RW1102"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m40ad"
+at = "E3>R16"
+code = "RW1102"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m40ad"
+at = "E3>R18"
+code = "RW1102"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m40ad"
+at = "E3>R20"
+code = "RW1102"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m40ad"
+at = "E3>R22"
+code = "RW1102"
+
+[[finding]]
+dialog = "pebn_swoopdrd.dlg"
+module = "ebo_m40ad"
+at = "start>E16"
+code = "RW1106"
+
+[[finding]]
+dialog = "plev_elev_dlg.dlg"
+module = "lev_m40ab"
+at = "R4>E3"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar02_gurney021.dlg"
+module = "tar_m02ac"
+at = "R24>E24"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar02_janice021.dlg"
+module = "tar_m02ab"
+at = "R33>E34"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar02_janice021.dlg"
+module = "tar_m02ab"
+at = "start>E1"
+code = "RW1106"
+
+[[finding]]
+dialog = "tar02_kebla021.dlg"
+module = "tar_m02ac"
+at = "R26"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar02_kebla021.dlg"
+module = "tar_m02ac"
+at = "R7"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar02_sarna021.dlg"
+module = "tar_m02ad"
+at = "E36"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar02_sarna021.dlg"
+module = "tar_m02ae"
+at = "E40"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar02_yungenda21.dlg"
+module = "tar_m02ad"
+at = "E36"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar02_yungenda21.dlg"
+module = "tar_m02ae"
+at = "E40"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar02_zelka021.dlg"
+module = "tar_m02ac"
+at = "R40>E34"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar03_mission031.dlg"
+module = "tar_m03ae"
+at = "E29"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar04_gendar041.dlg"
+module = "tar_m04aa"
+at = "E4>R3"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar04_infect041.dlg"
+module = "tar_m04aa"
+at = "E17>R14"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar04_infectf041.dlg"
+module = "tar_m04aa"
+at = "E17>R14"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar10_bartender.dlg"
+module = "tar_m10aa"
+at = "E0"
+code = "RW1102"
+
+[[finding]]
+dialog = "tar10_vulkmech04.dlg"
+module = "tar_m10ab"
+at = "start>E15"
+code = "RW1106"
+
+[[finding]]
+dialog = "tat17_07jawag_01.dlg"
+module = "tat_m17af"
+at = "R17>E19"
+code = "RW1106"
+
+[[finding]]
+dialog = "throw.dlg"
+module = "manm28ac"
+at = "R2"
+code = "RW1102"
+
