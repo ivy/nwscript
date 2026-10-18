@@ -27,6 +27,7 @@ Examples:
   rakata lip show ./n_juhani_01.lip        a lip-sync file's keyframes
   rakata save show SAVEDIR --module danm14ac --creature carth
                                            a creature as the save has it
+  rakata dialog show banter.dlg --game DIR a conversation's transcript, conditions decompiled
 
 Exit codes: 0 success, 1 errors reported, 2 bad invocation,
 3 a comparison found a difference, 101 internal error.";
@@ -143,4 +144,6 @@ pub enum Command {
     Lip(crate::cmd::LipArgs),
     /// A saved game by name: globals, the party, each module's creatures with their flags, effects and action queues, and the pending events.
     Save(crate::cmd::SaveArgs),
+    /// Conversations: show prints a dialogue's transcript, conditions decompiled.
+    Dialog(crate::cmd::DialogArgs),
 }

@@ -165,6 +165,7 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
             "cat",
             "conformance",
             "corpus",
+            "dialog",
             "explain",
             "gff",
             "install",
@@ -180,6 +181,7 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
         "cat",
         "conformance",
         "corpus",
+        "dialog",
         "explain",
         "gff",
         "install",
@@ -347,4 +349,83 @@ fn conformance_text_mode_prints_the_summary() {
         .assert()
         .code(0)
         .stdout(predicate::str::contains("| Format | Files | Identical |"));
+}
+
+/// A GFF V3.2 of type `ty` with an empty root struct.
+fn empty_gff(ty: &[u8; 4]) -> Vec<u8> {
+    let mut b = ty.to_vec();
+    b.extend(b"V3.2");
+    // Structs at 56, one; every other section at 68, empty.
+    for (offset, count) in [(56u32, 1u32), (68, 0), (68, 0), (68, 0), (68, 0), (68, 0)] {
+        b.extend(offset.to_le_bytes());
+        b.extend(count.to_le_bytes());
+    }
+    b.extend(u32::MAX.to_le_bytes());
+    b.extend(0u32.to_le_bytes());
+    b.extend(0u32.to_le_bytes());
+    b
+}
+
+#[test]
+fn dialog_show_without_a_game_is_a_usage_error_naming_the_flag() {
+    rakata()
+        .args(["dialog", "show", "banter.dlg"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("--game"));
+}
+
+#[test]
+fn dialog_show_of_a_dialogue_the_install_lacks_reports_re0404() {
+    let dir = install("dialog-missing");
+    rakata()
+        .args([
+            "--game",
+            dir.to_str().unwrap(),
+            "dialog",
+            "show",
+            "banter.dlg",
+        ])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("RE0404"));
+}
+
+#[test]
+fn dialog_show_of_a_gff_that_is_not_a_dialogue_reports_re1101() {
+    let dir = install("dialog-utc");
+    let file = dir.join("p_bastila.utc");
+    std::fs::write(&file, empty_gff(b"UTC ")).unwrap();
+    rakata()
+        .args(["--game", dir.to_str().unwrap(), "dialog", "show"])
+        .arg(&file)
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("RE1101"));
+}
+
+#[test]
+fn dialog_show_writes_the_transcript_as_one_json_document() {
+    let dir = install("dialog-json");
+    let file = dir.join("empty.dlg");
+    std::fs::write(&file, empty_gff(b"DLG ")).unwrap();
+    let out = rakata()
+        .args([
+            "--format",
+            "json",
+            "--game",
+            dir.to_str().unwrap(),
+            "dialog",
+            "show",
+        ])
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(doc["command"], "dialog show");
+    let t = &doc["result"]["transcript"];
+    assert_eq!(t["dialog"], "empty.dlg");
+    assert_eq!(t["entries"], 0);
+    assert!(t["nodes"].as_array().unwrap().is_empty());
 }

@@ -5,6 +5,8 @@ pub use conformance::ConformanceArgs;
 mod corpus;
 pub use corpus::CorpusArgs;
 mod cat;
+mod dialog;
+pub use dialog::DialogArgs;
 mod explain;
 mod install;
 mod save;
@@ -92,6 +94,7 @@ pub fn run(cli: Cli) -> Exit {
         Command::Tlk(args) => tlk::run(&ctx, &args),
         Command::Lip(args) => lip::run(&ctx, &args),
         Command::Save(args) => save::run(&ctx, &args),
+        Command::Dialog(args) => dialog::run(&ctx, &args),
         Command::Which {
             name,
             module,
