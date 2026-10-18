@@ -22,6 +22,23 @@ The first line is the winner, `wins LOCATION … sha256 HASH`; the rest are ever
 
 Each takes a file path as well (`./edited.dlg`), so the same commands read what a mod wrote.
 
+## A blueprint or an area, read
+
+```bash
+rakata show NAME.uti --module STEM --game DIR
+rakata show AREA.git --module STEM --game DIR --db FILE
+```
+
+`rakata show` reads a GFF with what it names resolved, so the 2DAs and the talk table need not be queried by hand. An item (`.uti`) shows its name, tag, base item and each property as one line, `Damage Bonus (Fire): 2 [itempropdef 11, iprp_damagetype 8, iprp_damagecost 2]`, the rows it came from in brackets. A creature, placeable or door (`.utc`, `.utp`, `.utd`) shows its name, tag, conversation, event scripts and inventory. An area's instances (`.git`) show each instance with its template's name, tag and scripts; with `--db`, an index (`refs.md`), it also lists what the module's scripts spawn there with `CreateObject` and which script does it, `kor37_freedon (creature) … by k37_opensarc`. A module's resources need `--module`. Any other GFF prints as `gff show` does.
+
+## One script, decompiled
+
+```bash
+rakata decompile NAME.ncs --module STEM --game DIR > NAME.nss
+```
+
+The copy the engine loads, decompiled as `dialog show` decompiles conditions: the install's `nwscript.nss`, include libraries folded back to `#include`, every function verified by recompiling. The first lines are `//` comments giving where the copy lies and `[verified, N of N functions]`; a function that did not verify is reported (RW2001) and should be read against `nws disasm`. Without `--module`, the one module holding the script is used.
+
 ## A dialogue
 
 ```bash

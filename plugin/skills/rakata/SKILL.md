@@ -24,7 +24,7 @@ Read only the file the task needs, from this skill's `references/` directory:
 
 | Task | File |
 |---|---|
-| Which copy the game loads; read a resource, a table, a string, a dialogue | `find.md` |
+| Which copy the game loads; read a resource, a table, a string, a dialogue, an item's properties, an area's instances, one script decompiled | `find.md` |
 | What refers to a strref, script, tag or global; search the install | `refs.md` |
 | Make a change: add dialogue nodes and links, declare a global, compile a condition, edit a table or blueprint, write to Override | `author.md` |
 | Check a change: lint a dialogue or the install, diff against the original | `check.md` |
