@@ -254,6 +254,15 @@ impl Dialog {
         Ok(())
     }
 
+    /// Set the script `at` runs when it is shown (`None` for none), in
+    /// place, and return the one it ran. Nothing moves.
+    pub fn set_script(&mut self, at: NodeRef, script: Option<ResRef>) -> Result<Option<ResRef>> {
+        self.require(at)?;
+        let old = self.node(at).and_then(|n| n.script());
+        self.nodes_mut(at.kind)[at.index].set(label("Script"), resref(script));
+        Ok(old)
+    }
+
     /// Reorder a list: `order[i]` is the index, before, of the node that
     /// lies at `i` after. Every link into the list (the other kind's links,
     /// and the starts for entries) is rewritten to follow its node. Fails
