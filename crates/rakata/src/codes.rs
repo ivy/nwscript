@@ -180,6 +180,12 @@ nwscript_diag::codes! {
     RW2102 Warning "a write naming a journal entry its category lacks";
     RW2103 Warning "a player reply doing what a sibling reply that writes the quest does, writing no entry";
     RW2104 Warning "a flags symbol no object in scope bears and no global declares";
+    RE2201 Error "a TPC truncated before its header or pixel data ends";
+    RE2202 Error "a TPC encoding that names no pixel format";
+    RE2203 Error "a TPC header describing no layout of images and mip levels";
+    RE2204 Error "a TGA truncated before its header or pixels end";
+    RE2205 Error "a TGA image type or pixel depth that is not decoded";
+    RE2206 Error "a TGA run-length packet past the image's last pixel";
 }
 
 /// The rakata code with this id, if registered; case does not matter.

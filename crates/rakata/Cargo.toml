@@ -23,6 +23,7 @@ rakata-res = { workspace = true }
 rakata-patch = { workspace = true }
 rakata-save = { workspace = true }
 rakata-tlk = { workspace = true }
+rakata-texture = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"

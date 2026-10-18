@@ -91,6 +91,12 @@ fn every_code_a_data_crate_reports_is_registered() {
         rakata::save::codes::BAD_SHAPE,
         rakata::save::codes::NO_SUCH_CREATURE,
         rakata::save::codes::NO_LOCAL_NAMES,
+        rakata::texture::codes::TPC_TRUNCATED,
+        rakata::texture::codes::TPC_UNKNOWN_FORMAT,
+        rakata::texture::codes::TPC_BAD_LAYOUT,
+        rakata::texture::codes::TGA_TRUNCATED,
+        rakata::texture::codes::TGA_UNSUPPORTED,
+        rakata::texture::codes::TGA_RLE_OVERRUN,
     ] {
         assert!(codes::lookup(id).is_some(), "{id} is not registered");
     }

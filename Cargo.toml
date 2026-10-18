@@ -22,6 +22,7 @@ nwscript-lua = { path = "crates/nwscript-lua" }
 nwscript-py = { path = "crates/nwscript-py" }
 rakata-res = { path = "crates/rakata-res" }
 rakata-lip = { path = "crates/rakata-lip" }
+rakata-texture = { path = "crates/rakata-texture" }
 rakata-archive = { path = "crates/rakata-archive" }
 rakata-2da = { path = "crates/rakata-2da" }
 rakata-gff = { path = "crates/rakata-gff" }

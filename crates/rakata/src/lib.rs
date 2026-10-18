@@ -29,6 +29,7 @@ pub use rakata_game as game;
 pub use rakata_gff as gff;
 pub use rakata_lip as lip;
 pub use rakata_res as res;
+pub use rakata_texture as texture;
 pub use rakata_tlk as tlk;
 
 use std::path::PathBuf;
