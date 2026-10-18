@@ -9,6 +9,20 @@ use rakata_dialog::{
 use rakata_gff::{Gff, Label, LocString, Struct, Value};
 use rakata_res::{ResRef, ResType};
 
+/// `bytes`, kept as a seed for the fuzz targets in the directory
+/// `$RAKATA_FUZZ_SEEDS` names, when it is set.
+fn seed(bytes: &[u8]) -> &[u8] {
+    if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        bytes.hash(&mut h);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+    }
+    bytes
+}
+
 fn label(s: &str) -> Label {
     Label::new(s).unwrap()
 }
@@ -81,7 +95,7 @@ fn ten() -> Dialog {
         .push(label("EntryList"), Value::List(entries))
         .push(label("ReplyList"), Value::List(replies))
         .push(label("StartingList"), Value::List(vec![start]));
-    Dialog::parse("ten.dlg", &g.to_bytes().unwrap()).unwrap()
+    Dialog::parse("ten.dlg", seed(&g.to_bytes().unwrap())).unwrap()
 }
 
 fn line(text: &str) -> NewNode {
@@ -101,7 +115,7 @@ fn appending_an_entry_leaves_every_node_at_its_index() {
     let reply = d.push_reply(&NewNode::default()).unwrap();
     assert_eq!(reply, NodeRef::reply(4));
     let bytes = d.to_bytes().unwrap();
-    let again = Dialog::parse("ten.dlg", &bytes).unwrap();
+    let again = Dialog::parse("ten.dlg", seed(&bytes)).unwrap();
     for (at, raw) in &before {
         assert_eq!(again.node(*at).unwrap().raw(), raw, "{at} moved or changed");
     }
@@ -235,7 +249,7 @@ fn an_emptied_dialogue_keeps_the_settings_and_drops_the_lines() {
     assert!(e.starts().is_empty());
     assert_eq!(e.info().skippable, Some(true));
     assert_eq!(e.info().end_conversation, None);
-    let again = Dialog::parse("new.dlg", &e.to_bytes().unwrap()).unwrap();
+    let again = Dialog::parse("new.dlg", seed(&e.to_bytes().unwrap())).unwrap();
     assert_eq!(again.len(Kind::Entry), 0);
 }
 

@@ -8,6 +8,20 @@ use rakata_dialog::{
 use rakata_gff::{Gff, Label, LocString, Struct, Value};
 use rakata_res::ResRef;
 
+/// `bytes`, kept as a seed for the fuzz targets in the directory
+/// `$RAKATA_FUZZ_SEEDS` names, when it is set.
+fn seed(bytes: &[u8]) -> &[u8] {
+    if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        bytes.hash(&mut h);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+    }
+    bytes
+}
+
 fn label(s: &str) -> Label {
     Label::new(s).unwrap()
 }
@@ -100,7 +114,7 @@ fn fixture() -> Dialog {
         .push(label("ReplyList"), Value::List(replies))
         .push(label("StartingList"), Value::List(vec![start0, start1]));
     let bytes = g.to_bytes().unwrap();
-    Dialog::parse("fixture.dlg", &bytes).unwrap()
+    Dialog::parse("fixture.dlg", seed(&bytes)).unwrap()
 }
 
 #[test]
@@ -132,7 +146,7 @@ fn the_model_reads_nodes_links_and_starts() {
 fn a_dialogue_writes_back_as_read_with_the_fields_it_does_not_name() {
     let d = fixture();
     let bytes = d.to_bytes().unwrap();
-    let again = Dialog::parse("fixture.dlg", &bytes).unwrap();
+    let again = Dialog::parse("fixture.dlg", seed(&bytes)).unwrap();
     assert_eq!(again.to_bytes().unwrap(), bytes);
     let e0 = again.node(NodeRef::entry(0)).unwrap();
     let n = e0

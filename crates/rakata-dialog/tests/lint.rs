@@ -7,6 +7,20 @@ use rakata_dialog::{Dialog, GlobalReads, NodeRef, Place, References, codes, lint
 use rakata_gff::{Gff, Label, LocString, Struct, Value};
 use rakata_res::{ResRef, ResType};
 
+/// `bytes`, kept as a seed for the fuzz targets in the directory
+/// `$RAKATA_FUZZ_SEEDS` names, when it is set.
+fn seed(bytes: &[u8]) -> &[u8] {
+    if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        bytes.hash(&mut h);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+    }
+    bytes
+}
+
 fn label(s: &str) -> Label {
     Label::new(s).unwrap()
 }
@@ -72,7 +86,7 @@ fn dialog(entries: &[N], replies: &[N], starts: &[(u32, &str)]) -> Dialog {
         .push(label("EntryList"), Value::List(e))
         .push(label("ReplyList"), Value::List(r))
         .push(label("StartingList"), Value::List(s));
-    Dialog::parse("fixture.dlg", &g.to_bytes().unwrap()).unwrap()
+    Dialog::parse("fixture.dlg", seed(&g.to_bytes().unwrap())).unwrap()
 }
 
 /// An install: the resources it holds, `globalcat.2da`'s names, and what
@@ -331,7 +345,7 @@ fn ending(e: &[N], end: &str, abort: &str) -> Dialog {
     g.root
         .push(label("EndConversation"), Value::resref(end).unwrap())
         .push(label("EndConverAbort"), Value::resref(abort).unwrap());
-    Dialog::parse("fixture.dlg", &g.to_bytes().unwrap()).unwrap()
+    Dialog::parse("fixture.dlg", seed(&g.to_bytes().unwrap())).unwrap()
 }
 
 #[test]
