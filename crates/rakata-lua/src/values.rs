@@ -91,12 +91,13 @@ pub fn location(install: &Install, l: &Location) -> String {
     }
 }
 
-/// A dialogue finding: `{code, place, key, subject, via, message}`.
+/// A dialogue finding: `{code, place, key, subject, via, message}`, `key`
+/// nil for the dialogue's end script.
 pub fn finding(lua: &Lua, dialog: &str, f: &Finding) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("code", f.code)?;
     t.set("place", f.place.to_string())?;
-    t.set("key", key_text(&f.key))?;
+    t.set("key", f.key.as_ref().map(key_text))?;
     t.set("subject", f.subject.as_str())?;
     t.set("via", f.via.clone())?;
     t.set("message", f.message(dialog))?;

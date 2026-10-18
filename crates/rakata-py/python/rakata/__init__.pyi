@@ -252,7 +252,8 @@ class Finding:
     @property
     def place(self) -> str: ...
     @property
-    def key(self) -> NodeKey: ...
+    def key(self) -> NodeKey | None:
+        """The node's stable key; None for the dialogue's end script."""
     @property
     def subject(self) -> str: ...
     @property

@@ -1,6 +1,7 @@
 # Findings `rakata dialog lint` accepts: the dialogue, the module it was
-# linted in (none for a global dialogue), where (E3, R0, E3>R4, start>E0)
-# and the code. Written by `rakata dialog lint --write-known`.
+# linted in (none for a global dialogue), where (E3, R0, E3>R4, start>E0,
+# and end or abort for its EndConversation or EndConverAbort script) and the
+# code. Written by `rakata dialog lint --write-known`.
 
 [[finding]]
 dialog = "dan13_cort.dlg"

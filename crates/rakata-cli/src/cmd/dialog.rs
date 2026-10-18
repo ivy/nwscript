@@ -102,7 +102,7 @@ Examples:
         #[arg(long, value_enum, default_value_t = ProfileArg::K1)]
         profile: ProfileArg,
     },
-    /// Report a dialogue's faults, each under its code: a script or condition that resolves to nothing, a strref past the talk table, a voiced node without its voice-over or lip sync, a dangling link, a node no start reaches, a global a condition reads that globalcat.2da does not declare or whose name is computed, and a SoundExists that disagrees with the node's audio.
+    /// Report a dialogue's faults, each under its code: a script, condition or end script that resolves to nothing, a strref past the talk table, a voiced node without its voice-over or lip sync, a dangling link, a node no start reaches, a global a condition reads that globalcat.2da does not declare or whose name is computed, and a SoundExists that disagrees with the node's audio.
     #[command(after_help = "\
 DIALOG is a .dlg file or NAME.dlg, loaded as `dialog show` loads it; several
 may be named. --all lints every dialogue of the install: each one a module's
@@ -118,8 +118,10 @@ shows such a line silent. Reachability is structural: from the starts along
 every link, whatever the conditions answer.
 
 --known FILE names findings already accepted, as the TOML --write-known
-writes: [[finding]] tables of dialog, module, at (E3, R0, E3>R4, start>E0)
-and code. Known findings are counted and not reported. The exit status is 1
+writes: [[finding]] tables of dialog, module, at (E3, R0, E3>R4, start>E0,
+end and abort for the dialogue's EndConversation and EndConverAbort) and
+code. In the JSON, a finding's key is its node's stable key, null for an end
+script. Known findings are counted and not reported. The exit status is 1
 when a finding is not in the known list, else 0.
 
 Codes: rakata explain RW1101, RW1102, RW1104 to RW1110.
@@ -386,7 +388,7 @@ fn run_lint(ctx: &Ctx, a: LintArgs<'_>) -> Exit {
             items.push(json!({
                 "code": f.code,
                 "at": entry.at,
-                "key": f.key.to_string(),
+                "key": f.key.as_ref().map(ToString::to_string),
                 "subject": f.subject,
                 "via": f.via,
                 "known": is_known,

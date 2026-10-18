@@ -36,8 +36,13 @@ fn the_vanilla_dialogues_find_exactly_the_known_list() {
     let mut linter = Linter::open(&root, Profile::K1).unwrap();
     let targets = linter.targets(None).unwrap();
     let mut found = Known::default();
+    let mut ends = 0;
     for t in &targets {
         let l = linter.lint_target(t).unwrap();
+        ends += [false, true]
+            .into_iter()
+            .filter(|&a| l.loaded.dialog.end_script(a).is_some())
+            .count();
         for f in &l.findings {
             found.findings.insert(Entry::of(
                 l.loaded.dialog.name(),
@@ -47,10 +52,12 @@ fn the_vanilla_dialogues_find_exactly_the_known_list() {
         }
     }
     eprintln!(
-        "{} dialogues linted in {:.2} s",
+        "{} dialogues linted in {:.2} s, {ends} end scripts named",
         targets.len(),
         start.elapsed().as_secs_f64()
     );
+    // The end scripts are checked where some are named.
+    assert!(ends > 0);
     let new: Vec<_> = found.findings.difference(&known.findings).collect();
     let gone: Vec<_> = known.findings.difference(&found.findings).collect();
     assert!(

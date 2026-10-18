@@ -27,7 +27,7 @@ pub fn lint(dialog: &Dialog, refs: &mut dyn References) -> Vec<Finding> {
         let find = |code, subject: String| Finding {
             code,
             place: Place::Node(node.at),
-            key: NodeKey::of(dialog, node.at),
+            key: Some(NodeKey::of(dialog, node.at)),
             subject,
             via: None,
         };
@@ -62,12 +62,14 @@ pub fn lint(dialog: &Dialog, refs: &mut dyn References) -> Vec<Finding> {
 }
 
 /// A place's position in the order findings are listed: a node, then the
-/// links leaving it, then the starts after every node.
+/// links leaving it, then the starts after every node, then the end
+/// scripts.
 fn order(p: &Place) -> (u8, NodeRef, u8, Option<NodeRef>) {
     match p {
         Place::Node(n) => (0, *n, 0, None),
         Place::Link { from, to } => (0, *from, 1, Some(*to)),
         Place::Start { to } => (1, *to, 0, None),
+        Place::End { aborted } => (2, NodeRef::entry(0), u8::from(*aborted), None),
     }
 }
 
@@ -76,7 +78,7 @@ fn dangling(dialog: &Dialog, out: &mut Vec<Finding>) {
         out.push(Finding {
             code: codes::DANGLING_LINK,
             place,
-            key,
+            key: Some(key),
             subject: target.to_string(),
             via: None,
         })
@@ -124,7 +126,7 @@ fn unreached(dialog: &Dialog, out: &mut Vec<Finding>) {
             out.push(Finding {
                 code: codes::UNREACHED_NODE,
                 place: Place::Node(node.at),
-                key: NodeKey::of(dialog, node.at),
+                key: Some(NodeKey::of(dialog, node.at)),
                 subject: String::new(),
                 via: None,
             });
@@ -179,7 +181,7 @@ fn computed(
         out.push(Finding {
             code,
             place: place.clone(),
-            key: key.clone(),
+            key: Some(key.clone()),
             subject,
             via: Some(via),
         });
@@ -188,7 +190,7 @@ fn computed(
         out.push(Finding {
             code: codes::UNDECIDABLE_GLOBAL,
             place: place.clone(),
-            key: key.clone(),
+            key: Some(key.clone()),
             subject: c.to_string(),
             via: Some(routine),
         });

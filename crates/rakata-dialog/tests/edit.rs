@@ -316,6 +316,7 @@ fn the_checks_find_each_missing_reference_with_its_code_and_key() {
     let mut refs = fake(&[
         ("k_con_start", ResType::Ncs),
         ("k_con_global", ResType::Ncs),
+        ("k_end", ResType::Ncs),
     ]);
     let found = check(&d, &mut refs);
     let codes_found: Vec<(&str, String)> =
@@ -330,7 +331,7 @@ fn the_checks_find_each_missing_reference_with_its_code_and_key() {
         ]
     );
     assert_eq!(found[0].place, Place::Node(NodeRef::entry(3)));
-    assert_eq!(found[0].key, NodeKey::Text("Entry 3.".into()));
+    assert_eq!(found[0].key, Some(NodeKey::Text("Entry 3.".into())));
     let m = found[0].message("ten.dlg");
     assert!(
         m.contains("k_act_three") && m.contains("text:\"Entry 3.\""),
@@ -350,7 +351,11 @@ fn the_checks_find_each_missing_reference_with_its_code_and_key() {
 #[test]
 fn a_missing_condition_is_found_on_its_start_and_nothing_is_asked_without_tables() {
     let d = ten();
-    let mut refs = fake(&[("k_act_three", ResType::Ncs), ("vo_four", ResType::Wav)]);
+    let mut refs = fake(&[
+        ("k_act_three", ResType::Ncs),
+        ("vo_four", ResType::Wav),
+        ("k_end", ResType::Ncs),
+    ]);
     refs.tlk = None;
     refs.globals = None;
     let found: Vec<Finding> = check(&d, &mut refs);

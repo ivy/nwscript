@@ -585,3 +585,50 @@ fn dialog_show_prints_each_nodes_key_and_node_shows_one_with_its_links() {
         assert!(err.contains(code), "{key}: {err}");
     }
 }
+
+#[test]
+fn dialog_lint_reports_a_missing_end_script_at_end_with_no_node_key() {
+    use rakata_gff::{Gff, Label, Value};
+    let dir = install("dialog-end");
+    let mut g = Gff::new(*b"DLG ");
+    for (field, script) in [("EndConversation", "k_end_gone"), ("EndConverAbort", "")] {
+        g.root
+            .push(Label::new(field).unwrap(), Value::resref(script).unwrap());
+    }
+    std::fs::write(dir.join("Override/ending.dlg"), g.to_bytes().unwrap()).unwrap();
+    let game = dir.to_str().unwrap();
+    let known = dir.join("known.toml");
+    let lint = |extra: &[&str]| {
+        rakata()
+            .args([
+                "--format",
+                "json",
+                "--game",
+                game,
+                "dialog",
+                "lint",
+                "ending.dlg",
+            ])
+            .args(extra)
+            .output()
+            .unwrap()
+    };
+    let out = lint(&["--write-known", known.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(1));
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let findings = &doc["result"]["results"][0]["findings"];
+    assert_eq!(findings.as_array().unwrap().len(), 1, "{findings}");
+    let f = &findings[0];
+    assert_eq!(f["code"], "RW1102");
+    assert_eq!(f["at"], "end");
+    assert!(f["key"].is_null(), "{f}");
+    assert_eq!(f["subject"], "k_end_gone");
+    assert_eq!(
+        f["message"],
+        "ending.dlg EndConversation names the script k_end_gone, which no layer of the install holds"
+    );
+    let written = std::fs::read_to_string(&known).unwrap();
+    assert!(written.contains("at = \"end\""), "{written}");
+    let out = lint(&["--known", known.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+}

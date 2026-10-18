@@ -323,3 +323,64 @@ fn sound_exists_disagreeing_with_the_audio_is_rw1110() {
     assert!(found[0].message("fixture.dlg").contains("names neither"));
     assert!(found[1].message("fixture.dlg").contains("is present"));
 }
+
+/// A dialogue of these entries and the clean replies, its
+/// `EndConversation` and `EndConverAbort` naming these scripts.
+fn ending(e: &[N], end: &str, abort: &str) -> Dialog {
+    let mut g = dialog(e, &clean_replies(), &[(0, "")]).into_gff();
+    g.root
+        .push(label("EndConversation"), Value::resref(end).unwrap())
+        .push(label("EndConverAbort"), Value::resref(abort).unwrap());
+    Dialog::parse("fixture.dlg", &g.to_bytes().unwrap()).unwrap()
+}
+
+#[test]
+fn a_missing_end_script_is_one_rw1102_on_the_dialogue() {
+    let d = ending(&clean_entries(), "k_end_absent", "k_act_present");
+    let found = lint(&d, &mut Fake::new(&scripts()));
+    assert_eq!(found.len(), 1, "{found:?}");
+    let f = &found[0];
+    assert_eq!(
+        (f.code, &f.place, f.key.as_ref(), f.subject.as_str()),
+        (
+            codes::MISSING_SCRIPT,
+            &Place::End { aborted: false },
+            None,
+            "k_end_absent"
+        )
+    );
+    assert_eq!(
+        f.message("fixture.dlg"),
+        "fixture.dlg EndConversation names the script k_end_absent, which no layer of the install holds"
+    );
+}
+
+#[test]
+fn a_missing_abort_script_is_one_rw1102_on_the_dialogue() {
+    let d = ending(&clean_entries(), "k_act_present", "k_abort_absent");
+    let found = lint(&d, &mut Fake::new(&scripts()));
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(
+        (found[0].code, &found[0].place),
+        (codes::MISSING_SCRIPT, &Place::End { aborted: true })
+    );
+    assert_eq!(
+        found[0].message("fixture.dlg"),
+        "fixture.dlg EndConverAbort names the script k_abort_absent, which no layer of the install holds"
+    );
+}
+
+#[test]
+fn end_scripts_follow_every_node_finding() {
+    let mut e = clean_entries();
+    e[1].script = "k_act_absent";
+    let d = ending(&e, "k_end_absent", "k_abort_absent");
+    assert_eq!(
+        codes_of(&d, &mut Fake::new(&scripts())),
+        vec![
+            (codes::MISSING_SCRIPT, Place::Node(NodeRef::entry(1))),
+            (codes::MISSING_SCRIPT, Place::End { aborted: false }),
+            (codes::MISSING_SCRIPT, Place::End { aborted: true }),
+        ]
+    );
+}

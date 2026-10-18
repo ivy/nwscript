@@ -63,7 +63,7 @@ rakata dialog lint --all --game $RAKATA_GAME_K1 --known conformance/dialog-known
 rakata dialog lint dan14_cutjuh.dlg dan14_juhani.dlg --module danm14ac --game $RAKATA_BUILD
 ```
 
-The exit status is 1 when a finding is not in the `--known` list. [`conformance/dialog-known.toml`](../conformance/dialog-known.toml) is the vanilla game's own findings, as dialogue, module, place and code, and `--write-known FILE` writes such a list from a run.
+The exit status is 1 when a finding is not in the `--known` list. [`conformance/dialog-known.toml`](../conformance/dialog-known.toml) is the vanilla game's own findings, as dialogue, module, place and code (a place is a node `E3`, a link `E3>R4`, a start `start>E0`, or the dialogue's end script: `end` for `EndConversation`, `abort` for `EndConverAbort`), and `--write-known FILE` writes such a list from a run.
 
 ### Where a dialogue is linted
 
@@ -74,7 +74,7 @@ A dialogue in a module's capsules is linted in that module: its scripts, voice-o
 | Code | What | Vanilla KotOR 1 |
 | --- | --- | --- |
 | RW1101 | a link to a node the dialogue does not have | none |
-| RW1102 | a script or condition no layer holds | 55 |
+| RW1102 | a script, condition or end script no layer holds | 55 |
 | RW1104 | a voiced node without its voice-over | none |
 | RW1105 | a strref at or past the end of the talk table | none |
 | RW1106 | a condition reading a global `globalcat.2da` does not declare | 39 |
@@ -91,7 +91,7 @@ A start or link whose `Index` lies past the end of the list it points into: the 
 
 #### RW1102: a script or condition that resolves to nothing
 
-A node's `Script` or a link's `Active` names a script no layer holds where the dialogue plays. The engine runs nothing, and a missing condition never passes. The Juhani mod's conditions are scripts of its own, which must be in the install before the dialogues that name them. In vanilla: `dan13_cort.dlg` in `danm13`, E1, names `k_pdan_cort01`, which the game does not ship.
+A node's `Script`, a link's `Active`, or the dialogue's own `EndConversation` or `EndConverAbort` names a script no layer holds where the dialogue plays. The engine runs nothing, and a missing condition never passes. An end script lies on no node, so its finding carries no node key: the text names the field (`banter.dlg EndConversation names the script k_x, ...`), the JSON's `key` is null, and the known list's place is `end` or `abort`. The Juhani mod's conditions are scripts of its own, which must be in the install before the dialogues that name them. In vanilla: `dan13_cort.dlg` in `danm13`, E1, names `k_pdan_cort01`, which the game does not ship. Every one of the 195 end scripts vanilla dialogues name resolves (`dan13_elise.dlg` in `danm13` ends with `k_pdan_elise10`, in `danm13_s.rim`).
 
 #### RW1104 and RW1108: a voiced node without its files
 

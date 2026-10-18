@@ -338,12 +338,14 @@ pub struct PyFinding {
     /// `RW1106` (global).
     #[pyo3(get)]
     code: &'static str,
-    /// Where it lies: `E3`, `the link E3 -> R1`, `the start into E0`.
+    /// Where it lies: `E3`, `the link E3 -> R1`, `the start into E0`,
+    /// `EndConversation`, `EndConverAbort`.
     #[pyo3(get)]
     place: String,
-    /// The stable key of the node it lies on.
+    /// The stable key of the node it lies on; `None` for the dialogue's
+    /// end script.
     #[pyo3(get)]
-    key: PyNodeKey,
+    key: Option<PyNodeKey>,
     /// What is referred to.
     #[pyo3(get)]
     subject: String,
@@ -358,9 +360,7 @@ impl From<Finding> for PyFinding {
         PyFinding {
             code: f.code,
             place: f.place.to_string(),
-            key: PyNodeKey {
-                inner: f.key.clone(),
-            },
+            key: f.key.clone().map(|inner| PyNodeKey { inner }),
             subject: f.subject.clone(),
             via: f.via.clone(),
             inner: f,

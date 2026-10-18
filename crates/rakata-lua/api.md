@@ -91,7 +91,7 @@ An install opened for a mod's writes, in one module. Every write is read back as
 - `m:write_module(name, bytes)`: write into the module's `STEM.mod`, for an edit this module alone loads, another module's own copy left as it is; a `.mod` the module lacks is made from its `.rim` and `_s.rim` first. Checked as `write_override` is, and returns as it does, `path` the `.mod`. A copy in `Override/` that would be loaded over it is `RE1418`, a mod in no module `RE1419`.
 - `m:write_streamwaves(resref, bytes)`: write a voice-over to `streamwaves/RESREF.wav`; bytes that are not RIFF WAVE are `RE1413`. Returns as `write_override`.
 - `m:find(dialog, key)`: the `NodeRef` a key names, text keys compared through the install's talk table.
-- `m:check_dialog(dialog)`: the reference checks `write_override` runs, a sequence of findings `{code, place, key, subject, via, message}`.
+- `m:check_dialog(dialog)`: the reference checks `write_override` runs, a sequence of findings `{code, place, key, subject, via, message}`, `key` nil for an end script (`place` `EndConversation` or `EndConverAbort`).
 
 ## rakata.twoda
 

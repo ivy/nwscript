@@ -443,6 +443,17 @@ impl Dialog {
         links(list(&self.gff.root, "StartingList"), Kind::Entry)
     }
 
+    /// The script run when the conversation ends: `EndConversation`, or
+    /// with `aborted`, `EndConverAbort`; `None` when the field is empty.
+    pub fn end_script(&self, aborted: bool) -> Option<ResRef> {
+        let label = if aborted {
+            "EndConverAbort"
+        } else {
+            "EndConversation"
+        };
+        resref(&self.gff.root, label)
+    }
+
     /// The conversation-wide fields.
     pub fn info(&self) -> Info {
         let r = &self.gff.root;

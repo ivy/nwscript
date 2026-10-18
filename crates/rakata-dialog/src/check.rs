@@ -3,7 +3,9 @@
 //! voiced node's voice-over has its file (a node is voiced, as
 //! [`crate::Node::voiced`] says, when it names a voice-over, no `Sound`,
 //! and a `SoundExists` other than `0`); a strref lies inside the talk
-//! table; a global a condition reads is declared in `globalcat.2da`.
+//! table; a global a condition reads is declared in `globalcat.2da`; the
+//! dialogue's own `EndConversation` and `EndConverAbort` scripts resolve to
+//! bytecode.
 //!
 //! The crate does no I/O, so the install answers through [`References`];
 //! `rakata`'s authoring API implements it over an install and what a mod
@@ -79,6 +81,20 @@ pub enum Place {
     Link { from: NodeRef, to: NodeRef },
     /// The condition of a start into an entry.
     Start { to: NodeRef },
+    /// The dialogue's own script run when the conversation ends:
+    /// `EndConversation`, or with `aborted`, `EndConverAbort`.
+    End { aborted: bool },
+}
+
+impl Place {
+    /// For a place on the dialogue itself, the field it names.
+    fn end_field(&self) -> Option<&'static str> {
+        match self {
+            Place::End { aborted: false } => Some("EndConversation"),
+            Place::End { aborted: true } => Some("EndConverAbort"),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for Place {
@@ -87,6 +103,7 @@ impl fmt::Display for Place {
             Place::Node(n) => write!(f, "{n}"),
             Place::Link { from, to } => write!(f, "the link {from} -> {to}"),
             Place::Start { to } => write!(f, "the start into {to}"),
+            Place::End { .. } => f.write_str(self.end_field().expect("an end place")),
         }
     }
 }
@@ -102,8 +119,9 @@ pub struct Finding {
     pub place: Place,
     /// The stable key of the node it lies on (for a link, the node the
     /// link leaves; for a start, the entry it enters), as
-    /// [`NodeKey::of`] chooses it.
-    pub key: NodeKey,
+    /// [`NodeKey::of`] chooses it; `None` for a place on the dialogue
+    /// itself, an end script, which the dialogue's name alone names.
+    pub key: Option<NodeKey>,
     /// What is referred to: the script, the voice resref, the strref, the
     /// global, the condition (for a computed global), the missing node
     /// (for a dangling link), or the disagreement (for `SoundExists`);
@@ -118,9 +136,10 @@ impl Finding {
     /// The message without the code, naming the dialogue, the node key and
     /// the subject.
     pub fn message(&self, dialog: &str) -> String {
-        let at = match &self.place {
-            Place::Node(_) => format!("{dialog} {}", self.key),
-            other => format!("{dialog} {other} ({})", self.key),
+        let at = match (&self.place, &self.key) {
+            (p, None) => format!("{dialog} {p}"),
+            (Place::Node(_), Some(k)) => format!("{dialog} {k}"),
+            (other, Some(k)) => format!("{dialog} {other} ({k})"),
         };
         let what = match self.code {
             codes::MISSING_SCRIPT => format!(
@@ -182,7 +201,8 @@ impl Finding {
 
 /// Every reference of `dialog` the install cannot satisfy, nodes first
 /// (entries, then replies, each in index order: script, voice, strref),
-/// then each node's links, then the starts.
+/// then each node's links, then the starts, then the end scripts
+/// (`EndConversation`, then `EndConverAbort`).
 pub fn check(dialog: &Dialog, refs: &mut dyn References) -> Vec<Finding> {
     let mut out = Vec::new();
     let tlk = refs.talk_table_len();
@@ -191,7 +211,7 @@ pub fn check(dialog: &Dialog, refs: &mut dyn References) -> Vec<Finding> {
         let find = |code, subject: String| Finding {
             code,
             place: Place::Node(node.at),
-            key: key.clone(),
+            key: Some(key.clone()),
             subject,
             via: None,
         };
@@ -225,6 +245,20 @@ pub fn check(dialog: &Dialog, refs: &mut dyn References) -> Vec<Finding> {
         let key = NodeKey::of(dialog, link.target);
         condition(&link, place, key, refs, &mut out);
     }
+    for aborted in [false, true] {
+        let place = Place::End { aborted };
+        if let Some(s) = dialog.end_script(aborted)
+            && !refs.resolves(&s, ResType::Ncs)
+        {
+            out.push(Finding {
+                code: codes::MISSING_SCRIPT,
+                place,
+                key: None,
+                subject: s.to_string(),
+                via: None,
+            });
+        }
+    }
     out
 }
 
@@ -242,7 +276,7 @@ fn condition(
         out.push(Finding {
             code: codes::MISSING_SCRIPT,
             place,
-            key,
+            key: Some(key),
             subject: c.to_string(),
             via: None,
         });
@@ -253,7 +287,7 @@ fn condition(
             out.push(Finding {
                 code: codes::UNDECLARED_GLOBAL,
                 place: place.clone(),
-                key: key.clone(),
+                key: Some(key.clone()),
                 subject: global,
                 via: Some(c.to_string()),
             });

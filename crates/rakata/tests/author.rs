@@ -551,6 +551,38 @@ fn a_node_whose_script_does_not_resolve_is_refused_and_nothing_is_written() {
 }
 
 #[test]
+fn an_end_script_no_layer_holds_is_refused_until_it_is_written() {
+    let root = make("dialog-end", false);
+    let mut m = open(&root);
+    let d = Dialog::parse("banter.dlg", &m.loaded(id("banter.dlg")).unwrap().bytes).unwrap();
+    let mut g = d.into_gff();
+    g.root
+        .push(
+            label("EndConversation"),
+            Value::resref("k_oaj_end").unwrap(),
+        )
+        .push(label("EndConverAbort"), Value::resref("k_oaj_end").unwrap());
+    let bytes = g.to_bytes().unwrap();
+    let e = m.write_override("banter.dlg", &bytes).unwrap_err();
+    assert_eq!(e.code(), codes::DIALOG_REFUSED);
+    let text = e.to_string();
+    assert!(
+        text.contains("banter.dlg EndConversation names the script k_oaj_end")
+            && text.contains("banter.dlg EndConverAbort names the script k_oaj_end")
+            && text.contains("RW1102"),
+        "{text}"
+    );
+    assert!(!root.join("Override/banter.dlg").exists());
+
+    let script = Source::new("k_oaj_end", b"void main() { }".to_vec()).unwrap();
+    let ncs = scripts::compile(&m, &[script], &[], Flags::default()).unwrap();
+    m.write_override("k_oaj_end.ncs", &ncs[0].ncs).unwrap();
+    let w = m.write_override("banter.dlg", &bytes).unwrap();
+    assert!(w.warnings.is_empty(), "{:?}", w.warnings);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn a_condition_reading_an_undeclared_global_is_refused_until_it_is_declared() {
     let root = make("dialog-global", false);
     let mut m = open(&root);

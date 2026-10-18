@@ -46,7 +46,9 @@ pub struct Entry {
     /// The module it was linted in; absent for a global dialogue.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub module: Option<String>,
-    /// The node (`E3`, `R0`), the link (`E3>R4`) or the start (`start>E0`).
+    /// The node (`E3`, `R0`), the link (`E3>R4`), the start (`start>E0`),
+    /// or the dialogue's end script (`end` for `EndConversation`, `abort`
+    /// for `EndConverAbort`).
     pub at: String,
     pub code: String,
 }
@@ -68,6 +70,8 @@ pub fn at(p: &Place) -> String {
         Place::Node(n) => n.to_string(),
         Place::Link { from, to } => format!("{from}>{to}"),
         Place::Start { to } => format!("start>{to}"),
+        Place::End { aborted: false } => "end".to_string(),
+        Place::End { aborted: true } => "abort".to_string(),
     }
 }
 
@@ -91,7 +95,7 @@ impl Known {
     /// The list as TOML, sorted, one table per finding.
     pub fn to_toml(&self) -> String {
         let mut out = String::from(
-            "# Findings `rakata dialog lint` accepts: the dialogue, the module it was\n# linted in (none for a global dialogue), where (E3, R0, E3>R4, start>E0)\n# and the code. Written by `rakata dialog lint --write-known`.\n\n",
+            "# Findings `rakata dialog lint` accepts: the dialogue, the module it was\n# linted in (none for a global dialogue), where (E3, R0, E3>R4, start>E0,\n# and end or abort for its EndConversation or EndConverAbort script) and the\n# code. Written by `rakata dialog lint --write-known`.\n\n",
         );
         for e in &self.findings {
             out.push_str("[[finding]]\n");

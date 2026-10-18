@@ -365,8 +365,8 @@ impl Mod {
     /// already there when one differs only in case. The bytes are read
     /// back as their type first (a GFF, a 2DA, a LIP, NCS); a dialogue is
     /// checked and refused (`RE1407`) when a node or link it adds or
-    /// changes against the copy the game loads now names what the install
-    /// lacks. A refused write leaves the disk as it was.
+    /// changes against the copy the game loads now, or an end script it
+    /// sets, names what the install lacks. A refused write leaves the disk as it was.
     pub fn write_override(&mut self, name: &str, bytes: &[u8]) -> Result<Written> {
         let id = ResId::parse(name)?;
         let warnings = self.validate(id, name, bytes)?;
