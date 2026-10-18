@@ -9,6 +9,7 @@ mod lyt;
 mod texture;
 mod tlk;
 mod twoda;
+mod walkmesh;
 
 pub use archive::Archive;
 pub use gff::Gff;
@@ -17,3 +18,4 @@ pub use lyt::{Lyt, Vis};
 pub use texture::{Tga, Tpc, Txi};
 pub use tlk::Tlk;
 pub use twoda::TwoDa;
+pub use walkmesh::Walkmesh;

@@ -15,7 +15,7 @@ A Rust workspace: a toolset for the data of BioWare's Aurora-family games, KotOR
 | `rakata-lip` | lip-sync files: the duration and the keyframes, read, written bit for bit, made from cues | present |
 | `rakata-texture` | textures: TPC to its images and mip levels with the pixel format kept raw (DXT1 and DXT5 blocks untouched), cube maps and animation sheets, its TXI as key/values; plain TGA to RGBA8; each read and written byte for byte | present |
 | `rakata-lyt` | an area's room layout (rooms, swoop tracks and obstacles, door hooks) and room visibility, read and written byte for byte | present |
-| `rakata-walkmesh` | walkmeshes: an area room's WOK, a placeable's PWK and a door's DWK to vertices, faces with their surface material, adjacency, perimeter edges with their room transitions, and the AABB tree; walkability through `surfacemat.2da` | present |
+| `rakata-walkmesh` | walkmeshes: an area room's WOK, a placeable's PWK and a door's DWK to vertices, faces with their surface material, adjacency, perimeter edges with their room transitions, and the AABB tree, read and written byte for byte; walkability through `surfacemat.2da` | present |
 | `rakata-mdl` | binary models: the MDL's node tree (names, parents, transforms, controllers) and each mesh's trimesh part (textures, flags, faces, triangle list), its MDX vertices borrowed as strided views; skins (bones, bind transforms, weights), animations with their keys (compressed orientations decoded), supermodel chains | present |
 | `rakata-game` | the install: search order, `which`, the `Resolver` for nwscript | present |
 | `rakata-gff` | the GFF tree, lossless read, BioWare-layout write, paths, diff | present |

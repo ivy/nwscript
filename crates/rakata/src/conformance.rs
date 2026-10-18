@@ -265,6 +265,7 @@ impl Registry {
         r.register(Box::new(crate::formats::Tpc));
         r.register(Box::new(crate::formats::Txi));
         r.register(Box::new(crate::formats::Tga));
+        r.register(Box::new(crate::formats::Walkmesh));
         r.register(Box::new(crate::formats::TwoDa));
         r.register(Box::new(crate::formats::Gff));
         r
