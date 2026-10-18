@@ -109,7 +109,7 @@ fn a_missing_section_is_a_warning_and_the_plan_goes_on() {
         .unwrap();
     assert_eq!(out.status.code(), Some(0));
     let err = String::from_utf8_lossy(&out.stderr);
-    assert!(err.contains("RW0201"), "{err}");
+    assert!(err.contains("RW0301"), "{err}");
     assert!(err.contains("[repeating_blaster]"), "{err}");
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.contains("ChangeRow0 change row #12"), "{text}");
