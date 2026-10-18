@@ -415,6 +415,35 @@ fn dialog_show_of_a_gff_that_is_not_a_dialogue_reports_re1101() {
 }
 
 #[test]
+fn dialog_show_of_an_override_dialogue_finds_the_module_holding_its_name() {
+    let dir = install("dialog-override");
+    std::fs::create_dir_all(dir.join("modules")).unwrap();
+    std::fs::write(dir.join("Override/x.dlg"), empty_gff(b"DLG ")).unwrap();
+    let rim = |path: &str| {
+        let mut r = rakata_archive::Rim::new();
+        r.add(
+            rakata_res::ResId::parse("x.dlg").unwrap(),
+            empty_gff(b"DLG "),
+        )
+        .unwrap();
+        std::fs::write(dir.join(path), r.to_bytes().unwrap()).unwrap();
+    };
+    rim("modules/danm13.rim");
+    let show = || {
+        rakata()
+            .args(["--game", dir.to_str().unwrap(), "dialog", "show", "x.dlg"])
+            .assert()
+    };
+    show().code(0).stdout(predicate::str::starts_with(
+        "Override/x.dlg (module danm13)\n",
+    ));
+    rim("modules/danm14aa.rim");
+    show().code(1).stderr(predicate::str::contains(
+        "x.dlg is in Override/ and in 2 modules: danm13, danm14aa",
+    ));
+}
+
+#[test]
 fn dialog_show_writes_the_transcript_as_one_json_document() {
     let dir = install("dialog-json");
     let file = dir.join("empty.dlg");

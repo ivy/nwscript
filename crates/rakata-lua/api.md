@@ -190,7 +190,7 @@ Dialogues, their nodes by `NodeRef` (list and index) and by `NodeKey` (what the 
 Dialogues loaded from the install, with transcripts whose conditions are decompiled.
 
 - `rakata.dialog.Session.open([{profile = "k1", module = "danm14ac"}])`: a session over the install `--game` names (`RE1803` without it).
-- `s:load(what)`: `{dialog, location, module}`. `what` is `NAME.dlg`, resolved through the session's module (with none set and no global copy, the one module holding it is found and set; several are `RE1105`), or a path with a directory in it (`./banter.dlg`), read when it is one of the script's inputs.
+- `s:load(what)`: `{dialog, location, module}`. `what` is `NAME.dlg`, resolved through the session's module (with none set and no global copy, or one only in `Override/`, the one module holding it is found and set; several are `RE1105`), or a path with a directory in it (`./banter.dlg`), read when it is one of the script's inputs.
 - `s:set_module(module)`, `s:module()`: the module whose capsules are searched.
 - `s:transcript(dialog, [{scripts = false}])`: the transcript's fields as `rakata --format json dialog show` gives them under `result.transcript` (`dialog`, `info`, `entries`, `replies`, `starts`, `nodes`, `scripts`, `tree`, `warnings`), and `text`, the transcript as text. `scripts = true` decompiles the action scripts too.
 - `s:resolve(dialog, key)`: the `NodeRef`, text keys compared through the talk table.

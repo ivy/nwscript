@@ -210,17 +210,19 @@ impl Linter {
     /// Load and lint one target.
     pub fn lint_target(&mut self, t: &Target) -> Result<Linted> {
         self.session.set_module(t.module.clone());
-        let loaded = self.session.load_id(t.id)?;
+        let loaded = self.session.load_id_with(t.id, false)?;
         self.global = !self.in_module(loaded.dialog.name())?;
         Ok(self.lint_loaded(loaded))
     }
 
-    /// Load `what` as [`Session::load`] does, through `module`, and lint it:
-    /// in the module when its capsules hold the dialogue (or it is a file),
-    /// else as a global dialogue.
+    /// Load `what` through `module`, and lint it: in the module when its
+    /// capsules hold the dialogue (or it is a file), else as a global
+    /// dialogue. With no module named, a dialogue in `Override/` is a
+    /// global one, a script no global layer holds counting as present when
+    /// any module holds it.
     pub fn lint_named(&mut self, what: &str, module: Option<ModuleName>) -> Result<Linted> {
         self.session.set_module(module);
-        let loaded = self.session.load(what)?;
+        let loaded = self.session.load_with(what, false)?;
         self.global = !Path::new(what).is_file() && !self.in_module(loaded.dialog.name())?;
         Ok(self.lint_loaded(loaded))
     }

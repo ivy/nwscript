@@ -47,9 +47,14 @@ pub enum Error {
     },
     /// The name is not `NAME.dlg`.
     NotDlg { name: String },
-    /// No module was named, the global layers do not hold the dialogue,
-    /// and several modules do.
-    Modules { id: ResId, modules: Vec<String> },
+    /// No module was named, several modules hold the dialogue, and the
+    /// global layers do not, or hold it only in `Override/`.
+    Modules {
+        id: ResId,
+        modules: Vec<String>,
+        /// Whether the loaded copy is in `Override/`.
+        overridden: bool,
+    },
 }
 
 impl Error {
@@ -81,8 +86,17 @@ impl Error {
             Error::NotDlg { name } => {
                 format!("`{name}` is neither a file nor a dialogue's name as NAME.dlg")
             }
-            Error::Modules { id, modules } => format!(
-                "{id} is in no global layer and in {} modules: {}; name one with --module",
+            Error::Modules {
+                id,
+                modules,
+                overridden,
+            } => format!(
+                "{id} is in {} and in {} modules: {}; name one with --module",
+                if *overridden {
+                    "Override/"
+                } else {
+                    "no global layer"
+                },
                 modules.len(),
                 modules.join(", ")
             ),
@@ -217,9 +231,16 @@ impl Session {
 
     /// Load `what`: a DLG file when such a file exists, else `NAME.dlg` as
     /// the engine resolves it, through the session's module when one is
-    /// set. With no module set and no global copy, the module that holds
-    /// it is found and set; several are an error naming them.
+    /// set. With no module set, when no global layer holds it or only
+    /// `Override/` does, the module whose capsules hold it is found and
+    /// set, so that its scripts resolve; several are an error naming them.
     pub fn load(&mut self, what: &str) -> Result<Loaded> {
+        self.load_with(what, true)
+    }
+
+    /// Load `what` as [`Session::load`] does; with `override_module`
+    /// false, a dialogue in `Override/` is loaded with no module found.
+    pub(crate) fn load_with(&mut self, what: &str, override_module: bool) -> Result<Loaded> {
         let path = Path::new(what);
         if path.is_file() {
             let bytes = fs::read(path).map_err(|source| Error::Read {
@@ -242,13 +263,19 @@ impl Session {
             .ok_or_else(|| Error::NotDlg {
                 name: what.to_string(),
             })?;
-        self.load_id(id)
+        self.load_id_with(id, override_module)
     }
 
     /// Load a dialogue by id, as [`Session::load`] does for a name.
     pub fn load_id(&mut self, id: ResId) -> Result<Loaded> {
+        self.load_id_with(id, true)
+    }
+
+    /// Load a dialogue by id, as [`Session::load_with`] does for a name.
+    pub(crate) fn load_id_with(&mut self, id: ResId, override_module: bool) -> Result<Loaded> {
         let mut found = self.install.read(id, self.module.as_ref())?;
-        if found.is_none() && self.module.is_none() {
+        let overridden = matches!(found, Some((Location::File { .. }, _)));
+        if self.module.is_none() && (found.is_none() || override_module && overridden) {
             let mut holders = Vec::new();
             for m in self.install.modules() {
                 if self.install.module_ids(m)?.contains(&id) {
@@ -265,6 +292,7 @@ impl Session {
                     return Err(Error::Modules {
                         id,
                         modules: holders.iter().map(ToString::to_string).collect(),
+                        overridden,
                     });
                 }
             }

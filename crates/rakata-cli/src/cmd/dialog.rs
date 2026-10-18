@@ -36,8 +36,9 @@ pub enum DialogAction {
     #[command(after_help = "\
 DIALOG is a .dlg file, or NAME.dlg resolved the way the engine loads it:
 Override/, the module's capsules (with --module, or the one module holding it
-when no global layer does), patch.erf, the BIFs. Scripts and conditions are
-looked up the same way, so a module's dialogue needs its module.
+when no global layer does or only Override/ does), patch.erf, the BIFs.
+Scripts and conditions are looked up the same way, so a module's dialogue
+needs its module; when several modules hold it, name one (RE1105).
 
 In the text, E3 is EntryList[3] and R0 is ReplyList[0]. An entry with an
 empty Speaker is spoken by the dialogue's owner, shown as (owner); replies

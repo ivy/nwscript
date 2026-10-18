@@ -34,6 +34,6 @@ The engine opens a conversation with the first start whose condition passes, try
 
 To pick a node to edit, note its **voice resref** or **strref** from the transcript: those are its stable keys (`voice:nm14acjuha07024_`, `strref:38576`). A node with neither has only its index, which is fragile.
 
-A module's dialogue copied into `Override/` is global as far as the search order goes, so without `--module` it is shown against the install alone and its module's scripts read as missing. After writing one, always name the module: `rakata dialog show NAME.dlg --module STEM --game SCRATCH`.
+A module's dialogue copied into `Override/` is shown with the one module whose capsules hold the same name, so its scripts resolve: the first line reads `Override/NAME.dlg (module STEM)`. When several modules hold it, `RE1105` names them; pass `--module STEM`.
 
 `rakata --format json dialog show NAME.dlg --game DIR` gives the same as structured nodes.
