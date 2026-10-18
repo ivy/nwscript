@@ -1,14 +1,37 @@
 # AGENTS.md
 
-Onboarding for coding agents working on nwscript. The design and its reasons are in [`docs/prd.md`](docs/prd.md); read its Core principles and Clean room sections before any change to a compiler crate.
+Onboarding for coding agents working on this workspace. The design and its reasons are in [`docs/prd.md`](docs/prd.md) for the scripts layer and [`docs/proposals/rakata.md`](docs/proposals/rakata.md) for everything else; read their Core principles and Clean room sections before any change to a crate.
 
 ## What this is
 
-A Rust workspace: a toolchain for NWScript, the scripting language of BioWare's Aurora-family games, KotOR 1 and 2 first. Crates under `crates/`, one responsibility each, as the PRD's Architecture table lists them. The binaries are `nws` (the command line) and `nwnnsscomp` (a compatibility shim; the only place nwnnsscomp's flags exist).
+A Rust workspace: a toolset for the data of BioWare's Aurora-family games, KotOR 1 and 2 first. Crates under `crates/`, one responsibility each. The `nwscript-*` crates are the scripts toolchain, as the PRD's Architecture table lists them; the binaries are `nws` (the command line) and `nwnnsscomp` (a compatibility shim; the only place nwnnsscomp's flags exist). The `rakata-*` crates are the data layers, as the Rakata proposal's Architecture table lists them, with the `rakata` façade and the `rakata` binary; those not yet present are planned:
+
+| Crate | Responsibility | State |
+| --- | --- | --- |
+| `rakata-res` | `ResRef`, the resource type table, content hashes | planned |
+| `rakata-archive` | KEY/BIF, ERF, RIM: read, write, add and replace members | planned |
+| `rakata-gff` | the GFF tree, lossless read, BioWare-layout write, paths, diff | planned |
+| `rakata-2da` | tables, every header variant the engine accepts, diff | planned |
+| `rakata-tlk` | `dialog.tlk` and `LocalizedString`, append | planned |
+| `rakata-lip` | lip-sync files | planned |
+| `rakata-game` | the install: search order, `which`, the `Resolver` for nwscript | planned |
+| `rakata-dialog` | DLG model, stable keys, transcript, lints | planned |
+| `rakata-save` | save games by name | planned |
+| `rakata-index` | facts, references and full text in SQLite | planned |
+| `rakata-patch` | `changes.ini` reader, plan, executor, report read back from the tree | planned |
+| `rakata` | the façade and the diagnostic codes | planned |
+| `rakata-lua`, `rakata-py` | bindings; the Python module `rakata` carries `rakata.nwscript` | planned |
+| `rakata-cli` | the `rakata` binary | planned |
+
+The `nwscript-*` library crates never depend on a `rakata-*` crate; `rakata-game` implements their resolver, and only the `nws` binary may take it.
 
 ## The clean-room rule
 
-Do not open the source of nwnnsscomp (`~/src/github.com/niv/nwn-tools`, `~/src/github.com/meaglyn/nwn-tools`, any SourceForge tarball), Beamdog's compiler in `~/src/github.com/niv/neverwinter.nim`, pykotor's compiler (`pykotor/resource/formats/ncs/`), xoreos-tools' code (GPL), or nwnrs-nwscript (GPL), and do not query codebase-memory against those projects. Run compilers only as black boxes. Permitted: the corpus, BioWare's `nwscript.nss`, written format documentation (xoreos's docs, the KotOR and NWN wikis), and compilers' output.
+Do not open the source of nwnnsscomp (`~/src/github.com/niv/nwn-tools`, `~/src/github.com/meaglyn/nwn-tools`, any SourceForge tarball), Beamdog's compiler in `~/src/github.com/niv/neverwinter.nim`, PyKotor (all of it, in any checkout or installed copy, including modshop's `.venv`), HoloPatcher, kpatcher (`~/src/github.com/th3w1zard1/kpatcher`), TSLPatcher's reconstructed source, xoreos-tools' code (GPL), or nwnrs-nwscript (GPL), and do not query codebase-memory against those projects. Run compilers, patchers and other tools only as black boxes. Permitted: the user's own game files and mod archives, BioWare's `nwscript.nss`, written format documentation (xoreos's documents, the KotOR and NWN wikis' format pages, stoffe's TSLPatcher readme and `changes.ini` syntax pages), the engine's observable behaviour, and other tools' output.
+
+## Game trees for tests
+
+No game bytes are committed, ever. Tests that need a game install read the user's own, from two variables, and skip with a message naming the variable when it is unset: `$RAKATA_GAME_K1`, a vanilla KotOR 1 install (the folder holding `chitin.key`); `$RAKATA_BUILD`, a modded build in the same layout. `$RAKATA_SAVES` names a folder of save-game directories for the save tests. On the maintainer's build host these are modshop's `games/kotor/data/game/vanilla/tree`, `games/kotor/data/game/build` and `games/kotor/data/saves`, under `~/src/github.com/ivy/modshop`.
 
 ## The corpus
 

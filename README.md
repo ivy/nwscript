@@ -1,6 +1,6 @@
 # nwscript
 
-A toolchain for NWScript, the scripting language of BioWare's Aurora-family games: a compiler measured byte for byte against BioWare's own, an interpreter that makes scripts testable without the game, a decompiler that verifies its output by recompiling it, and a drop-in replacement for `nwnnsscomp`. Built for people new to modding who work with coding agents, and for the installers and mods that already exist.
+A toolset for the data of BioWare's Aurora-family games, KotOR 1 and 2 first, in Rust. The scripts layer is complete and measured: a compiler byte for byte against BioWare's own, an interpreter that makes scripts testable without the game, a decompiler that verifies its output by recompiling it, and a drop-in replacement for `nwnnsscomp`. The rest is in progress under the name Rakata, as [`docs/proposals/rakata.md`](docs/proposals/rakata.md) specifies: the archives, the resource formats, the install's loading rules, dialogues, saves, an index that joins them, an authoring API, and a TSLPatcher-compatible installer, each verified by round-tripping the bytes the games ship. Built for people new to modding who work with coding agents, and for the installers and mods that already exist.
 
 ## Results
 
