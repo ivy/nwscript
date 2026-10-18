@@ -328,7 +328,11 @@ fn archives_built_in_memory_are_identical_and_their_members_listed() {
         &Erf::new(ErfKind::Erf).to_bytes().unwrap(),
     );
     put(&root, "streamwaves/m03af/a.lip", b"LIP V1.0");
-    put(&root, "dialog.tlk", b"TLK V3.0");
+    put(
+        &root,
+        "dialog.tlk",
+        &rakata_tlk::Tlk::default().to_bytes().unwrap(),
+    );
     let report = run(&root, &registry(), &Known::default(), 0).unwrap();
     let a = by_name(&report, "archive");
     assert_eq!(a.counts.files, 8, "{:?}", a.entries);
@@ -338,7 +342,7 @@ fn archives_built_in_memory_are_identical_and_their_members_listed() {
     );
     assert_eq!(report.no_reader.by_extension["utc"], 2);
     assert_eq!(report.no_reader.by_extension["lip"], 1);
-    assert_eq!(report.no_reader.by_extension["tlk"], 1);
+    assert_eq!(by_name(&report, "tlk").counts.identical, 1);
     assert_eq!(report.exit(), Exit::Ok);
     let md = report.markdown_table();
     assert!(md.contains("| `archive` | 8 | 8 | 0 | 0 | |"), "{md}");

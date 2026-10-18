@@ -8,8 +8,8 @@
 //! (`rakata-res`), `RE02xx` archives (`rakata-archive`), `RE03xx` and
 //! `RW03xx` the installer's change files (`rakata-patch`), `RE04xx` the
 //! install (`rakata-game`), `RE05xx` the round-trip suite
-//! ([`crate::conformance`]). Each format crate takes a range of its own as
-//! it lands.
+//! ([`crate::conformance`]), `RE08xx` the talk table (`rakata-tlk`). Each
+//! format crate takes a range of its own as it lands.
 
 pub use nwscript_diag::codes::Code;
 
@@ -43,6 +43,11 @@ nwscript_diag::codes! {
     RW0401 Warning "Override files that differ only in case";
     RE0501 Error "a directory that is not a game install";
     RE0502 Error "a round trip wrote bytes the format's own reader rejects";
+    RE0801 Error "not a `TLK V3.0` talk table";
+    RE0802 Error "a talk table truncated before its header, entry table or a string ends";
+    RE0803 Error "a talk table string holding a character Windows-1252 cannot encode";
+    RE0804 Error "a talk table entry with text but without the text-present flag";
+    RE0805 Error "a talk table too large for its 32-bit fields";
 }
 
 /// The rakata code with this id, if registered; case does not matter.

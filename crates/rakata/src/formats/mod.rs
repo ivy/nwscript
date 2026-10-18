@@ -3,5 +3,7 @@
 //! to [`crate::conformance::Format`].
 
 mod archive;
+mod tlk;
 
 pub use archive::Archive;
+pub use tlk::Tlk;

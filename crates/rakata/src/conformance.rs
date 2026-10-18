@@ -243,6 +243,7 @@ impl Registry {
     pub fn builtin() -> Self {
         let mut r = Self::empty();
         r.register(Box::new(crate::formats::Archive));
+        r.register(Box::new(crate::formats::Tlk));
         r
     }
 
