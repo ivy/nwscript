@@ -23,7 +23,7 @@ Examples:
   rakata index coverage --tree vanilla
 
 The database is --db FILE, or index.sqlite under $XDG_CACHE_HOME/rakata/
-(~/.cache/rakata/). docs/index.md describes every table and column.")]
+(~/.cache/rakata/). `rakata index query --help` lists the tables.")]
 pub struct IndexArgs {
     #[command(subcommand)]
     pub action: IndexAction,
@@ -78,6 +78,28 @@ Examples:
     #[command(after_help = "\
 The rows print as an aligned table with a header, NULL as an empty cell;
 --format json gives the column names and the rows as arrays.
+
+Tables, joined through hash (a content's SHA-256); locations says where each
+content lies:
+  trees(id, label, parent, root)
+  resources(hash, name, type, size, first_tree)
+  contents(hash, type, status, reason)
+  locations(tree, path, member, name, type, hash)
+  coverage(tree, path, member, status, reason)
+  dialog_nodes(hash, node, kind, idx, speaker, strref, text, voice, script, ...)
+  dialog_links(hash, source, position, target, condition, is_child)
+  gff_fields(hash, path, label, type, value, strref)
+  cells(hash, row, label, column, value)
+  strings(hash, strref, text, sound, sound_length, flags)
+  calls(hash, offset, routine, routine_id, args)
+  refs(from_hash, kind, value, site), kind resref, strref, tag or global
+  search(body, kind, hash, site), full text: WHERE search MATCH 'word*'
+Views:
+  tree_resources(tree, path, member, name, type, hash, status)
+  node_text(tree, path, member, hash, node, kind, idx, strref, text)
+
+A node is E3 (EntryList[3]) or R0 (ReplyList[0]). Every column: SELECT name,
+sql FROM sqlite_master. The full reference is docs/index.md in the source.
 
 Examples:
   rakata index query \"SELECT t.label, l.path FROM calls c JOIN locations l ON l.hash = c.hash JOIN trees t ON t.id = l.tree WHERE json_extract(c.args, '$[0]') = 'k_pman_aioff'\"

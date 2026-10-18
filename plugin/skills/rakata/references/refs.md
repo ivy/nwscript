@@ -21,7 +21,7 @@ Each hit is the resource holding the reference, the site in it (a GFF field path
 
 ## index query
 
-`rakata index query --db FILE "SQL"` runs one read-only statement. The tables and their columns:
+`rakata index query --db FILE "SQL"` runs one read-only statement. `rakata index query --help` lists the tables with their key columns; every column:
 
 ```bash
 rakata index query --db FILE "SELECT name, sql FROM sqlite_master WHERE type = 'table'"

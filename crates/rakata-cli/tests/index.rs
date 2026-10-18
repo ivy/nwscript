@@ -198,3 +198,64 @@ fn the_acceptance_queries_over_the_vanilla_install() {
 fn the_acceptance_queries_over_the_modded_build() {
     acceptance("RAKATA_BUILD");
 }
+
+/// `rakata index query --help` names every table and view of the schema,
+/// and every column it lists for one is the schema's.
+#[test]
+fn query_help_lists_the_schemas_tables_and_their_columns() {
+    let dir = tempfile::tempdir().unwrap();
+    let game = dir.path().join("game");
+    install(&game);
+    let db = dir.path().join("idx.sqlite");
+    json(&["index", "build", "--game", s(&game), "--db", s(&db)]);
+    let out = rakata()
+        .args(["index", "query", "--help"])
+        .output()
+        .unwrap();
+    let help = String::from_utf8(out.stdout).unwrap();
+    let tables = help.split("Tables,").nth(1).unwrap();
+    let tables = tables.split("Examples:").next().unwrap();
+    let listed: Vec<(&str, Vec<&str>)> = tables
+        .lines()
+        .filter_map(|l| {
+            let (name, rest) = l.strip_prefix("  ")?.split_once('(')?;
+            let columns = rest.split_once(')')?.0;
+            Some((name, columns.split(", ").filter(|c| *c != "...").collect()))
+        })
+        .collect();
+    let q = json(&[
+        "index",
+        "query",
+        "--db",
+        s(&db),
+        "SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name <> 'meta' \
+         AND name NOT LIKE 'search_%' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+    ]);
+    let schema: Vec<&str> = q["result"]["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r[0].as_str().unwrap())
+        .collect();
+    let mut names: Vec<&str> = listed.iter().map(|(n, _)| *n).collect();
+    names.sort();
+    assert_eq!(names, schema, "{help}");
+    for (name, columns) in &listed {
+        let q = json(&[
+            "index",
+            "query",
+            "--db",
+            s(&db),
+            &format!("SELECT name FROM pragma_table_info('{name}')"),
+        ]);
+        let have: Vec<&str> = q["result"]["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r[0].as_str().unwrap())
+            .collect();
+        for c in columns {
+            assert!(have.contains(c), "{name} has no column {c}: {have:?}");
+        }
+    }
+}
