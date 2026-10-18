@@ -8,6 +8,8 @@ license.workspace = true
 publish = false
 
 [dependencies]
+rakata-archive = { workspace = true }
+rakata-res = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 toml = "0.8"

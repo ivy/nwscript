@@ -2,7 +2,8 @@
 //! verify a corpus against a manifest. The corpus is game data and is never
 //! committed; the manifest holds only names and hashes.
 
-use crate::archive::{self, NCS, NSS};
+use rakata_archive::{Bif, Erf, Key, KeyEntry, Member, Rim, Source};
+use rakata_res::ResType;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -147,12 +148,19 @@ fn find_ci(root: &Path, rel: &str) -> Option<PathBuf> {
     Some(cur)
 }
 
-fn ext(restype: u16) -> Option<&'static str> {
-    match restype {
-        NSS => Some("nss"),
-        NCS => Some("ncs"),
+/// The extension of the two types the corpus keeps; `None` for the rest.
+fn ext(ty: ResType) -> Option<&'static str> {
+    match ty {
+        ResType::Nss => Some("nss"),
+        ResType::Ncs => Some("ncs"),
         _ => None,
     }
+}
+
+/// A resource name as the corpus files it: lowercase, as the engine compares
+/// it, whatever the archive's spelling.
+fn lower(m: &rakata_res::ResRef) -> String {
+    m.to_string().to_ascii_lowercase()
 }
 
 /// Files in `dir` whose extension is one of `exts`, sorted by name.
@@ -192,11 +200,6 @@ fn fix_nwscript(src: &[u8]) -> Vec<u8> {
 }
 
 /// A BIF read into memory with its resource table.
-struct LoadedBif {
-    bytes: Vec<u8>,
-    table: Vec<(usize, usize)>,
-}
-
 fn write(path: &Path, data: &[u8]) -> Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
@@ -208,7 +211,7 @@ fn write(path: &Path, data: &[u8]) -> Result<()> {
 fn extract(o: Opts) -> Result<()> {
     let game = o.game_dir.as_deref().ok_or("extract needs --game-dir")?;
     let key_path = find_ci(game, "chitin.key").ok_or("no chitin.key under --game-dir")?;
-    let key = archive::read_key(&fs::read(&key_path)?)?;
+    let key = Key::parse(&Source::read(&key_path)?)?;
 
     // Rewrite from scratch so a rerun is byte-identical and nothing stale survives.
     for sub in ["nss", "ncs", "oracle", "modules", "rims"] {
@@ -220,32 +223,36 @@ fn extract(o: Opts) -> Result<()> {
 
     let mut scripts: BTreeMap<String, Hashes> = BTreeMap::new();
     let mut per_bif: BTreeMap<String, (usize, usize)> = BTreeMap::new();
-    let mut bif_cache: BTreeMap<usize, LoadedBif> = BTreeMap::new();
-    for e in &key.entries {
-        let Some(x) = ext(e.restype) else { continue };
-        if let std::collections::btree_map::Entry::Vacant(slot) = bif_cache.entry(e.bif) {
-            let rel = key.bifs.get(e.bif).ok_or("key names a missing bif")?;
-            let path = find_ci(game, rel).ok_or_else(|| format!("missing {rel}"))?;
-            let bytes = fs::read(&path)?;
-            let table = archive::read_bif(&bytes)?;
-            slot.insert(LoadedBif { bytes, table });
-        }
-        let LoadedBif { bytes, table } = &bif_cache[&e.bif];
-        let &(off, size) = table
-            .get(e.index)
-            .ok_or_else(|| format!("{}.{x}: index beyond bif table", e.name))?;
-        let data = bytes
-            .get(off..off + size)
-            .ok_or_else(|| format!("{}.{x}: data beyond bif end", e.name))?;
-        write(&o.out.join(x).join(format!("{}.{x}", e.name)), data)?;
-        let h = scripts.entry(e.name.clone()).or_default();
-        let c = per_bif.entry(key.bifs[e.bif].clone()).or_default();
-        if e.restype == NSS {
-            h.nss = Some(sha256(data));
-            c.0 += 1;
-        } else {
-            h.ncs = Some(sha256(data));
-            c.1 += 1;
+    // One pass per BIF: each is mapped once and its scripts copied out.
+    let mut by_bif: BTreeMap<u32, Vec<&KeyEntry>> = BTreeMap::new();
+    for e in key.entries().iter().filter(|e| ext(e.id.ty).is_some()) {
+        by_bif.entry(e.bif).or_default().push(e);
+    }
+    for (bif, entries) in &by_bif {
+        let rel = key
+            .bifs()
+            .get(*bif as usize)
+            .ok_or("key names a missing bif")?
+            .name_str();
+        let path = find_ci(game, &rel).ok_or_else(|| format!("missing {rel}"))?;
+        let source = Source::map(&path)?;
+        let archive = Bif::parse(&source)?;
+        for e in entries {
+            let x = ext(e.id.ty).expect("filtered to nss and ncs");
+            let name = lower(&e.id.name);
+            let data = archive
+                .get(e.index as usize)
+                .ok_or_else(|| format!("{name}.{x}: index beyond bif table"))?;
+            write(&o.out.join(x).join(format!("{name}.{x}")), data)?;
+            let h = scripts.entry(name).or_default();
+            let c = per_bif.entry(rel.clone()).or_default();
+            if e.id.ty == ResType::Nss {
+                h.nss = Some(sha256(data));
+                c.0 += 1;
+            } else {
+                h.ncs = Some(sha256(data));
+                c.1 += 1;
+            }
         }
     }
 
@@ -269,12 +276,15 @@ fn extract(o: Opts) -> Result<()> {
             continue;
         };
         for p in listed(&d, &["rim", "mod", "erf"]) {
-            let bytes = fs::read(&p)?;
-            let is_rim = bytes.starts_with(b"RIM ");
-            let entries = if is_rim {
-                archive::read_rim(&bytes)?
+            let source = Source::map(&p)?;
+            let rim;
+            let erf;
+            let entries: &[Member] = if source.starts_with(b"RIM ") {
+                rim = Rim::parse(&source)?;
+                rim.members()
             } else {
-                archive::read_erf(&bytes)?
+                erf = Erf::parse(&source)?;
+                erf.members()
             };
             let file = p
                 .file_name()
@@ -286,16 +296,17 @@ fn extract(o: Opts) -> Result<()> {
                 .unwrap()
                 .to_string_lossy()
                 .to_ascii_lowercase();
-            for e in entries.iter().filter(|e| e.restype == NCS) {
+            for e in entries.iter().filter(|e| e.id.ty == ResType::Ncs) {
+                let name = lower(&e.id.name);
                 write(
-                    &o.out.join(sub).join(&stem).join(format!("{}.ncs", e.name)),
-                    e.data,
+                    &o.out.join(sub).join(&stem).join(format!("{name}.ncs")),
+                    e.data(),
                 )?;
                 modules
                     .archives
                     .entry(format!("{sub}/{file}"))
                     .or_default()
-                    .insert(e.name.clone(), sha256(e.data));
+                    .insert(name, sha256(e.data()));
             }
         }
     }

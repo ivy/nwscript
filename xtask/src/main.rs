@@ -1,7 +1,6 @@
 //! Development tasks. `cargo xtask corpus --help` for the corpus commands,
 //! `cargo xtask grammar-census --help` for the grammar's evidence.
 
-mod archive;
 mod corpus;
 mod grammar_census;
 
