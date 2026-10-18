@@ -123,7 +123,7 @@ pub enum Operation {
 }
 
 impl Plan {
-    /// The plan of `changes`, and a warning (`RW0204`) for every token an
+    /// The plan of `changes`, and a warning (`RW0304`) for every token an
     /// operation reads before any operation sets it, in this order.
     pub fn build(changes: &Changes, file: usize, issues: &mut Vec<Issue>) -> Plan {
         let mut plan = Plan {

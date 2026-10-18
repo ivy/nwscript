@@ -7,9 +7,11 @@
 //! differs, an install directory here where `nws` records a profile.
 
 pub mod codes;
+pub mod patch;
 
 pub use nwscript_diag as diag;
 pub use nwscript_diag::{Exit, InputRecord, OutputRecord};
+pub use rakata_res as res;
 
 use std::path::PathBuf;
 

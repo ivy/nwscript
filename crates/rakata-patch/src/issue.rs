@@ -9,21 +9,21 @@ use serde::Serialize;
 /// ranges of the `rakata` registry.
 pub mod codes {
     /// A line that is neither a section header, `Key=Value`, a comment nor blank.
-    pub const MALFORMED_LINE: &str = "RE0201";
+    pub const MALFORMED_LINE: &str = "RE0301";
     /// A `Key=Value` line before the first `[Section]` header.
-    pub const ENTRY_BEFORE_SECTION: &str = "RE0202";
+    pub const ENTRY_BEFORE_SECTION: &str = "RE0302";
     /// A value in no form its key takes (a row index that is not a number, a field type that names no type).
-    pub const BAD_VALUE: &str = "RE0203";
+    pub const BAD_VALUE: &str = "RE0303";
     /// A `namespaces.ini` whose `[Namespaces]` list is missing or empty.
-    pub const NO_NAMESPACES: &str = "RE0204";
+    pub const NO_NAMESPACES: &str = "RE0304";
     /// A list entry names a section the file does not have; TSLPatcher skips the entry.
-    pub const MISSING_SECTION: &str = "RW0201";
+    pub const MISSING_SECTION: &str = "RW0301";
     /// A key the section's vocabulary does not have; kept on the model, not applied.
-    pub const UNKNOWN_KEY: &str = "RW0202";
+    pub const UNKNOWN_KEY: &str = "RW0302";
     /// A section or key written twice; the first is what TSLPatcher reads.
-    pub const DUPLICATE: &str = "RW0203";
+    pub const DUPLICATE: &str = "RW0303";
     /// A memory token (`2DAMEMORY#`, `StrRef#`) read by an operation before any operation sets it.
-    pub const TOKEN_UNSET: &str = "RW0204";
+    pub const TOKEN_UNSET: &str = "RW0304";
 }
 
 /// Where an issue is: a file the reader was given, by index, and a line.

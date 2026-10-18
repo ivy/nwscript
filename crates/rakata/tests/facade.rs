@@ -72,6 +72,14 @@ fn every_code_a_data_crate_reports_is_registered() {
         rakata_res::codes::RESREF_TOO_LONG,
         rakata_res::codes::RESID_NO_EXTENSION,
         rakata_res::codes::UNKNOWN_EXTENSION,
+        rakata::patch::codes::MALFORMED_LINE,
+        rakata::patch::codes::ENTRY_BEFORE_SECTION,
+        rakata::patch::codes::BAD_VALUE,
+        rakata::patch::codes::NO_NAMESPACES,
+        rakata::patch::codes::MISSING_SECTION,
+        rakata::patch::codes::UNKNOWN_KEY,
+        rakata::patch::codes::DUPLICATE,
+        rakata::patch::codes::TOKEN_UNSET,
     ] {
         assert!(codes::lookup(id).is_some(), "{id} is not registered");
     }

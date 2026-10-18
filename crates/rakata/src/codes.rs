@@ -5,8 +5,11 @@
 //! crate, which `rakata explain CODE` prints.
 //!
 //! Ranges: `RE00xx` inputs and invocation, `RE01xx` resource identity
-//! (`rakata-res`), `RE02xx` archives (`rakata-archive`). Each format crate
+//! (`rakata-res`), `RE02xx` archives (`rakata-archive`), `RE03xx` and
+//! `RW03xx` the installer's change files (`rakata-patch`). Each format crate
 //! takes a range of its own as it lands.
+//! (`rakata-res`), `RE02xx` and `RW02xx` the installer's change files
+//! (`rakata-patch`). Each format crate takes a range of its own as it lands.
 
 pub use nwscript_diag::codes::Code;
 
@@ -25,6 +28,14 @@ nwscript_diag::codes! {
     RE0207 Error "a member replaced that the archive does not hold";
     RE0208 Error "a BIF with fixed resources";
     RE0209 Error "a BIF member index past the end of its table";
+    RE0301 Error "a line of a change file that is not a section, a key or a comment";
+    RE0302 Error "a key before the first section of a change file";
+    RE0303 Error "a value in no form its key takes";
+    RE0304 Error "a namespaces.ini without options";
+    RW0301 Warning "a list entry naming a section the change file does not have";
+    RW0302 Warning "a key the section does not take";
+    RW0303 Warning "a section or key written twice";
+    RW0304 Warning "a memory token read before anything sets it";
 }
 
 /// The rakata code with this id, if registered; case does not matter.

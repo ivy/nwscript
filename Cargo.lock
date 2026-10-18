@@ -1043,6 +1043,7 @@ name = "rakata"
 version = "0.0.0"
 dependencies = [
  "nwscript-diag",
+ "rakata-patch",
  "rakata-res",
  "serde_json",
  "sha2",

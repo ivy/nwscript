@@ -46,8 +46,8 @@ pub struct Ini {
 
 impl Ini {
     /// Parse `bytes` as Windows-1252 text. Every line that is not a header,
-    /// an entry, a comment or blank is reported under `RE0201` and skipped;
-    /// an entry before the first header is reported under `RE0202`. `file`
+    /// an entry, a comment or blank is reported under `RE0301` and skipped;
+    /// an entry before the first header is reported under `RE0302`. `file`
     /// is the index the issues carry.
     pub fn parse(bytes: &[u8], file: usize, issues: &mut Vec<Issue>) -> Ini {
         let text = decode_1252(bytes);
