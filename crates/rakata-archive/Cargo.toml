@@ -1,0 +1,25 @@
+[package]
+name = "rakata-archive"
+description = "The archives of Aurora-family games: KEY/BIF, ERF (MOD, SAV, HAK) and RIM; read without copying, written back in BioWare's layout, members added and replaced."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+memmap2 = "0.9"
+rakata-res = { workspace = true }
+
+[dev-dependencies]
+sha2 = "0.10"
+
+# The workspace forbids `unsafe_code`. This crate holds the one exception the
+# owner allowed, the memory-mapped `Source` in `src/mmap.rs`, which `forbid`
+# would not let a module opt out of; so this crate denies the lint and that
+# module alone allows it. Everything else mirrors the workspace table.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
