@@ -22,11 +22,11 @@ Over the vanilla install (`$RAKATA_GAME_K1`), measured on the maintainer's machi
 
 | Source | Scripts | Functions | Verified | Fraction | Folded into an include | Calls indexed |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `modules` | 10,863 | 44,925 | 44,889 | 99.92% | 25,419 | 315,121 |
-| `rims` | 492 | 1,586 | 1,586 | 100.00% | 664 | 11,694 |
-| **total** | 11,355 | 46,511 | 46,475 | 99.92% | 26,083 | 326,815 |
+| `modules` | 10,863 | 44,925 | 44,889 | 99.92% | 26,208 | 315,121 |
+| `rims` | 492 | 1,586 | 1,586 | 100.00% | 682 | 11,694 |
+| **total** | 11,355 | 46,511 | 46,475 | 99.92% | 26,890 | 326,815 |
 
-21 include libraries are indexed: every NSS of the install without an entry point that defines a function, which is the `k_inc_*` files less `k_inc_switch` (constants only) and `e3_scripts` (a Neverwinter Nights leftover that does not compile against KotOR 1's `nwscript.nss`, reported as RW1002). 2,670 scripts fold at least one include, and no fold is refused. Wall time: 1.9 s on 16 threads, the libraries compiled in parallel. The modded build (`$RAKATA_BUILD`, 22,507 scripts, 147 of them under `Override/`) takes 3.5 s and folds 52,264 functions; its `Override/` scripts verify at 88.72%, the rest having been compiled by other tools from other declarations.
+21 include libraries are indexed: every NSS of the install without an entry point that defines a function, which is the `k_inc_*` files less `k_inc_switch` (constants only) and `e3_scripts` (a Neverwinter Nights leftover that does not compile against KotOR 1's `nwscript.nss`, reported as RW1002). 3,126 scripts fold at least one include, and no fold is refused. Wall time: 1.9 s on 16 threads, the libraries compiled in parallel. The modded build (`$RAKATA_BUILD`, 22,507 scripts, 147 of them under `Override/`) takes 3.5 s and folds 53,866 functions; its `Override/` scripts verify at 88.72%, the rest having been compiled by other tools from other declarations.
 
 | Directory | Scripts | Verified whole | Failed | Functions | Verified | Unverified | Not recovered | Unchecked | Verified fraction |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |

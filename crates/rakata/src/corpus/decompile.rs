@@ -745,10 +745,10 @@ fn library(
     let ranges = function_ranges(&program);
     // With globals the entry stub jumps to their initialisation, which
     // ends in `SAVEBP; JSR main`; without, it jumps to main itself.
-    let (globals_end, main_jsr) = match ins.iter().position(|x| x.opcode == Opcode::SaveBp) {
-        Some(save) => (save, save + 1),
-        None => (2.min(ins.len()), 0),
-    };
+    let main_jsr = ins
+        .iter()
+        .position(|x| x.opcode == Opcode::SaveBp)
+        .map_or(0, |save| save + 1);
     let main_range = ins
         .get(main_jsr)
         .and_then(|x| x.jump_target(program.offsets()[main_jsr]))
@@ -818,7 +818,7 @@ fn library(
                 .to_string()
         })
         .collect();
-    let globals_init = ins[2.min(globals_end)..globals_end].to_vec();
+    let globals_init = globals_section(&program).to_vec();
     let program = &analysis.program;
     let globals: Vec<LibGlobal> = program
         .globals
@@ -1180,6 +1180,26 @@ fn one(
     }
 }
 
+/// The instructions that initialise a program's globals: from the entry
+/// stub's target up to `SAVEBP`, empty for a program without globals. The
+/// stub is `JSR; RETN` before `main` and `RSADDI; JSR; RETN` before
+/// `StartingConditional`, whose return value it reserves first.
+fn globals_section(p: &Program) -> &[Instruction] {
+    let ins = p.instructions();
+    let Some(save) = ins.iter().position(|x| x.opcode == Opcode::SaveBp) else {
+        return &[];
+    };
+    let start = ins
+        .iter()
+        .take(2)
+        .position(|x| x.opcode == Opcode::Jsr)
+        .and_then(|i| ins[i].jump_target(p.offsets()[i]))
+        .and_then(|t| p.index_at(t))
+        .filter(|&t| t <= save)
+        .unwrap_or(save);
+    &ins[start..save]
+}
+
 /// The includes to fold into a script, from the functions whose shape a
 /// library's function has and the globals the libraries would declare.
 fn plan_fold(
@@ -1242,11 +1262,7 @@ fn plan_fold(
     if matches.is_empty() {
         return None;
     }
-    // The script's globals section, empty for a script without globals.
-    let globals = match ins.iter().position(|x| x.opcode == Opcode::SaveBp) {
-        Some(save) => &ins[2.min(save)..save],
-        None => &ins[0..0],
-    };
+    let globals = globals_section(p);
 
     let mut chosen: Vec<usize> = Vec::new();
     let mut files: BTreeSet<&str> = BTreeSet::new();
@@ -1313,8 +1329,11 @@ fn plan_fold(
     // Which library function each matched one is. Where several have the
     // same shape and signature (the debug printers, say), a folded caller
     // decides: its library version calls a known function at each `JSR`,
-    // and the callee at the same position in the script is that one. The
-    // rest take their first candidate.
+    // and the callee at the same position in the script is that one. So do
+    // known callees: a candidate whose library version calls other
+    // functions than the ones the script's callees are is not this one
+    // (`IsDark` and `IsLight` compile alike but call different functions).
+    // The rest take their first candidate.
     let cands: Vec<(usize, Vec<(usize, usize)>)> = matches
         .iter()
         .map(|(i, hits)| {
@@ -1327,6 +1346,30 @@ fn plan_fold(
         })
         .filter(|(_, c)| !c.is_empty())
         .collect();
+    // The candidates whose library version calls, at each `JSR` to a
+    // callee already picked, that callee's library function.
+    let fitting = |i: usize,
+                   c: &[(usize, usize)],
+                   pick: &HashMap<usize, (usize, usize)>|
+     -> Vec<(usize, usize)> {
+        let called = callees(i);
+        c.iter()
+            .copied()
+            .filter(|&(l, fi)| {
+                called
+                    .iter()
+                    .enumerate()
+                    .all(|(k, callee)| match pick.get(callee) {
+                        Some(&(pl, pf)) => {
+                            pl == l
+                                && libs[l].functions[fi].callees.get(k).copied().flatten()
+                                    == Some(pf)
+                        }
+                        None => true,
+                    })
+            })
+            .collect()
+    };
     let mut pick: HashMap<usize, (usize, usize)> = cands
         .iter()
         .filter(|(_, c)| c.len() == 1)
@@ -1350,6 +1393,11 @@ fn plan_fold(
             if let Some(hit) = demanded {
                 pick.insert(*i, hit);
                 changed = true;
+                continue;
+            }
+            if let [hit] = fitting(*i, c, &pick)[..] {
+                pick.insert(*i, hit);
+                changed = true;
             }
         }
         if !changed {
@@ -1358,7 +1406,11 @@ fn plan_fold(
     }
     let mut functions = Vec::new();
     for (i, c) in &cands {
-        let (l, fi) = pick.get(i).copied().unwrap_or(c[0]);
+        let (l, fi) = pick
+            .get(i)
+            .copied()
+            .or_else(|| fitting(*i, c, &pick).first().copied())
+            .unwrap_or(c[0]);
         functions.push((*i, libs[l].functions[fi].name.clone()));
     }
     Some(Fold {
@@ -1520,6 +1572,27 @@ int GetHitDice(object oCreature);
             serde_json::json!([{ "object": "OBJECT_SELF" }])
         );
         assert!(rows[0]["offset"].as_u64().unwrap() < rows[1]["offset"].as_u64().unwrap());
+    }
+
+    #[test]
+    fn the_globals_section_starts_after_either_entry_stub() {
+        let asm = |text: &str| {
+            nwscript::ncs::asm::parse(nwscript::diag::FileId(0), text.as_bytes()).unwrap()
+        };
+        let globals = "g:\nRSADDI\nCONSTI 0\nCPDOWNSP -8, 4\nMOVSP -4\nSAVEBP\n";
+        // `main` is entered by `JSR; RETN`, `StartingConditional` by
+        // `RSADDI; JSR; RETN`: both sections are the same four instructions.
+        let main = asm(&format!(
+            "JSR g\nRETN\n{globals}JSR main\nRESTOREBP\nMOVSP -4\nRETN\nmain:\nRETN\n"
+        ));
+        let cond = asm(&format!(
+            "RSADDI\nJSR g\nRETN\n{globals}RSADDI\nJSR sc\nCPDOWNSP -12, 4\nMOVSP -4\nRESTOREBP\nMOVSP -4\nRETN\nsc:\nCONSTI 1\nCPDOWNSP -8, 4\nMOVSP -4\nRETN\n"
+        ));
+        assert_eq!(globals_section(&main).len(), 4);
+        assert_eq!(globals_section(&main), globals_section(&cond));
+        assert_eq!(globals_section(&cond)[0].opcode, Opcode::RsAdd);
+        let bare = asm("JSR main\nRETN\nmain:\nRETN\n");
+        assert!(globals_section(&bare).is_empty());
     }
 
     #[test]

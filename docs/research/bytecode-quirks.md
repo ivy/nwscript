@@ -57,6 +57,12 @@ For every other instruction the second byte is a type. For `STORE_STATE` it is t
 
 `SAVEBP` sets BP to the stack slot it saves the old BP into, so the last global variable is at `BP-4` and the first at `BP-4×n`. Treating BP as the slot above the saved one is off by one element, and it shows: in `modules/danm13_s/k_pdan_elise10.ncs`, `CPTOPBP -32, 4` must read the integer global just below the string `"bastila"`, which `SetGlobalNumber` then receives. With BP one slot higher the call gets the string. A deferred action's saved globals are the elements below BP, without the saved BP.
 
+### `StartingConditional`'s entry stub reserves the result first
+
+A script with `main` starts `JSR; RETN`; one with `StartingConditional` starts `RSADDI; JSR; RETN`, reserving the slot the conditional's result is returned in before calling into the globals' initialisation (or straight into the function when there are no globals). The globals therefore begin at the third instruction of a `main` script and at the fourth of a conditional. `nws disasm modules/korr_m37aa_s/k37_frd_wrongswd.ncs` shows the three-instruction stub, `ncs/k_con_light.ncs` the same for a vanilla conditional. Code that takes the globals to start at a fixed index reads a conditional's `RETN` as the first of them, matches no include's globals against any conditional, and leaves `k_inc_utility`'s constants unnamed (`sub_39d(oLocal1, nGlobal1)` for `UT_GetPlotBooleanFlag(oLocal1, SW_PLOT_BOOLEAN_01)`).
+
+26 scripts, 21 of them in `modules/korr_m37aa_s` and the rest in `unk_m41aa_s`, `unk_m42aa_s`, `unk_m44aa_s` and `ebo_m46ab_s`, declare one more `int` global after `k_inc_utility`'s 27, initialised to 24, that no shipped include declares; `modules/korr_m37aa_s/k_pkor_actdroid1.ncs` passes it to `ActionPlayAnimation`. Its declaration stays in the recovered source, unnamed.
+
 ### Module bytecode compiled against other declarations
 
 Fourteen module scripts call engine routines with arguments the shipped `nwscript.nss` does not declare for them, so their bytecode was compiled against an earlier table:
