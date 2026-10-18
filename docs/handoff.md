@@ -19,9 +19,13 @@ The epic's goal: Rakata reads and writes every data format a KotOR mod touches w
 
 The first measure is met (#83): the Juhani mod, ported onto the `rakata` Python module, rebuilds to the same tree (178 of 184 changed paths byte-identical, 5 dialogues equal in data, one Rhubarb keyframe 10 ms off and explained), reproducibly (tree `c3b7cb610403` on every Rakata build since). The second measure, the Calo Nord Taris chapter, is a test of the system the owner may rewrite later; its nine design questions were decided by the lead at the owner's direction (#107's result).
 
+## Work done for OdysseyUE after the pause
+
+The owner's Unreal Engine runtime (the OdysseyUE session, `~/src/github.com/ivy/odyssey-ue`) asked for the 3D asset crates, which landed on `main` as their own nodes, each closed with its API and census: #124 `rakata-texture` (TPC with TXI, TGA; mip data borrowed), #125 `rakata-lyt` (LYT and VIS; door-hook quaternions w x y z, measured), #126 `rakata-mdl` (static geometry; vertex attributes as stride-and-offset views into the MDX), #127 `rakata-walkmesh` (WOK, PWK, DWK; vertices already in area coordinates), #128 skins, animations with compressed quaternions, and supermodel chains in `rakata-mdl`. Each parses every vanilla instance with zero failures; the specs are in `docs/formats/`. OdysseyUE merges `main` into its own vendored branch; keep `main` stable for it, and build with at most four cargo jobs while it shares the host. Questions only the engine can answer (cube face directions, uncompressed TPC channel and row order, whether animation position keys are offsets from rest, three Endar Spire doors half a turn off their hooks) are in the nodes' results and the specs.
+
 ## State of the repositories
 
-- nwscript `main`: e7a83e8. Clean. Not pushed (`origin/main` is c90437e; no history rewrite has been done, and four early commits of `scripts/clean-room-test.py` still carry the build host's home path in sample paths; the owner said it is not a big deal; rewrite before a first push only if they ask).
+- nwscript `main`: the 3D asset crates on top of e7a83e8 (see above). Clean. Not pushed (`origin/main` is c90437e; no history rewrite has been done, and four early commits of `scripts/clean-room-test.py` still carry the build host's home path in sample paths; the owner said it is not a big deal; rewrite before a first push only if they ask).
 - modshop `main`: b65b6b2. Clean. Not pushed. The chain is up to date on Rakata 2fce656 (`mise run rakata:local` from `local.toml`'s `[rakata] checkout`); its final tree is `c3b7cb610403`.
 
 ## Unmerged branches, by node
