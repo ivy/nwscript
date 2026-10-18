@@ -18,12 +18,25 @@ pub mod codes {
     pub const AMBIGUOUS_KEY: &str = "RE1103";
     /// A node key that does not parse.
     pub const BAD_KEY: &str = "RE1104";
+    /// A link or start that cannot be made: between two nodes of one kind,
+    /// a start to a reply, or at a position past the end of its list.
+    pub const BAD_LINK: &str = "RE1106";
+    /// A reordering that is not a permutation of the list.
+    pub const BAD_ORDER: &str = "RE1107";
+    /// Text for a new node holding a character Windows-1252 cannot encode.
+    pub const UNENCODABLE: &str = "RE1108";
     /// A link to a node the dialogue does not have.
     pub const DANGLING_LINK: &str = "RW1101";
     /// A script or condition no layer of the install holds.
     pub const MISSING_SCRIPT: &str = "RW1102";
     /// A script whose bytecode the decompiler could not read back.
     pub const UNREADABLE_SCRIPT: &str = "RW1103";
+    /// A voiced node whose voice-over no layer or `streamwaves/` holds.
+    pub const MISSING_VOICE: &str = "RW1104";
+    /// A node whose strref lies past the end of the talk table.
+    pub const STRREF_PAST_TLK: &str = "RW1105";
+    /// A condition reading a global `globalcat.2da` does not declare.
+    pub const UNDECLARED_GLOBAL: &str = "RW1106";
 }
 
 /// An error in reading a dialogue or addressing one of its nodes.
@@ -61,6 +74,29 @@ pub enum Error {
         /// What is wrong with it.
         reason: &'static str,
     },
+    /// A link or start that cannot be made.
+    BadLink {
+        /// The dialogue's name.
+        dialog: String,
+        /// Why, naming the nodes or the position.
+        reason: String,
+    },
+    /// A reordering that is not a permutation of the list.
+    BadOrder {
+        /// The dialogue's name.
+        dialog: String,
+        /// The list, `EntryList` or `ReplyList`.
+        list: &'static str,
+        /// How many nodes it holds.
+        len: usize,
+    },
+    /// Text for a new node that the game's code page cannot hold.
+    Unencodable {
+        /// The field.
+        field: &'static str,
+        /// The first character it cannot encode.
+        character: char,
+    },
 }
 
 /// This crate's result type.
@@ -75,6 +111,9 @@ impl Error {
             Error::NoSuchNode { .. } => codes::NO_SUCH_NODE,
             Error::AmbiguousKey { .. } => codes::AMBIGUOUS_KEY,
             Error::BadKey { .. } => codes::BAD_KEY,
+            Error::BadLink { .. } => codes::BAD_LINK,
+            Error::BadOrder { .. } => codes::BAD_ORDER,
+            Error::Unencodable { .. } => codes::UNENCODABLE,
         }
     }
 
@@ -106,6 +145,13 @@ impl Error {
             Error::BadKey { text, reason } => {
                 format!("cannot parse the node key `{text}`: {reason}")
             }
+            Error::BadLink { dialog, reason } => format!("{dialog}: {reason}"),
+            Error::BadOrder { dialog, list, len } => format!(
+                "{dialog}: a new order for {list} names each of its {len} indices once, from 0"
+            ),
+            Error::Unencodable { field, character } => format!(
+                "`{character}` in a node's {field} has no Windows-1252 byte, the game's code page"
+            ),
         }
     }
 }

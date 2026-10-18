@@ -14,6 +14,13 @@
 //! no node matches or several do; an index key exists for what content
 //! cannot name and is marked fragile wherever it is shown.
 //!
+//! Edits keep every index: [`Dialog::push_entry`], [`Dialog::push_reply`],
+//! [`Dialog::push_link`] and [`Dialog::push_start`] add at the ends of the
+//! lists (or inside a node's own links), and [`Dialog::reorder`], which
+//! moves indices, is named apart. [`check()`] lists the references the
+//! install cannot satisfy (a script or condition, a voice-over, a strref, a
+//! global a condition reads), asked through [`References`].
+//!
 //! A [`Transcript`] renders the conversation for reading, as text or as
 //! structured nodes, with what lies outside the dialogue (the talk table,
 //! the voice files, the decompiled scripts) supplied by a [`Lookup`]. The
@@ -26,11 +33,15 @@
 #![forbid(unsafe_code)]
 
 pub mod audio;
+mod check;
+mod edit;
 mod error;
 mod key;
 mod model;
 mod transcript;
 
+pub use check::{Finding, Place, References, check};
+pub use edit::{CAMERA_STATIC, NO_DELAY, NewNode, Text};
 pub use error::{Error, Result, codes};
 pub use key::NodeKey;
 pub use model::{Animation, Dialog, Info, Kind, Link, Node, NodeRef, localized};

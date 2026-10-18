@@ -31,6 +31,28 @@ impl NodeKey {
         matches!(self, NodeKey::Index(..))
     }
 
+    /// The stable key that names the node at `at` and no other: its voice
+    /// resref, else its strref, else its embedded text, whichever is first
+    /// to match it alone; an index key (fragile) when none does.
+    pub fn of(dialog: &Dialog, at: NodeRef) -> NodeKey {
+        let index = NodeKey::Index(at.kind, at.index);
+        let Some(node) = dialog.node(at) else {
+            return index;
+        };
+        let candidates = [
+            node.voice().map(NodeKey::Voice),
+            node.strref().map(NodeKey::StrRef),
+            node.embedded_text()
+                .filter(|t| !t.trim().is_empty())
+                .map(NodeKey::Text),
+        ];
+        candidates
+            .into_iter()
+            .flatten()
+            .find(|k| k.resolve(dialog).ok() == Some(at))
+            .unwrap_or(index)
+    }
+
     /// The one node of `dialog` the key names. Text keys compare with the
     /// text the node embeds, as when no talk table is at hand; a caller
     /// holding one uses [`NodeKey::resolve_with`].
@@ -91,6 +113,13 @@ impl NodeKey {
                 nodes: matches,
             }),
         }
+    }
+}
+
+impl From<NodeRef> for NodeKey {
+    /// The index key of a node, as an edit that just made it returns.
+    fn from(at: NodeRef) -> Self {
+        NodeKey::Index(at.kind, at.index)
     }
 }
 

@@ -344,8 +344,8 @@ pub struct Info {
 /// A dialogue: a DLG's GFF, kept whole, read through the model.
 #[derive(Debug, Clone)]
 pub struct Dialog {
-    name: String,
-    gff: Gff,
+    pub(crate) name: String,
+    pub(crate) gff: Gff,
 }
 
 impl Dialog {

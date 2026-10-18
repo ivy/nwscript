@@ -95,9 +95,15 @@ nwscript_diag::codes! {
     RE1103 Error "a node key that matches more than one node of the dialogue";
     RE1104 Error "a node key that does not parse";
     RE1105 Error "a dialogue several modules hold, with no module named";
+    RE1106 Error "a dialogue link or start between nodes it cannot join, or past the end of its list";
+    RE1107 Error "a dialogue reordering that is not a permutation of the list";
+    RE1108 Error "text for a new dialogue node holding a character Windows-1252 cannot encode";
     RW1101 Warning "a link to a node the dialogue does not have";
     RW1102 Warning "a script or condition no layer of the install holds";
     RW1103 Warning "a script whose bytecode the decompiler could not read back";
+    RW1104 Warning "a voiced node whose voice-over no layer or streamwaves/ holds";
+    RW1105 Warning "a node whose strref lies past the end of the talk table";
+    RW1106 Warning "a condition reading a global globalcat.2da does not declare";
     RE1201 Error "a directory that is not a saved game";
     RE1202 Error "a module the save holds no state for";
     RE1203 Error "a save member lacking a field the game writes";
