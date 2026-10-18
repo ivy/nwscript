@@ -5,6 +5,11 @@
 //! Ranges: `E00xx` inputs and invocation, `E01xx` bytecode, `E02xx` syntax,
 //! `E03xx` semantic analysis, `E04xx` code generation, `E05xx` the
 //! interpreter, `E06xx` decompilation, `W0xxx` lints.
+//!
+//! The [`codes!`](crate::codes!) macro that declares them is public: another
+//! toolset registers its own codes, under its own prefix and with its own
+//! explanation directory, the same way, and looks them up with
+//! [`lookup_in`].
 
 use crate::Severity;
 
@@ -17,23 +22,38 @@ pub struct Code {
     pub explanation: &'static str,
 }
 
+/// Declare a registry of codes: one `pub static` per code, named by its id,
+/// and `ALL`, every code in declaration order. `dir` is the directory of
+/// the explanations relative to the invoking crate's manifest; each code's
+/// explanation is `dir/ID.md`, read at compile time.
+///
+/// ```ignore
+/// nwscript_diag::codes! {
+///     dir "explain";
+///     RE0001 Error "an input file could not be read";
+/// }
+/// ```
+#[macro_export]
 macro_rules! codes {
-    ($( $id:ident $sev:ident $summary:literal; )*) => {
+    (dir $dir:literal; $( $id:ident $sev:ident $summary:literal; )*) => {
         $(
             #[doc = $summary]
-            pub static $id: Code = Code {
+            pub static $id: $crate::codes::Code = $crate::codes::Code {
                 id: stringify!($id),
-                severity: Severity::$sev,
+                severity: $crate::Severity::$sev,
                 summary: $summary,
-                explanation: include_str!(concat!("../explain/", stringify!($id), ".md")),
+                explanation: include_str!(concat!(
+                    env!("CARGO_MANIFEST_DIR"), "/", $dir, "/", stringify!($id), ".md"
+                )),
             };
         )*
         /// Every registered code, in declaration order.
-        pub static ALL: &[&Code] = &[$(&$id),*];
+        pub static ALL: &[&$crate::codes::Code] = &[$(&$id),*];
     };
 }
 
 codes! {
+    dir "explain";
     E0001 Error "an input file could not be read";
     E0002 Error "no nwscript.nss to read the engine's declarations from";
     E0101 Error "not an NCS V1.0 file";
@@ -111,7 +131,15 @@ pub static NWNNSSCOMP_ACCEPTED: &[&Code] = &[&E0327, &E0328];
 
 pub static BIOWARE_ACCEPTED: &[&Code] = &[&E0308, &E0309, &E0311];
 
-/// The code with this id, if registered.
+/// The nwscript code with this id, if registered.
 pub fn lookup(id: &str) -> Option<&'static Code> {
-    ALL.iter().copied().find(|c| c.id.eq_ignore_ascii_case(id))
+    lookup_in(ALL, id)
+}
+
+/// The code with this id in a registry, if registered; case does not matter.
+pub fn lookup_in(registry: &[&'static Code], id: &str) -> Option<&'static Code> {
+    registry
+        .iter()
+        .copied()
+        .find(|c| c.id.eq_ignore_ascii_case(id))
 }

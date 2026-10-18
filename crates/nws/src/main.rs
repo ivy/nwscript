@@ -21,21 +21,8 @@ pub fn working_on(input: impl Into<String>) {
     }
 }
 
-/// The documented exit codes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Exit {
-    Ok = 0,
-    Errors = 1,
-    Usage = 2,
-    Different = 3,
-    Internal = 101,
-}
-
-impl From<Exit> for ExitCode {
-    fn from(e: Exit) -> ExitCode {
-        ExitCode::from(e as u8)
-    }
-}
+/// The documented exit codes, the table `rakata` shares.
+pub use nwscript::diag::Exit;
 
 fn install_panic_hook() {
     std::panic::set_hook(Box::new(|info| {

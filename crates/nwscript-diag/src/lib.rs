@@ -6,8 +6,13 @@
 //! through miette, [`json`] shapes it for a program, and the `lsp` feature
 //! converts it for a language server. Nothing in the toolchain builds a
 //! diagnostic from rendered text.
+//!
+//! The crate also holds the agent surface every binary of the workspace
+//! shares: the JSON [`Envelope`] and the [`Exit`] codes.
 
 pub mod codes;
+pub mod envelope;
+pub mod exit;
 pub mod json;
 pub mod levels;
 #[cfg(feature = "lsp")]
@@ -16,6 +21,8 @@ pub mod render;
 mod source;
 
 pub use codes::Code;
+pub use envelope::{Envelope, InputRecord, OutputRecord};
+pub use exit::Exit;
 pub use levels::{Level, Levels};
 pub use source::{FileId, LineCol, SourceFile, SourceMap, Span};
 

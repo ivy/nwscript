@@ -8,7 +8,7 @@
 
 use super::Ctx;
 use crate::Exit;
-use nwscript::{Envelope, sha256_hex};
+use nwscript::sha256_hex;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -505,7 +505,7 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
                     }
                 }
             }
-            let mut env = Envelope::new("conformance", ctx.game);
+            let mut env = super::envelope("conformance", ctx.game);
             env.result = serde_json::to_value(&report).expect("report serializes");
             ctx.finish(
                 env,

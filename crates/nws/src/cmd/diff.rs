@@ -3,7 +3,6 @@
 use super::Ctx;
 use crate::Exit;
 use crate::io::{display_name, read_input};
-use nwscript::Envelope;
 use nwscript::compare::{self, Level};
 use nwscript::diag::SourceMap;
 use nwscript::vm::{Engine, Recording, World};
@@ -55,7 +54,7 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
     } else {
         args.level.clone()
     };
-    let mut env = Envelope::new("diff", ctx.game);
+    let mut env = super::envelope("diff", ctx.game);
     let mut map = SourceMap::new();
     let mut load = |p: &PathBuf| -> Result<(Vec<u8>, nwscript::ncs::Program), Exit> {
         crate::working_on(display_name(p));

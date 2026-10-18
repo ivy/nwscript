@@ -4,7 +4,6 @@ use super::Ctx;
 use crate::Exit;
 use crate::cli::Format;
 use crate::io::{display_name, read_input, write_output};
-use nwscript::Envelope;
 use nwscript::bytecode::{self, PrintOptions};
 use nwscript::diag::SourceMap;
 use std::path::PathBuf;
@@ -58,7 +57,7 @@ pub fn disasm(ctx: &Ctx, args: &DisasmArgs) -> Exit {
             return Exit::Usage;
         }
     };
-    let mut env = Envelope::new("disasm", ctx.game);
+    let mut env = super::envelope("disasm", ctx.game);
     env.inputs.push(input);
     let mut map = SourceMap::new();
     // Routine names come from nwscript.nss when one resolves: --nwscript,
@@ -148,7 +147,7 @@ pub fn asm(ctx: &Ctx, args: &AsmArgs) -> Exit {
             return Exit::Usage;
         }
     };
-    let mut env = Envelope::new("asm", ctx.game);
+    let mut env = super::envelope("asm", ctx.game);
     env.inputs.push(input);
     let mut map = SourceMap::new();
     match bytecode::assemble(&display_name(&args.input), &text, &mut map) {

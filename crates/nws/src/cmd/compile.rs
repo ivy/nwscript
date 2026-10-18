@@ -6,7 +6,7 @@ use crate::cli::Format;
 use crate::io::{display_name, read_input, write_output};
 use nwscript::diag::{Diagnostic, SourceMap, has_errors};
 use nwscript::ncs::asm::{PrintOptions, print};
-use nwscript::{Envelope, InputRecord, Resolver};
+use nwscript::{InputRecord, Resolver};
 use std::path::{Path, PathBuf};
 
 #[derive(clap::Args, Debug)]
@@ -86,7 +86,7 @@ pub fn run(ctx: &Ctx, args: &CompileArgs) -> Exit {
         eprintln!("error: cannot create `{}`: {e}", d.display());
         return Exit::Usage;
     }
-    let mut env = Envelope::new("compile", Some(game));
+    let mut env = super::envelope("compile", Some(game));
     let mut map = SourceMap::new();
     let mut checker = ctx.checker(game);
     let mut all: Vec<Diagnostic> = Vec::new();

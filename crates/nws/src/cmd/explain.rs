@@ -2,7 +2,6 @@
 
 use super::Ctx;
 use crate::Exit;
-use nwscript::Envelope;
 use nwscript::diag::{SourceMap, codes};
 
 pub fn run(ctx: &Ctx, code: &str) -> Exit {
@@ -10,7 +9,7 @@ pub fn run(ctx: &Ctx, code: &str) -> Exit {
         eprintln!("error: no diagnostic code `{code}`; codes look like E0001 or W0001");
         return Exit::Usage;
     };
-    let mut env = Envelope::new("explain", ctx.game);
+    let mut env = super::envelope("explain", ctx.game);
     env.result = serde_json::json!({
         "code": c.id,
         "severity": c.severity,

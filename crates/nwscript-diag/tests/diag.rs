@@ -82,3 +82,24 @@ fn lookup_is_case_insensitive() {
     assert_eq!(codes::lookup("e0001").map(|c| c.id), Some("E0001"));
     assert!(codes::lookup("E9999").is_none());
 }
+
+/// A second toolset's registry: its own prefix, its own explanation
+/// directory, declared through the same macro.
+mod other {
+    nwscript_diag::codes! {
+        dir "tests/explain";
+        T0001 Warning "a code registered by another crate";
+    }
+}
+
+#[test]
+fn another_crate_registers_its_own_codes() {
+    assert_eq!(other::ALL.len(), 1);
+    let c = codes::lookup_in(other::ALL, "t0001").unwrap();
+    assert_eq!(c.id, "T0001");
+    assert_eq!(c.severity, Severity::Warning);
+    assert!(c.explanation.contains("another crate"));
+    // The two registries are disjoint: neither answers for the other.
+    assert!(codes::lookup("T0001").is_none());
+    assert!(codes::lookup_in(other::ALL, "E0001").is_none());
+}

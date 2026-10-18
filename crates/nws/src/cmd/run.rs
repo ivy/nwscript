@@ -3,7 +3,6 @@
 use super::Ctx;
 use crate::Exit;
 use crate::io::{display_name, read_input};
-use nwscript::Envelope;
 use nwscript::diag::SourceMap;
 use nwscript::snapshot::{self, EngineKind, WorldSpec};
 use std::path::PathBuf;
@@ -98,7 +97,7 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
             return Exit::Usage;
         }
     };
-    let mut env = Envelope::new("run", Some(game));
+    let mut env = super::envelope("run", Some(game));
     env.inputs.push(input);
     env.inputs
         .extend(nwscript::Resolver::inputs(&resolver).iter().cloned());

@@ -4,7 +4,7 @@ use super::Ctx;
 use crate::Exit;
 use crate::io::{display_name, read_input};
 use nwscript::diag::SourceMap;
-use nwscript::{Envelope, InputRecord, Resolver};
+use nwscript::{InputRecord, Resolver};
 use std::path::{Path, PathBuf};
 
 #[derive(clap::Args, Debug)]
@@ -38,7 +38,7 @@ pub fn run(ctx: &Ctx, args: &CheckArgs) -> Exit {
         Ok(g) => g,
         Err(e) => return e,
     };
-    let mut env = Envelope::new("check", Some(game));
+    let mut env = super::envelope("check", Some(game));
     let mut map = SourceMap::new();
     let mut checker = ctx.checker(game);
     let mut diags = Vec::new();

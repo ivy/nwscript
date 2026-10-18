@@ -11,7 +11,6 @@ use super::Ctx;
 use crate::Exit;
 use crate::cli::Format;
 use crate::io::{display_name, read_input, write_output};
-use nwscript::Envelope;
 use nwscript::decompile::{CompileError, Compiler, Status};
 use nwscript::diag::SourceMap;
 use nwscript::sema::EngineTable;
@@ -183,8 +182,12 @@ fn engine_table(ctx: &Ctx, resolver: &mut nwscript::FsResolver) -> Result<Engine
         diags.extend(table.overlay(file, bytes));
     }
     if nwscript::diag::has_errors(&diags) {
-        ctx.out
-            .emit(Envelope::new("decompile", ctx.game), "", &diags, &table_map);
+        ctx.out.emit(
+            super::envelope("decompile", ctx.game),
+            "",
+            &diags,
+            &table_map,
+        );
         return Err(Exit::Errors);
     }
     Ok(table)
@@ -260,7 +263,7 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
             return Exit::Usage;
         }
     };
-    let mut env = Envelope::new("decompile", ctx.game);
+    let mut env = super::envelope("decompile", ctx.game);
     env.inputs.push(input);
     let dir = args
         .input
@@ -488,7 +491,7 @@ fn report(ctx: &Ctx, args: &Args) -> Exit {
         return Exit::Usage;
     }
     let root = &args.input;
-    let mut env = Envelope::new("decompile", ctx.game);
+    let mut env = super::envelope("decompile", ctx.game);
     let mut resolver = ctx.resolver(None);
     let table = match engine_table(ctx, &mut resolver) {
         Ok(t) => t,

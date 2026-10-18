@@ -2,7 +2,6 @@
 
 use super::Ctx;
 use crate::Exit;
-use nwscript::Envelope;
 use nwscript::diag::SourceMap;
 use nwscript::sema::{EngineTable, Function, Type};
 use std::path::PathBuf;
@@ -88,7 +87,7 @@ pub fn run(ctx: &Ctx, args: &Args) -> Exit {
             return Exit::Usage;
         }
     };
-    let mut env = Envelope::new("fn", ctx.game);
+    let mut env = super::envelope("fn", ctx.game);
     env.inputs
         .extend(nwscript::Resolver::inputs(&resolver).iter().cloned());
     let entry = |n: usize, f: &Function| {

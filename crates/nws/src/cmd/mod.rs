@@ -18,6 +18,11 @@ use nwscript::diag::{Diagnostic, Level, Levels, SourceMap, codes, has_errors};
 use nwscript::modes::Mode;
 use nwscript::{Envelope, FsResolver, Game};
 
+/// The envelope of an `nws` command.
+pub fn envelope(command: &str, game: Option<Game>) -> Envelope {
+    Envelope::new("nws", env!("CARGO_PKG_VERSION"), command, game)
+}
+
 /// What every command receives: the profile, lint levels, and where output goes.
 pub struct Ctx {
     pub game: Option<Game>,
