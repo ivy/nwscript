@@ -58,6 +58,9 @@ pub struct Plan {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Step {
     pub phase: Phase,
+    /// The line of the list entry the operation comes from: its name in a
+    /// report. 0 for the TLK append, which no one entry names.
+    pub line: u32,
     #[serde(flatten)]
     pub op: Operation,
 }
@@ -94,6 +97,8 @@ pub enum Operation {
     /// Edit or create a GFF file.
     Gff {
         file: String,
+        /// `!SourceFile`, or `file`: the name to take from tslpatchdata.
+        source: String,
         destination: Destination,
         name: String,
         replace_file: bool,
@@ -159,6 +164,7 @@ impl Plan {
             );
             plan.steps.push(Step {
                 phase: Phase::Tlk,
+                line: tlk.appends.first().map_or(0, |a| a.line),
                 op: Operation::TlkAppend {
                     file: file_name,
                     tokens: tlk.appends.clone(),
@@ -168,6 +174,7 @@ impl Plan {
         for r in &tlk.replacements {
             plan.steps.push(Step {
                 phase: Phase::Tlk,
+                line: r.line,
                 op: Operation::TlkReplace {
                     file: r.file.clone(),
                     entries: r.entries.clone(),
@@ -179,6 +186,7 @@ impl Plan {
             for f in &folder.files {
                 plan.steps.push(Step {
                     phase: Phase::Install,
+                    line: f.line,
                     op: Operation::InstallFile {
                         source: f.source_file.clone().unwrap_or_else(|| f.name.clone()),
                         destination: folder.destination.clone(),
@@ -199,6 +207,7 @@ impl Plan {
                 );
                 plan.steps.push(Step {
                     phase: Phase::TwoDa,
+                    line: op.line,
                     op: Operation::Table {
                         file: table.file.clone(),
                         key: op.key.clone(),
@@ -233,8 +242,10 @@ impl Plan {
             }
             plan.steps.push(Step {
                 phase: Phase::Gff,
+                line: g.line,
                 op: Operation::Gff {
                     file: g.file.clone(),
+                    source: g.source_file.clone().unwrap_or_else(|| g.file.clone()),
                     destination: g.destination.clone().unwrap_or_else(override_folder),
                     name: g
                         .save_as
@@ -257,6 +268,7 @@ impl Plan {
             check(reads, Vec::new(), issues);
             plan.steps.push(Step {
                 phase: Phase::Hack,
+                line: h.line,
                 op: Operation::Hack {
                     file: h.file.clone(),
                     destination: h.destination.clone().unwrap_or_else(override_folder),
@@ -273,6 +285,7 @@ impl Plan {
                 .unwrap_or_else(|| replace_extension(&s.file, "ncs"));
             plan.steps.push(Step {
                 phase: Phase::Compile,
+                line: s.line,
                 op: Operation::Compile {
                     file: s.file.clone(),
                     destination: s
@@ -295,6 +308,7 @@ impl Plan {
             check(reads, Vec::new(), issues);
             plan.steps.push(Step {
                 phase: Phase::Ssf,
+                line: s.line,
                 op: Operation::Ssf {
                     file: s.file.clone(),
                     replace: s.replace,
@@ -480,6 +494,7 @@ impl fmt::Display for Operation {
             }
             Operation::Gff {
                 file,
+                source: _,
                 destination,
                 name,
                 replace_file,

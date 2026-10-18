@@ -6,7 +6,7 @@
 //!
 //! Ranges: `RE00xx` inputs and invocation, `RE01xx` resource identity
 //! (`rakata-res`), `RE02xx` archives (`rakata-archive`), `RE03xx` and
-//! `RW03xx` the installer's change files (`rakata-patch`), `RE04xx` the
+//! `RW03xx` the installer, its change files and its run (`rakata-patch`), `RE04xx` the
 //! install (`rakata-game`), `RE05xx` the round-trip suite
 //! ([`crate::conformance`]), `RE06xx` GFF (`rakata-gff`), `RE07xx` tables
 //! (`rakata-2da`), `RE08xx` the talk table (`rakata-tlk`), `RE09xx` lip-sync
@@ -42,6 +42,15 @@ nwscript_diag::codes! {
     RW0302 Warning "a key the section does not take";
     RW0303 Warning "a section or key written twice";
     RW0304 Warning "a memory token read before anything sets it";
+    RE0305 Error "a write the read-back did not find: the target holds other bytes";
+    RE0306 Error "a file or capsule the installer could not write or read back";
+    RE0307 Error "a file an install operation needs that nothing holds";
+    RE0308 Error "a file an install operation edits that does not parse";
+    RE0309 Error "an install operation that cannot apply as written";
+    RE0310 Error "a script of [CompileList] that does not compile";
+    RE0311 Error "a memory token read during the install that has no value";
+    RE0312 Error "a file [Settings] requires that is not installed";
+    RW0305 Warning "a `File#` entry skipped because its destination holds the file";
     RE0401 Error "not a game install: no chitin.key";
     RE0402 Error "a BIF the KEY names is missing from the install";
     RE0403 Error "no module capsule carries the name";

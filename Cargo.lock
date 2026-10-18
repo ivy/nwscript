@@ -1137,8 +1137,17 @@ dependencies = [
 name = "rakata-patch"
 version = "0.0.0"
 dependencies = [
+ "nwscript",
+ "nwscript-diag",
+ "rakata-2da",
+ "rakata-archive",
+ "rakata-game",
+ "rakata-gff",
+ "rakata-res",
+ "rakata-tlk",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

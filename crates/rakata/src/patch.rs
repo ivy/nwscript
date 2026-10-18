@@ -1,6 +1,7 @@
-//! The installer's reader through the façade: `rakata-patch` as it is, and
-//! the turn of its [`Issue`]s into diagnostics with spans into the files it
-//! read, under the codes this crate registers.
+//! The installer through the façade: `rakata-patch` as it is, the turn of
+//! its reader's [`Issue`]s into diagnostics with spans into the files it
+//! read, and of an install's [`Report`] into diagnostics naming each
+//! operation, under the codes this crate registers.
 
 pub use rakata_patch::*;
 
@@ -30,6 +31,38 @@ pub fn diagnostics(loaded: &Loaded, map: &mut SourceMap) -> Vec<Diagnostic> {
             }
         })
         .collect()
+}
+
+/// One diagnostic per issue of every operation in `report`, each naming
+/// the operation, and one for what stopped the install, if anything did.
+/// `changes` is the changes file in `map`, for a span on the operation's line.
+pub fn report_diagnostics(report: &Report, changes: Option<(FileId, &[u8])>) -> Vec<Diagnostic> {
+    let code_of = |id: &str| {
+        crate::codes::lookup(id).unwrap_or_else(|| panic!("installer code {id} is not registered"))
+    };
+    let mut out = Vec::new();
+    if let Some(f) = &report.failure {
+        out.push(Diagnostic::new(code_of(f.code), f.message.clone()));
+    }
+    for r in &report.records {
+        for issue in &r.issues {
+            let msg = if issue.message.contains(&r.name()) {
+                issue.message.clone()
+            } else {
+                format!("{}: {}", r.name(), issue.message)
+            };
+            let d = Diagnostic::new(code_of(issue.code), msg);
+            let d = match changes {
+                Some((id, bytes)) if r.line > 0 => {
+                    let (start, end) = line_span(bytes, r.line);
+                    d.primary(Span::new(id, start, end), "")
+                }
+                _ => d,
+            };
+            out.push(d);
+        }
+    }
+    out
 }
 
 /// Byte offsets of one-based `line` in `bytes`, without its line ending.

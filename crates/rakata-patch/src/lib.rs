@@ -10,20 +10,25 @@
 //! installer's folder. Findings are [`Issue`]s under codes the `rakata`
 //! façade registers; nothing here builds one from rendered text.
 //!
-//! The executor, which applies a plan to a game and reports what it finds in
-//! the tree afterwards, is the next piece and is not here.
+//! The [`exec`] module applies a plan to a game install: TSLPatcher's
+//! phases in its order, every write read back, and a [`Report`] of what the
+//! tree holds afterwards. [`ssf`] is KotOR's soundset, read and written for
+//! `[SSFList]`.
 
 #![forbid(unsafe_code)]
 
 pub mod changes;
+pub mod exec;
 pub mod ini;
 pub mod issue;
 pub mod load;
 pub mod namespaces;
 pub mod plan;
+pub mod ssf;
 pub mod value;
 
 pub use changes::Changes;
+pub use exec::{Executor, Failure, Outcome, Record, Report, Target, Tokens};
 pub use ini::Ini;
 pub use issue::{Issue, codes};
 pub use load::{LoadError, Loaded, Source, load};

@@ -1,6 +1,6 @@
 [package]
 name = "rakata-patch"
-description = "TSLPatcher's changes.ini and namespaces.ini: the reader, the typed model, and the install plan."
+description = "TSLPatcher's changes.ini and namespaces.ini: the reader, the typed model, the install plan, and the executor that applies it and reads back every write."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,10 +8,19 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+nwscript = { workspace = true }
+nwscript-diag = { workspace = true }
+rakata-2da = { workspace = true }
+rakata-archive = { workspace = true }
+rakata-game = { workspace = true }
+rakata-gff = { workspace = true }
+rakata-res = { workspace = true }
+rakata-tlk = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
 serde_json = "1"
+tempfile = "3"
 
 [lints]
 workspace = true
