@@ -484,14 +484,20 @@ fn unpack_rle(
     count: usize,
     bpp: usize,
 ) -> Result<(Vec<u8>, Vec<u8>, usize)> {
-    let mut out = Vec::with_capacity(count * bpp);
-    let mut heads = Vec::new();
-    let mut at = 0;
     let truncated = |at: usize| Error::TgaTruncated {
         what: "run-length packets",
         needed: start + at,
         available: start + data.len(),
     };
+    // A packet is a head and at least one pixel and gives at most 128
+    // pixels, so fewer bytes than that cannot hold the image.
+    let least = count.div_ceil(128) * (1 + bpp);
+    if data.len() < least {
+        return Err(truncated(least));
+    }
+    let mut out = Vec::with_capacity(count * bpp);
+    let mut heads = Vec::new();
+    let mut at = 0;
     while out.len() < count * bpp {
         let head = *data.get(at).ok_or_else(|| truncated(at + 1))?;
         at += 1;
