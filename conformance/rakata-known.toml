@@ -13,12 +13,6 @@ writer = "the installer modshop's build runs over its mods (HoloPatcher); measur
 description = "the ERF header's offset to the localized string list (0x14) is 0 where BioWare writes 160 (the header's length, the list being empty), the build year and day (0x20, 0x24) are 0 where BioWare writes 103 and the day, and the description strref (0x28) is 0xFFFFFFFF where BioWare's files carry uninitialised memory; keys, resources and members are laid out as BioWare lays them"
 recognised = "erf: strings at 0, keys at 160, resources at *, build 0/0, strref 0xffffffff"
 
-[variant.2da-nul-ended-names]
-format = "2da"
-writer = "BioWare, for the tables inside rims/global.rim and rims/miniglobal.rim (13 members each, the same bytes in both; measured on the vanilla KotOR 1 install, where the build's copies are identical to vanilla's)"
-description = "each column name and each row label ends in a NUL (0x00) where the members of data/2da.bif end them in a tab (0x09), the column list still closing with one more NUL; the row count, the offsets, the size field and the strings are as BioWare lays them in 2da.bif, so the written file differs only in those terminators"
-recognised = "2da: NUL-ended names, *"
-
 [variant.2da-zero-size-unordered-strings]
 format = "2da"
 writer = "an editor used by some of the build's mods (measured on two loose tables of the build's Override/; modshop's patches README counts five mods shipping the size-0 header)"
