@@ -6,8 +6,10 @@ mod archive;
 mod lip;
 mod tlk;
 mod twoda;
+mod gff;
 
 pub use archive::Archive;
 pub use lip::Lip;
 pub use tlk::Tlk;
 pub use twoda::TwoDa;
+pub use gff::Gff;

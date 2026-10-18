@@ -11,6 +11,8 @@
 //! ([`crate::conformance`]), `RE07xx` tables (`rakata-2da`), `RE08xx` the
 //! talk table (`rakata-tlk`), `RE09xx` lip-sync files (`rakata-lip`). Each
 //! format crate takes a range of its own as it lands.
+//! ([`crate::conformance`]), `RE06xx` GFF (`rakata-gff`). Each format crate
+//! takes a range of its own as it lands.
 
 pub use nwscript_diag::codes::Code;
 
@@ -43,6 +45,14 @@ nwscript_diag::codes! {
     RE0404 Error "no layer of the install holds the resource";
     RW0401 Warning "Override files that differ only in case";
     RE0501 Error "a directory that is not a game install";
+    RE0601 Error "not a GFF V3.2 file";
+    RE0602 Error "a GFF section or field lying beyond the end of the file";
+    RE0603 Error "a GFF struct, field or label index out of range";
+    RE0604 Error "a GFF field type id that names no type";
+    RE0605 Error "a GFF too large for 32-bit offsets";
+    RE0606 Error "a field path that does not parse";
+    RE0607 Error "a field path naming nothing in the file";
+    RE0608 Error "a GFF label or resref longer than sixteen bytes";
     RE0502 Error "a round trip wrote bytes the format's own reader rejects";
     RE0701 Error "not a 2DA V2.b table";
     RE0702 Error "a 2DA header running past the end of the file";

@@ -14,6 +14,7 @@ rakata-archive = { workspace = true }
 rakata-2da = { workspace = true }
 rakata-game = { workspace = true }
 rakata-lip = { workspace = true }
+rakata-gff = { workspace = true }
 rakata-res = { workspace = true }
 rakata-patch = { workspace = true }
 rakata-tlk = { workspace = true }

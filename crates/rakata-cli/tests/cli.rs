@@ -188,11 +188,11 @@ fn conformance_with_an_unknown_format_is_a_usage_error() {
             dir.to_str().unwrap(),
             "conformance",
             "--only",
-            "gff",
+            "nope",
         ])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("no format `gff`"));
+        .stderr(predicate::str::contains("no format `nope`"));
 }
 
 #[test]
