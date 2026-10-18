@@ -15,6 +15,8 @@ mod explain;
 mod index;
 pub use index::IndexArgs;
 mod install;
+mod plot;
+pub use plot::{FlagsArgs, QuestArgs};
 mod refs;
 pub use refs::RefsArgs;
 mod lint;
@@ -188,6 +190,8 @@ pub fn run(cli: Cli) -> Exit {
         Command::Diff(args) => diff::run(&ctx, &args),
         Command::Index(args) => index::run(&ctx, &args),
         Command::Refs(args) => refs::run(&ctx, &args),
+        Command::Flags(args) => plot::flags(&ctx, &args),
+        Command::Quest(args) => plot::quest(&ctx, &args),
         Command::Lint(args) => lint::run(&ctx, &args),
         Command::Which {
             name,

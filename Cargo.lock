@@ -1151,6 +1151,8 @@ version = "0.0.0"
 dependencies = [
  "assert_cmd",
  "clap",
+ "nwscript-diag",
+ "nwscript-ncs",
  "predicates",
  "rakata",
  "rakata-archive",

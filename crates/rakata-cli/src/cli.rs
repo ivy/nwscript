@@ -40,6 +40,9 @@ Examples:
   rakata index query \"SELECT * FROM refs WHERE value = 'k_pman_aioff'\"
   rakata lua build.lua OUT --game DIR     a Lua script over the façade, writing below OUT
   rakata refs 42724 --kind strref          what refers to a strref, and where each lies
+  rakata flags k37_inv_statue --module korr_m37aa
+                                           who writes and reads an object's local flags
+  rakata quest kor37_ajuntapall            a quest's entries with what writes each, linted
   rakata lint --game DIR --known conformance/tree-known.toml
                                            dangling references, strrefs past the TLK, Override faults
 
@@ -189,6 +192,10 @@ pub enum Command {
     Index(crate::cmd::IndexArgs),
     /// Every reference to a strref, resref, tag or global, or every reference a resource makes, from the index.
     Refs(crate::cmd::RefsArgs),
+    /// Who writes and reads an object's local flags or a global, with values and sites, from the index.
+    Flags(crate::cmd::FlagsArgs),
+    /// A quest's journal entries in order, with what writes each, what removes it, and the quest lints, from the index.
+    Quest(crate::cmd::QuestArgs),
     /// The tree lints: references that resolve to nothing, strrefs past the talk table, case-variant and .tpc-shadowed Override files.
     Lint(crate::cmd::LintArgs),
 }
