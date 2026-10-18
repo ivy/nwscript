@@ -25,7 +25,16 @@ FORBIDDEN = [
     r"nwnrs",
     r"holocron",
 ]
-PATTERN = re.compile("|".join(FORBIDDEN), re.IGNORECASE)
+NAMES = "|".join(FORBIDDEN)
+# A path or a glob names a project if the word appears anywhere in it.
+PATTERN = re.compile(NAMES, re.IGNORECASE)
+# A command or a query names a project only where it would reach its source: as a path segment, a Python import or
+# a module run. A command that merely mentions the word (editing a document that says "PyKotor", `grep -v pykotor`)
+# reads nothing.
+COMMAND_PATTERN = re.compile(
+    rf"[/\\][^\s/\\]*(?:{NAMES})|(?:{NAMES})[^\s/\\]*[/\\]|(?:import|from|-m)\s+(?:{NAMES})",
+    re.IGNORECASE,
+)
 
 # What each tool reads, as the fields of tool_input to inspect.
 FIELDS = {
@@ -62,13 +71,16 @@ def main() -> None:
         return
     tool = event.get("tool_name", "")
     tool_input = event.get("tool_input") or {}
-    texts: list[str] = []
     if tool.startswith("mcp__codebase-memory__"):
-        texts = [json.dumps(tool_input)]
+        # The project id is a path with its separators turned to dashes; the rest is a query.
+        rest = {k: v for k, v in tool_input.items() if k != "project"}
+        checks = [(PATTERN, str(tool_input.get("project", ""))), (COMMAND_PATTERN, json.dumps(rest))]
+    elif tool == "Bash":
+        checks = [(COMMAND_PATTERN, str(tool_input.get("command", "")))]
     else:
-        texts = [str(tool_input.get(f, "")) for f in FIELDS.get(tool, [])]
-    for text in texts:
-        hit = PATTERN.search(text)
+        checks = [(PATTERN, str(tool_input.get(f, ""))) for f in FIELDS.get(tool, [])]
+    for pattern, text in checks:
+        hit = pattern.search(text)
         if hit:
             deny(
                 f"clean room (AGENTS.md): `{hit.group(0)}` names a reference project whose source may not be read. "
