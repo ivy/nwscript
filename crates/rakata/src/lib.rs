@@ -18,6 +18,7 @@ pub mod index;
 pub mod inspect;
 pub mod lint;
 pub mod patch;
+pub mod plot;
 pub mod save;
 pub mod show;
 

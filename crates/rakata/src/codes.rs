@@ -174,6 +174,12 @@ nwscript_diag::codes! {
     RW2001 Warning "a decompiled script some of whose functions did not verify";
     RW2002 Warning "a 2DA a shown value names that the install lacks or that does not read";
     RW2003 Warning "a blueprint an instance or inventory names that no layer holds";
+    RE2101 Error "an index holding several trees, none named, or none at all";
+    RE2102 Error "a quest global.jrl has no category for, or a tree without global.jrl";
+    RW2101 Warning "a journal entry nothing in the index writes";
+    RW2102 Warning "a write naming a journal entry its category lacks";
+    RW2103 Warning "a player reply doing what a sibling reply that writes the quest does, writing no entry";
+    RW2104 Warning "a flags symbol no object in scope bears and no global declares";
 }
 
 /// The rakata code with this id, if registered; case does not matter.
