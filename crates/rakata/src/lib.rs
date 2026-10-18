@@ -28,6 +28,7 @@ pub use rakata_2da as twoda;
 pub use rakata_game as game;
 pub use rakata_gff as gff;
 pub use rakata_lip as lip;
+pub use rakata_lyt as lyt;
 pub use rakata_mdl as mdl;
 pub use rakata_res as res;
 pub use rakata_texture as texture;
