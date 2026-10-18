@@ -15,8 +15,9 @@ use rakata_lua::{Options, Print};
 #[derive(Args, Debug)]
 #[command(after_help = "\
 The script gets the global `rakata`: Install and Mod, the formats (twoda, gff,
-lip, tlk), dialog with stable node keys, the authoring operations (author), and
-errors as rakata.Error values carrying their codes. rakata.args holds the
+lip, tlk), the assets (txi, tpc, tga, lyt, vis, walkmesh, mdl), dialog with
+stable node keys, the authoring operations (author), and errors as
+rakata.Error values carrying their codes. rakata.args holds the
 arguments after the script's name; put `--` before one that begins with `-`.
 `rakata lua --reference` prints the whole API.
 
