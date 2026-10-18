@@ -217,6 +217,9 @@ nwscript_diag::codes! {
     RE2411 Error "the loader failed reading a model of a supermodel chain";
     RE2412 Error "the model a supermodel chain starts from is not found";
     RE2413 Error "models given as a supermodel chain out of the order their supermodels name";
+    RE2414 Error "a model structure the owned model does not hold";
+    RE2415 Error "a model whose parts disagree, so the writer cannot lay it out";
+    RE2416 Error "a model too large for the format's offsets and counts";
 }
 
 /// The rakata code with this id, if registered; case does not matter.

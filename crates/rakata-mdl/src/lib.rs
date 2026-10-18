@@ -37,16 +37,24 @@
 mod animation;
 mod controller;
 mod error;
+mod file;
 mod lineage;
 mod model;
 mod skin;
 mod view;
+mod write;
 
 pub use animation::{ANIMATION_HEADER_LEN, Animation, EVENT_LEN, Event};
 pub use controller::{
     BEZIER, CONTROLLER_LEN, Controller, Key, controller_types, decompress_quaternion,
 };
 pub use error::{ChainError, Error, Result, codes};
+pub use file::{
+    AABB_ENTRY_LEN, AABB_HEADER_LEN, AabbEntry, AnimationFile, Body, DANGLY_HEADER_LEN, DanglyFile,
+    EMITTER_HEADER_LEN, LIGHT_HEADER_LEN, LightFile, MODEL_HEADER_LEN, MdxBlock, MeshFile,
+    MeshKind, ModelFile, NodeFile, NodePointer, REFERENCE_HEADER_LEN, SABER_HEADER_LEN, SaberFile,
+    SkinFile,
+};
 pub use lineage::{Chain, Lineage, ModelFiles, supermodel_name};
 pub use model::{
     BoundingBox, Classification, FILE_HEADER_LEN, MESH_HEADER_LEN, Mesh, Model, NODE_HAS_MESH,

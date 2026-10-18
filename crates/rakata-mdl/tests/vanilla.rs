@@ -24,7 +24,8 @@ use rakata_game::{Install, ModuleName, Profile};
 use rakata_gff::{Gff, Value};
 use rakata_lyt::Lyt;
 use rakata_mdl::{
-    Chain, Controller, Lineage, Model, Node, NodeKind, Quaternion, controller_types, mdx_flags,
+    Chain, Controller, Lineage, Model, ModelFile, Node, NodeKind, Quaternion, controller_types,
+    mdx_flags,
 };
 use rakata_res::{ResId, ResRef, ResType};
 
@@ -641,6 +642,42 @@ fn every_vanilla_model_parses() {
     assert!(c.flags_disagree.is_empty());
     assert!(c.index_list_not_faces.is_empty());
     assert_eq!(c.not_unit, 0);
+}
+
+/// Every vanilla model, read as a [`ModelFile`] and written again, gives
+/// back its MDL and its MDX byte for byte.
+#[test]
+fn every_vanilla_model_writes_back_byte_for_byte() {
+    let Some(root) = game() else { return };
+    let (mut models, mut failed) = (0, Vec::new());
+    each_model(&root, |name, mdl, mdx| {
+        models += 1;
+        let outcome = ModelFile::parse(mdl, mdx).and_then(|m| m.to_bytes());
+        match outcome {
+            Ok((w_mdl, w_mdx)) if w_mdl == mdl && w_mdx == mdx => {}
+            Ok((w_mdl, w_mdx)) => {
+                let first = |a: &[u8], b: &[u8]| {
+                    a.iter()
+                        .zip(b)
+                        .position(|(x, y)| x != y)
+                        .unwrap_or(a.len().min(b.len()))
+                };
+                failed.push(format!(
+                    "{name}: MDL {} read, {} written, first difference at {}; MDX {} read, {} written, first difference at {}",
+                    mdl.len(),
+                    w_mdl.len(),
+                    first(mdl, &w_mdl),
+                    mdx.len(),
+                    w_mdx.len(),
+                    first(mdx, &w_mdx)
+                ));
+            }
+            Err(e) => failed.push(format!("{name}: {e}")),
+        }
+    });
+    println!("{models} models written, {} not identical", failed.len());
+    show("not identical", &failed);
+    assert!(failed.is_empty(), "{} models differ", failed.len());
 }
 
 fn install() -> Option<Install> {

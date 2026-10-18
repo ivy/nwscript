@@ -34,6 +34,12 @@ pub mod codes {
     pub const MODEL_NOT_FOUND: &str = "RE2412";
     /// Models given as a chain whose next is not the supermodel named.
     pub const BAD_LINEAGE: &str = "RE2413";
+    /// A node of a kind the owned model does not hold.
+    pub const UNSUPPORTED: &str = "RE2414";
+    /// A model whose parts disagree, so the writer cannot lay it out.
+    pub const INCONSISTENT: &str = "RE2415";
+    /// A model too large for the format's offsets and counts.
+    pub const TOO_LARGE: &str = "RE2416";
 }
 
 /// An error in reading a model.
@@ -134,6 +140,24 @@ pub enum Error {
         /// The name of the model that follows it.
         next: String,
     },
+    /// A structure the owned model does not hold: a node whose flags name
+    /// no kind it knows the length of.
+    Unsupported {
+        /// What and where.
+        what: String,
+    },
+    /// Parts of a model that disagree, such as a vertex count and the
+    /// length of the vertices: the writer cannot lay them out.
+    Inconsistent {
+        /// What disagrees.
+        what: String,
+    },
+    /// A model that does not fit the format: an offset past 32 bits or a
+    /// count past the width of its field.
+    TooLarge {
+        /// What overflows.
+        what: String,
+    },
 }
 
 /// This crate's result type.
@@ -155,6 +179,9 @@ impl Error {
             Error::SupermodelCycle { .. } => codes::SUPERMODEL_CYCLE,
             Error::ModelNotFound { .. } => codes::MODEL_NOT_FOUND,
             Error::BadLineage { .. } => codes::BAD_LINEAGE,
+            Error::Unsupported { .. } => codes::UNSUPPORTED,
+            Error::Inconsistent { .. } => codes::INCONSISTENT,
+            Error::TooLarge { .. } => codes::TOO_LARGE,
         }
     }
 }
@@ -225,6 +252,9 @@ impl fmt::Display for Error {
                     "model `{model}` has no supermodel and is followed by `{next}`"
                 ),
             },
+            Error::Unsupported { what } => write!(f, "not a structure this crate holds: {what}"),
+            Error::Inconsistent { what } => write!(f, "the model's parts disagree: {what}"),
+            Error::TooLarge { what } => write!(f, "the model does not fit the format: {what}"),
         }
     }
 }
