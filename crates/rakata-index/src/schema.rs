@@ -149,7 +149,7 @@ CREATE INDEX cells_hash ON cells(hash);
 CREATE INDEX strings_hash ON strings(hash, strref);
 CREATE INDEX calls_hash ON calls(hash);
 CREATE INDEX calls_routine ON calls(routine);
-CREATE INDEX resolved_calls_hash ON resolved_calls(hash);
+CREATE INDEX resolved_calls_hash ON resolved_calls(hash, offset);
 CREATE INDEX resolved_calls_routine ON resolved_calls(routine);
 CREATE INDEX script_strings_hash ON script_strings(hash);
 CREATE INDEX script_strings_value ON script_strings(value);
