@@ -2,9 +2,13 @@
 //! (the BIFs the KEY names, the capsules under `modules/` and `rims/` with
 //! their `dx` partners, `patch.erf`, and loose files in `Override/`) is
 //! read with its MDX, and what the layout leaves open is counted: node
-//! kinds, classifications, the MDX attribute layouts, the flags. A second
-//! test reads every room, door and placeable model the Endar Spire's first
-//! area, `end_m01aa`, uses. Run with `--nocapture` to see the counts.
+//! kinds, classifications, the MDX attribute layouts, the flags, the
+//! animations and their controllers by type, the compressed orientation
+//! keys, and the skins. Further tests resolve every supermodel chain,
+//! read the four character skeletons (`s_male01`, `s_male02`,
+//! `s_female01`, `s_female02`) through theirs, and read every room, door
+//! and placeable model the Endar Spire's first area, `end_m01aa`, uses.
+//! Run with `--nocapture` to see the counts.
 //!
 //! Reads the user's own install from `$RAKATA_GAME_K1` (the folder holding
 //! `chitin.key`) and skips, naming the variable, when it is unset. No game
@@ -19,7 +23,9 @@ use rakata_archive::{Bif, Erf, Key, Rim};
 use rakata_game::{Install, ModuleName, Profile};
 use rakata_gff::{Gff, Value};
 use rakata_lyt::Lyt;
-use rakata_mdl::{Model, NodeKind, mdx_flags};
+use rakata_mdl::{
+    Chain, Controller, Lineage, Model, Node, NodeKind, Quaternion, controller_types, mdx_flags,
+};
 use rakata_res::{ResId, ResRef, ResType};
 
 const GAME_VAR: &str = "RAKATA_GAME_K1";
@@ -203,6 +209,62 @@ struct Census {
     with_supermodel: usize,
     with_animations: usize,
     not_unit: usize,
+    supermodels: BTreeSet<String>,
+    animations: usize,
+    animation_nodes: usize,
+    events: BTreeMap<String, usize>,
+    controllers: BTreeMap<String, usize>,
+    compressed_keys: usize,
+    keys_past_length: Vec<String>,
+    rest_disagrees: Vec<String>,
+    first_orientation_at_rest: [usize; 2],
+    first_position_nearer: [usize; 2],
+    animation_nodes_unnamed_in_model: usize,
+    animation_roots_named_as_model: [usize; 2],
+    animation_trees_rooted_at_model_name: [usize; 2],
+    animation_node_kinds: BTreeMap<String, usize>,
+    fields: BTreeMap<String, usize>,
+    skins: usize,
+    bones: BTreeMap<usize, usize>,
+    weights_not_one: usize,
+    bad_influences: Vec<String>,
+    bind_disagrees: BTreeMap<String, usize>,
+    bind_agrees: usize,
+}
+
+fn same_rotation(a: Quaternion, b: Quaternion, tol: f32) -> bool {
+    let d = |s: f32| {
+        (a.w - s * b.w)
+            .abs()
+            .max((a.x - s * b.x).abs())
+            .max((a.y - s * b.y).abs())
+            .max((a.z - s * b.z).abs())
+    };
+    d(1.0).min(d(-1.0)) < tol
+}
+
+fn conj(q: Quaternion) -> Quaternion {
+    Quaternion {
+        w: q.w,
+        x: -q.x,
+        y: -q.y,
+        z: -q.z,
+    }
+}
+
+fn controller_label(c: &Controller<'_>) -> String {
+    format!(
+        "type {} columns {}{}",
+        c.kind,
+        c.columns,
+        if c.is_compressed() {
+            " (compressed)"
+        } else if c.is_bezier() {
+            " (bezier)"
+        } else {
+            ""
+        }
+    )
 }
 
 impl Census {
@@ -222,8 +284,42 @@ impl Census {
             .or_default() += 1;
         self.with_supermodel += m.supermodel.is_some() as usize;
         self.with_animations += !m.animations.is_empty() as usize;
+        if m.supermodel.is_some() {
+            let resref = name.rsplit('/').next().unwrap();
+            let resref = resref.split('.').next().unwrap().to_ascii_lowercase();
+            self.supermodels.insert(resref);
+        }
+        self.animations_of(name, &m);
+        self.skins_of(name, &m);
         for n in &m.nodes {
             self.nodes += 1;
+            for c in &n.controllers {
+                *self
+                    .controllers
+                    .entry(format!("geometry {}", controller_label(c)))
+                    .or_default() += 1;
+                if c.field != 0xFFFF {
+                    *self
+                        .fields
+                        .entry(format!("geometry type {} field {:#x}", c.kind, c.field))
+                        .or_default() += 1;
+                }
+            }
+            // The position and orientation controllers repeat the header.
+            if let Some(k) = n.controller(controller_types::POSITION) {
+                let k = k.vector_keys().unwrap().next().unwrap();
+                if k.value != n.position {
+                    self.rest_disagrees
+                        .push(format!("{name}/{}: position", n.name));
+                }
+            }
+            if let Some(k) = n.controller(controller_types::ORIENTATION) {
+                let k = k.orientation(0).unwrap();
+                if !same_rotation(k.value, n.orientation, 1e-5) {
+                    self.rest_disagrees
+                        .push(format!("{name}/{}: orientation", n.name));
+                }
+            }
             *self.kinds.entry(kind_name(n.kind)).or_default() += 1;
             let q = n.orientation;
             if ((q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z) - 1.0).abs() > 1e-3 {
@@ -286,6 +382,116 @@ impl Census {
     }
 }
 
+impl Census {
+    fn animations_of(&mut self, name: &str, m: &Model<'_>) {
+        for a in &m.animations {
+            self.animations += 1;
+            self.animation_roots_named_as_model[a.root.eq_ignore_ascii_case(m.name) as usize] += 1;
+            self.animation_trees_rooted_at_model_name
+                [a.nodes[0].name.eq_ignore_ascii_case(m.name) as usize] += 1;
+            for e in &a.events {
+                *self.events.entry(e.name.to_ascii_lowercase()).or_default() += 1;
+            }
+            for n in &a.nodes {
+                self.animation_nodes += 1;
+                *self
+                    .animation_node_kinds
+                    .entry(kind_name(n.kind))
+                    .or_default() += 1;
+                let rest: Option<&Node<'_>> = m.node(n.name);
+                if rest.is_none() {
+                    self.animation_nodes_unnamed_in_model += 1;
+                }
+                for c in &n.controllers {
+                    *self
+                        .controllers
+                        .entry(format!("animation {}", controller_label(c)))
+                        .or_default() += 1;
+                    *self
+                        .fields
+                        .entry(format!("animation type {} field {:#x}", c.kind, c.field))
+                        .or_default() += 1;
+                    if c.times().any(|t| t > a.length + 1e-4) {
+                        self.keys_past_length
+                            .push(format!("{name}/{}/{}", a.name, n.name));
+                    }
+                    if c.kind == controller_types::ORIENTATION {
+                        let keys: Vec<_> = c.orientation_keys().unwrap().collect();
+                        if c.is_compressed() {
+                            self.compressed_keys += keys.len();
+                            if let (Some(r), Some(k)) = (rest, keys.first()) {
+                                self.first_orientation_at_rest
+                                    [same_rotation(k.value, r.orientation, 3e-3) as usize] += 1;
+                            }
+                        }
+                    }
+                    if c.kind == controller_types::POSITION
+                        && let (Some(r), Some(k)) = (rest, c.vector_keys().unwrap().next())
+                        && r.position.iter().any(|x| x.abs() > 0.01)
+                    {
+                        let d0: f32 = k.value.iter().map(|x| x * x).sum();
+                        let dr: f32 = k
+                            .value
+                            .iter()
+                            .zip(r.position)
+                            .map(|(x, y)| (x - y) * (x - y))
+                            .sum();
+                        self.first_position_nearer[(d0 < dr) as usize] += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    fn skins_of(&mut self, name: &str, m: &Model<'_>) {
+        let xf = m.model_transforms();
+        for (i, n) in m.nodes.iter().enumerate() {
+            let Some(skin) = &n.skin else { continue };
+            self.skins += 1;
+            *self.bones.entry(skin.bones.len()).or_default() += 1;
+            let mesh = n.mesh.as_ref().unwrap();
+            for v in 0..skin.weights.len() {
+                let w = skin.weights.get(v).unwrap();
+                if (w.iter().sum::<f32>() - 1.0).abs() > 1e-3 {
+                    self.weights_not_one += 1;
+                }
+                let ix = skin.bone_indices.get(v).unwrap();
+                let inf = skin.influences(v).unwrap();
+                for k in 0..4 {
+                    if (ix[k] >= 0.0) != inf[k].is_some() {
+                        self.bad_influences
+                            .push(format!("{name}/{} vertex {v}", n.name));
+                    }
+                }
+            }
+            assert_eq!(skin.weights.len(), mesh.vertex_count);
+            // The bind transforms: from the skin node's coordinates to the
+            // bone's, as the geometry's rest pose has them.
+            let (mq, mt) = xf[i];
+            for &b in &skin.bones {
+                let Some(bi) = m.nodes.iter().position(|x| x.number == b) else {
+                    *self
+                        .bind_disagrees
+                        .entry(format!("{name}: bone not in the tree"))
+                        .or_default() += 1;
+                    continue;
+                };
+                let (bq, bt) = xf[bi];
+                let want_q = conj(bq) * mq;
+                let want_t = conj(bq).rotate([mt[0] - bt[0], mt[1] - bt[1], mt[2] - bt[2]]);
+                let q = skin.qbone(b).unwrap();
+                let t = skin.tbone(b).unwrap();
+                let t_ok = t.iter().zip(want_t).all(|(a, b)| (a - b).abs() < 1e-3);
+                if same_rotation(q, want_q, 1e-3) && t_ok {
+                    self.bind_agrees += 1;
+                } else {
+                    *self.bind_disagrees.entry(name.to_owned()).or_default() += 1;
+                }
+            }
+        }
+    }
+}
+
 fn show(label: &str, v: &[String]) {
     println!("{label}: {}", v.len());
     for s in v.iter().take(8) {
@@ -332,9 +538,105 @@ fn every_vanilla_model_parses() {
         "index lists that are not the faces' vertices",
         &c.index_list_not_faces,
     );
+    println!(
+        "animations: {}, with {} nodes ({} named by no node of their own model)",
+        c.animations, c.animation_nodes, c.animation_nodes_unnamed_in_model
+    );
+    table(
+        "controllers (where, type, columns) per controller",
+        &c.controllers,
+    );
+    table("animation node kinds", &c.animation_node_kinds);
+    println!(
+        "animation root field naming the model: {} of {}; animation trees whose root is named as the model: {} of {}",
+        c.animation_roots_named_as_model[1],
+        c.animations,
+        c.animation_trees_rooted_at_model_name[1],
+        c.animations
+    );
+    let fields: BTreeMap<String, usize> = c
+        .fields
+        .iter()
+        .filter(|(k, _)| {
+            k.contains("type 8 ") || k.contains("type 20 ") || k.starts_with("geometry")
+        })
+        .map(|(k, v)| (k.clone(), *v))
+        .collect();
+    table(
+        "the u16 after the controller type, position and orientation (and any not 0xFFFF in geometry)",
+        &fields,
+    );
+    println!(
+        "other animation controllers with the u16 0xFFFF: {} of {}",
+        c.fields
+            .iter()
+            .filter(|(k, _)| k.ends_with("0xffff")
+                && !k.contains("type 8 ")
+                && !k.contains("type 20 "))
+            .map(|(_, v)| v)
+            .sum::<usize>(),
+        c.fields
+            .iter()
+            .filter(|(k, _)| k.starts_with("animation")
+                && !k.contains("type 8 ")
+                && !k.contains("type 20 "))
+            .map(|(_, v)| v)
+            .sum::<usize>()
+    );
+    println!("compressed orientation keys: {}", c.compressed_keys);
+    println!(
+        "first compressed key within 0.003 of the node's rest orientation: {} of {}",
+        c.first_orientation_at_rest[1],
+        c.first_orientation_at_rest[0] + c.first_orientation_at_rest[1]
+    );
+    println!(
+        "animation position controllers whose first key is nearer the origin than the rest position: {} of {}",
+        c.first_position_nearer[1],
+        c.first_position_nearer[0] + c.first_position_nearer[1]
+    );
+    let top_events: Vec<String> = {
+        let mut v: Vec<_> = c.events.iter().collect();
+        v.sort_by(|a, b| b.1.cmp(a.1));
+        v.iter().take(8).map(|(k, n)| format!("{k} {n}")).collect()
+    };
+    println!(
+        "events: {} ({} names); most: {}",
+        c.events.values().sum::<usize>(),
+        c.events.len(),
+        top_events.join(", ")
+    );
+    println!(
+        "skins: {}; weights not summing to one: {}; bind transforms agreeing with the rest pose: {}",
+        c.skins, c.weights_not_one, c.bind_agrees
+    );
+    table("skins by bone count", &c.bones);
+    table("bind transforms disagreeing, by model", &c.bind_disagrees);
+    show(
+        "geometry controllers disagreeing with the node header",
+        &c.rest_disagrees,
+    );
+    show("keys past their animation's length", &c.keys_past_length);
+    show(
+        "vertex slots whose bone the bone map lacks",
+        &c.bad_influences,
+    );
     show("failed", &c.failed);
 
     assert!(c.models > 3000, "only {} models found", c.models);
+    assert!(c.rest_disagrees.is_empty());
+    assert!(c.keys_past_length.is_empty());
+    assert!(c.bad_influences.is_empty());
+    assert_eq!(c.weights_not_one, 0);
+    // The main menu's model is posed away from its bind pose; in four
+    // others eight bones of one mesh hold transforms that fit other bones.
+    let odd = ["mainmenu_model", "pfbcl", "pfbcm", "pfbcs", "p_bastilabb"];
+    assert!(
+        c.bind_disagrees
+            .keys()
+            .all(|k| odd.iter().any(|o| k.ends_with(&format!("/{o}.mdl")))),
+        "{:?}",
+        c.bind_disagrees
+    );
     assert!(c.failed.is_empty(), "models refused: {:#?}", c.failed);
     assert!(c.flags_disagree.is_empty());
     assert!(c.index_list_not_faces.is_empty());
@@ -466,4 +768,178 @@ fn every_model_of_the_endar_spire_first_area_parses() {
     show("lightmap names no TGA answers", &missing);
     assert!(used.get("room").is_some_and(|r| !r.is_empty()));
     assert!(failed.is_empty(), "{failed:#?}");
+}
+
+fn load_model(install: &Install, name: &str) -> rakata_game::Result<Option<(Vec<u8>, Vec<u8>)>> {
+    let Ok(r) = ResRef::new(name) else {
+        return Ok(None);
+    };
+    let Some((_, mdl)) = install.read(ResId::new(r, ResType::Mdl), None)? else {
+        return Ok(None);
+    };
+    let mdx = install
+        .read(ResId::new(r, ResType::Mdx), None)?
+        .map(|(_, b)| b)
+        .unwrap_or_default();
+    Ok(Some((mdl, mdx)))
+}
+
+#[test]
+fn every_supermodel_chain_resolves() {
+    let Some(root) = game() else { return };
+    let mut supered = BTreeSet::new();
+    each_model(&root, |name, mdl, _| {
+        if rakata_mdl::supermodel_name(mdl).unwrap().is_some() {
+            let resref = name.rsplit('/').next().unwrap();
+            supered.insert(resref.split('.').next().unwrap().to_ascii_lowercase());
+        }
+    });
+    let install = Install::open(&root, Profile::K1).unwrap();
+    let mut depths: BTreeMap<usize, usize> = BTreeMap::new();
+    let mut missing = Vec::new();
+    let mut failed = Vec::new();
+    let mut unbound = 0usize;
+    let mut inherited = 0usize;
+    for name in &supered {
+        let chain = match Chain::load(name, |n| load_model(&install, n)) {
+            Ok(c) => c,
+            Err(e) => {
+                failed.push(format!("{name}: {e}"));
+                continue;
+            }
+        };
+        if let Some(m) = &chain.missing {
+            missing.push(format!("{name}: supermodel {m}"));
+        }
+        let models = match chain.parse() {
+            Ok(m) => m,
+            Err(e) => {
+                failed.push(format!("{name}: {e}"));
+                continue;
+            }
+        };
+        let lineage = match Lineage::new(&models) {
+            Ok(l) => l,
+            Err(e) => {
+                failed.push(format!("{name}: {e}"));
+                continue;
+            }
+        };
+        *depths.entry(models.len() - 1).or_default() += 1;
+        for (from, a) in lineage.animations() {
+            inherited += (from > 0) as usize;
+            unbound += lineage.bind(a).iter().filter(|b| b.is_none()).count();
+        }
+    }
+    println!(
+        "{} models with a supermodel (by resref, as the install resolves them)",
+        supered.len()
+    );
+    table("supermodels above each (chain depth)", &depths);
+    println!(
+        "animations played from a supermodel: {inherited}; their nodes naming no node of the model: {unbound}"
+    );
+    show("chains ending at a supermodel the install lacks", &missing);
+    show("failed", &failed);
+    assert!(failed.is_empty(), "{failed:#?}");
+}
+
+#[test]
+fn the_character_skeletons_resolve_through_their_supermodels() {
+    let Some(install) = install() else { return };
+    for (name, depth) in [
+        ("s_male01", 0),
+        ("s_male02", 1),
+        ("s_female01", 2),
+        ("s_female02", 3),
+    ] {
+        let chain = Chain::load(name, |n| load_model(&install, n)).unwrap();
+        assert_eq!(chain.missing, None);
+        let models = chain.parse().unwrap();
+        let lineage = Lineage::new(&models).unwrap();
+        let names: Vec<&str> = models.iter().map(|m| m.name).collect();
+        assert_eq!(names.len(), depth + 1, "{names:?}");
+        let m = &models[0];
+        let animations = lineage.animations();
+        let mut keys = [0usize; 3];
+        for (_, a) in &animations {
+            for n in &a.nodes {
+                for c in &n.controllers {
+                    if let Some(k) = c.orientation_keys() {
+                        keys[c.is_compressed() as usize] += k.len();
+                    } else if c.kind == controller_types::POSITION {
+                        keys[2] += c.vector_keys().unwrap().len();
+                    }
+                }
+            }
+        }
+        println!(
+            "{name}: chain {}; {} nodes ({} with a mesh); {} animations of its own, {} played; orientation keys {} plain, {} compressed; position keys {}",
+            names.join(" -> "),
+            m.nodes.len(),
+            m.meshes().count(),
+            m.animations.len(),
+            animations.len(),
+            keys[0],
+            keys[1],
+            keys[2]
+        );
+        // `s_male01` holds twelve combat animations; the rest come down
+        // from `s_male02`, which holds the walk.
+        let name = if depth == 0 { "c2d1" } else { "walk" };
+        let (from, a) = lineage.animation(name).expect(name);
+        assert_eq!(from, depth.saturating_sub(1));
+        let bound = lineage.bind(a);
+        let unbound = bound.iter().filter(|b| b.is_none()).count();
+        println!(
+            "    {name} from {}: {} nodes, {unbound} the model lacks",
+            models[from].name,
+            a.nodes.len()
+        );
+        assert!(bound.iter().filter(|b| b.is_some()).count() > 10);
+    }
+
+    // A player body skinned to the skeleton it inherits.
+    let chain = Chain::load("pmbam", |n| load_model(&install, n)).unwrap();
+    let models = chain.parse().unwrap();
+    let lineage = Lineage::new(&models).unwrap();
+    let names: Vec<&str> = models.iter().map(|m| m.name).collect();
+    assert_eq!(
+        names[1..],
+        ["S_Female02", "S_Female01", "S_Male02", "S_Male01"]
+    );
+    let body = &models[0];
+    let skins: Vec<_> = body
+        .nodes
+        .iter()
+        .filter_map(|n| n.skin.as_ref().map(|s| (n.name, s)))
+        .collect();
+    for (name, skin) in &skins {
+        println!("    pmbam {name}: {} bones", skin.bones.len());
+        for &b in &skin.bones {
+            assert!(body.nodes.iter().any(|n| n.number == b), "{name} bone {b}");
+        }
+    }
+    assert!(!skins.is_empty());
+    let (from, walk) = lineage.animation("walk").unwrap();
+    assert_eq!(models[from].name, "S_Male02");
+    let bound = lineage.bind(walk);
+    let lacks: Vec<&str> = walk
+        .nodes
+        .iter()
+        .zip(&bound)
+        .filter(|(_, b)| b.is_none())
+        .map(|(n, _)| n.name)
+        .collect();
+    println!(
+        "    pmbam plays walk from S_Male02: {} of its {} nodes bound; the body lacks {lacks:?}",
+        bound.len() - lacks.len(),
+        bound.len()
+    );
+    // The head and face bones are the head model's.
+    assert!(
+        lacks
+            .iter()
+            .all(|n| !n.contains("thigh") && !n.contains("bicep"))
+    );
 }

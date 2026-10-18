@@ -3,7 +3,10 @@
 
 use std::collections::HashSet;
 
+use crate::animation::{Animation, read_animation};
+use crate::controller::{Controller, read_controllers};
 use crate::error::{Error, Result};
+use crate::skin::{Skin, read_skin};
 use crate::view::{Attribute, FACE_LEN, Faces, Indices, Vec2s, Vec3s};
 
 /// The file header's length; the model data begins here, and every offset
@@ -15,8 +18,8 @@ pub const NODE_HEADER_LEN: usize = 80;
 pub const MESH_HEADER_LEN: usize = 332;
 
 // The model data, from its start.
-const GEOM_NAME: usize = 0x08;
-const GEOM_ROOT: usize = 0x28;
+pub(crate) const GEOM_NAME: usize = 0x08;
+pub(crate) const GEOM_ROOT: usize = 0x28;
 const MODEL_CLASS: usize = 0x50;
 const MODEL_FOG: usize = 0x53;
 const MODEL_ANIMS: usize = 0x58;
@@ -261,9 +264,9 @@ pub struct Model<'a> {
     pub radius: f32,
     /// The animation scale.
     pub animation_scale: f32,
-    /// The names of the model's animations, which this crate does not
-    /// decode further.
-    pub animations: Vec<&'a str>,
+    /// The model's own animations, in stored order. A model with a
+    /// supermodel also plays the supermodel's; see [`Lineage`](crate::Lineage).
+    pub animations: Vec<Animation<'a>>,
     /// Every node the geometry's tree reaches, depth first in child
     /// order: `nodes[0]` is the root.
     pub nodes: Vec<Node<'a>>,
@@ -293,6 +296,21 @@ pub struct Node<'a> {
     pub orientation: Quaternion,
     /// The trimesh part of a node with a mesh header.
     pub mesh: Option<Mesh<'a>>,
+    /// The skin part of a skin node: its bones and its vertices' weights.
+    pub skin: Option<Skin<'a>>,
+    /// The node's controllers, in stored order. In a model's geometry each
+    /// holds one key, the node's resting value (the position and
+    /// orientation controllers repeat the header's); in an animation they
+    /// hold its keys.
+    pub controllers: Vec<Controller<'a>>,
+}
+
+impl<'a> Node<'a> {
+    /// The first controller of type `kind` (see
+    /// [`controller_types`](crate::controller_types)).
+    pub fn controller(&self, kind: u32) -> Option<&Controller<'a>> {
+        self.controllers.iter().find(|c| c.kind == kind)
+    }
 }
 
 /// The trimesh part of a mesh node: what a renderer needs to draw it.
@@ -366,6 +384,13 @@ impl<'a> Model<'a> {
         self.nodes
             .iter()
             .find(|n| n.name.eq_ignore_ascii_case(name))
+    }
+
+    /// The model's own animation named `name`, compared without case.
+    pub fn animation(&self, name: &str) -> Option<&Animation<'a>> {
+        self.animations
+            .iter()
+            .find(|a| a.name.eq_ignore_ascii_case(name))
     }
 
     /// Each node with a mesh, with its mesh.
@@ -452,7 +477,7 @@ pub fn parse<'a>(mdl: &'a [u8], mdx: &'a [u8]) -> Result<Model<'a>> {
     let mut animations = Vec::with_capacity(anim_count);
     for i in 0..anim_count {
         let a = d.u32(anim_off + 4 * i, "animation pointer")? as usize;
-        animations.push(d.fixed_str(a + GEOM_NAME, "animation name")?);
+        animations.push(read_animation(&d, &names, a)?);
     }
 
     let nodes = read_tree(&d, mdx, &names, d.u32(GEOM_ROOT, "root")? as usize)?;
@@ -482,7 +507,7 @@ fn read_names<'a>(d: &Data<'a>) -> Result<Vec<&'a str>> {
         .collect()
 }
 
-fn read_tree<'a>(
+pub(crate) fn read_tree<'a>(
     d: &Data<'a>,
     mdx: &'a [u8],
     names: &[&'a str],
@@ -515,6 +540,22 @@ fn read_tree<'a>(
         } else {
             None
         };
+        let skin = match (&mesh, NodeKind::from_flags(flags)) {
+            (Some(m), NodeKind::Skin) => Some(read_skin(
+                d,
+                at + NODE_HEADER_LEN + MESH_HEADER_LEN,
+                name,
+                m.vertex_buffer,
+                m.stride,
+                if m.vertex_buffer.is_empty() {
+                    0
+                } else {
+                    m.vertex_count
+                },
+            )?),
+            _ => None,
+        };
+        let controllers = read_controllers(d, at, name)?;
         let (ch_off, ch_count) = d.array(at + NODE_CHILDREN, "child array")?;
         d.slice(ch_off, ch_count * 4, "child array")?;
         let index = nodes.len();
@@ -537,6 +578,8 @@ fn read_tree<'a>(
                 z: q[3],
             },
             mesh,
+            skin,
+            controllers,
         });
         for i in (0..ch_count).rev() {
             stack.push((
@@ -679,12 +722,12 @@ fn check_indices(node: &str, nv: usize, it: impl Iterator<Item = u16>) -> Result
 }
 
 /// The model data, read with every offset checked.
-struct Data<'a> {
-    b: &'a [u8],
+pub(crate) struct Data<'a> {
+    pub(crate) b: &'a [u8],
 }
 
 impl<'a> Data<'a> {
-    fn slice(&self, at: usize, len: usize, what: &'static str) -> Result<&'a [u8]> {
+    pub(crate) fn slice(&self, at: usize, len: usize, what: &'static str) -> Result<&'a [u8]> {
         at.checked_add(len)
             .and_then(|end| self.b.get(at..end))
             .ok_or(Error::Truncated {
@@ -695,21 +738,21 @@ impl<'a> Data<'a> {
             })
     }
 
-    fn u32(&self, at: usize, what: &'static str) -> Result<u32> {
+    pub(crate) fn u32(&self, at: usize, what: &'static str) -> Result<u32> {
         let s = self.slice(at, 4, what)?;
         Ok(u32::from_le_bytes([s[0], s[1], s[2], s[3]]))
     }
 
-    fn u16(&self, at: usize) -> Result<u16> {
+    pub(crate) fn u16(&self, at: usize) -> Result<u16> {
         let s = self.slice(at, 2, "u16")?;
         Ok(u16::from_le_bytes([s[0], s[1]]))
     }
 
-    fn f32(&self, at: usize) -> Result<f32> {
+    pub(crate) fn f32(&self, at: usize) -> Result<f32> {
         Ok(f32::from_bits(self.u32(at, "float")?))
     }
 
-    fn f32s<const N: usize>(&self, at: usize) -> Result<[f32; N]> {
+    pub(crate) fn f32s<const N: usize>(&self, at: usize) -> Result<[f32; N]> {
         let mut out = [0.0; N];
         for (i, v) in out.iter_mut().enumerate() {
             *v = self.f32(at + 4 * i)?;
@@ -717,7 +760,7 @@ impl<'a> Data<'a> {
         Ok(out)
     }
 
-    fn bbox(&self, at: usize) -> Result<BoundingBox> {
+    pub(crate) fn bbox(&self, at: usize) -> Result<BoundingBox> {
         Ok(BoundingBox {
             min: self.f32s::<3>(at)?,
             max: self.f32s::<3>(at + 12)?,
@@ -726,7 +769,7 @@ impl<'a> Data<'a> {
 
     /// An array header: the offset and the used count (the allocated count
     /// that follows is ignored).
-    fn array(&self, at: usize, what: &'static str) -> Result<(usize, usize)> {
+    pub(crate) fn array(&self, at: usize, what: &'static str) -> Result<(usize, usize)> {
         Ok((
             self.u32(at, what)? as usize,
             self.u32(at + 4, what)? as usize,
@@ -734,7 +777,7 @@ impl<'a> Data<'a> {
     }
 
     /// A 32-byte name field: ASCII up to a NUL within the field.
-    fn fixed_str(&self, at: usize, what: &'static str) -> Result<&'a str> {
+    pub(crate) fn fixed_str(&self, at: usize, what: &'static str) -> Result<&'a str> {
         let s = self.slice(at, 32, what)?;
         let end = s
             .iter()
@@ -744,7 +787,7 @@ impl<'a> Data<'a> {
     }
 
     /// A NUL-ended name anywhere in the data.
-    fn c_str(&self, at: usize, what: &'static str) -> Result<&'a str> {
+    pub(crate) fn c_str(&self, at: usize, what: &'static str) -> Result<&'a str> {
         let s = self.b.get(at..).ok_or(Error::Truncated {
             what,
             offset: at,

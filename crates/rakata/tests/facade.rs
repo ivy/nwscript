@@ -118,6 +118,12 @@ fn every_code_a_data_crate_reports_is_registered() {
         rakata::mdl::codes::BAD_NAME,
         rakata::mdl::codes::BAD_VERTEX_LAYOUT,
         rakata::mdl::codes::BAD_INDEX,
+        rakata::mdl::codes::BAD_CONTROLLER,
+        rakata::mdl::codes::BAD_SKIN,
+        rakata::mdl::codes::SUPERMODEL_CYCLE,
+        rakata::mdl::codes::SUPERMODEL_LOAD,
+        rakata::mdl::codes::MODEL_NOT_FOUND,
+        rakata::mdl::codes::BAD_LINEAGE,
     ] {
         assert!(codes::lookup(id).is_some(), "{id} is not registered");
     }

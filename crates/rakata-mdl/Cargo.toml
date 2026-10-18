@@ -1,6 +1,6 @@
 [package]
 name = "rakata-mdl"
-description = "The binary models of Aurora-family games, KotOR 1 first: the MDL's node tree with names, parents and transforms, and each mesh's faces, textures and flags, with its vertices borrowed from the MDX as strided views."
+description = "The binary models of Aurora-family games, KotOR 1 first: the MDL's node tree with names, parents, transforms and controllers, each mesh's faces, textures and flags with its vertices borrowed from the MDX as strided views, skins, animations and supermodel chains."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

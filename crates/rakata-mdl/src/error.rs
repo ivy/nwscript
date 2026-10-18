@@ -22,6 +22,18 @@ pub mod codes {
     pub const BAD_VERTEX_LAYOUT: &str = "RE2406";
     /// A face or index naming a vertex the mesh does not have.
     pub const BAD_INDEX: &str = "RE2407";
+    /// A controller whose keys lie past its node's controller data.
+    pub const BAD_CONTROLLER: &str = "RE2408";
+    /// A skin whose bone map, qbones and tbones disagree.
+    pub const BAD_SKIN: &str = "RE2409";
+    /// A supermodel chain that comes back to a model it has passed.
+    pub const SUPERMODEL_CYCLE: &str = "RE2410";
+    /// The loader failed to read a model of a supermodel chain.
+    pub const SUPERMODEL_LOAD: &str = "RE2411";
+    /// The model a supermodel chain starts from is not found.
+    pub const MODEL_NOT_FOUND: &str = "RE2412";
+    /// Models given as a chain whose next is not the supermodel named.
+    pub const BAD_LINEAGE: &str = "RE2413";
 }
 
 /// An error in reading a model.
@@ -84,6 +96,44 @@ pub enum Error {
         /// The mesh's vertex count.
         vertices: usize,
     },
+    /// A controller whose time keys or values lie past the node's
+    /// controller data.
+    BadController {
+        /// The node.
+        node: String,
+        /// The controller type.
+        kind: u32,
+        /// Why.
+        reason: String,
+    },
+    /// A skin whose bone map does not name each local bone index once, or
+    /// whose bone map, qbones and tbones differ in length.
+    BadSkin {
+        /// The skin's node.
+        node: String,
+        /// Why.
+        reason: String,
+    },
+    /// A supermodel chain that names a model it has already passed.
+    SupermodelCycle {
+        /// The chain from its first model, ending with the name repeated.
+        chain: Vec<String>,
+    },
+    /// The model a supermodel chain starts from is not found.
+    ModelNotFound {
+        /// Its name.
+        name: String,
+    },
+    /// Models given as a supermodel chain whose next model is not the
+    /// supermodel the one before names.
+    BadLineage {
+        /// The model whose supermodel is wrong or missing.
+        model: String,
+        /// The supermodel it names, if any.
+        supermodel: Option<String>,
+        /// The name of the model that follows it.
+        next: String,
+    },
 }
 
 /// This crate's result type.
@@ -100,6 +150,11 @@ impl Error {
             Error::BadName { .. } => codes::BAD_NAME,
             Error::BadVertexLayout { .. } => codes::BAD_VERTEX_LAYOUT,
             Error::BadIndex { .. } => codes::BAD_INDEX,
+            Error::BadController { .. } => codes::BAD_CONTROLLER,
+            Error::BadSkin { .. } => codes::BAD_SKIN,
+            Error::SupermodelCycle { .. } => codes::SUPERMODEL_CYCLE,
+            Error::ModelNotFound { .. } => codes::MODEL_NOT_FOUND,
+            Error::BadLineage { .. } => codes::BAD_LINEAGE,
         }
     }
 }
@@ -146,8 +201,78 @@ impl fmt::Display for Error {
                 f,
                 "mesh `{node}` names vertex {index} and has {vertices} vertices"
             ),
+            Error::BadController { node, kind, reason } => {
+                write!(f, "node `{node}`'s controller of type {kind}: {reason}")
+            }
+            Error::BadSkin { node, reason } => write!(f, "skin `{node}`: {reason}"),
+            Error::SupermodelCycle { chain } => write!(
+                f,
+                "the supermodel chain {} comes back to a model it has passed",
+                chain.join(" -> ")
+            ),
+            Error::ModelNotFound { name } => write!(f, "model `{name}` is not found"),
+            Error::BadLineage {
+                model,
+                supermodel,
+                next,
+            } => match supermodel {
+                Some(s) => write!(
+                    f,
+                    "model `{model}` names supermodel `{s}` and is followed by `{next}`"
+                ),
+                None => write!(
+                    f,
+                    "model `{model}` has no supermodel and is followed by `{next}`"
+                ),
+            },
         }
     }
 }
 
 impl std::error::Error for Error {}
+
+/// An error in loading a supermodel chain: the loader's own, or the
+/// model's.
+#[derive(Debug)]
+pub enum ChainError<E> {
+    /// The loader failed reading a model.
+    Load {
+        /// The model it was asked for.
+        name: String,
+        /// Its error.
+        error: E,
+    },
+    /// A model of the chain is not readable, or the chain is not a chain.
+    Model(Error),
+}
+
+impl<E> ChainError<E> {
+    /// The registered diagnostic code for this error.
+    pub fn code(&self) -> &'static str {
+        match self {
+            ChainError::Load { .. } => codes::SUPERMODEL_LOAD,
+            ChainError::Model(e) => e.code(),
+        }
+    }
+}
+
+impl<E> From<Error> for ChainError<E> {
+    fn from(e: Error) -> Self {
+        ChainError::Model(e)
+    }
+}
+
+impl<E: fmt::Display> fmt::Display for ChainError<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ChainError::Load { name, error } => write!(
+                f,
+                "{}: reading model `{name}` of a supermodel chain: {error}",
+                self.code()
+            ),
+            ChainError::Model(e) => e.fmt(f),
+        }
+    }
+}
+
+impl<E: fmt::Debug + fmt::Display> std::error::Error for ChainError<E> {}

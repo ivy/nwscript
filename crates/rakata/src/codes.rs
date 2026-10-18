@@ -207,6 +207,12 @@ nwscript_diag::codes! {
     RE2405 Error "a model's name or texture field that is not ASCII ended by a NUL";
     RE2406 Error "a mesh's vertex layout that does not fit its stride";
     RE2407 Error "a face or triangle list entry naming a vertex the mesh lacks";
+    RE2408 Error "a controller whose keys lie past its node's controller data";
+    RE2409 Error "a skin whose bone map, qbones and tbones disagree";
+    RE2410 Error "a supermodel chain that comes back to a model it has passed";
+    RE2411 Error "the loader failed reading a model of a supermodel chain";
+    RE2412 Error "the model a supermodel chain starts from is not found";
+    RE2413 Error "models given as a supermodel chain out of the order their supermodels name";
 }
 
 /// The rakata code with this id, if registered; case does not matter.
