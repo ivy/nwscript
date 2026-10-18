@@ -15,6 +15,8 @@ pub use index::IndexArgs;
 mod install;
 mod refs;
 pub use refs::RefsArgs;
+mod lint;
+pub use lint::LintArgs;
 mod save;
 pub use save::SaveArgs;
 mod which;
@@ -108,6 +110,7 @@ pub fn run(cli: Cli) -> Exit {
         Command::Diff(args) => diff::run(&ctx, &args),
         Command::Index(args) => index::run(&ctx, &args),
         Command::Refs(args) => refs::run(&ctx, &args),
+        Command::Lint(args) => lint::run(&ctx, &args),
         Command::Which {
             name,
             module,

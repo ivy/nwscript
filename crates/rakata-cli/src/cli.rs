@@ -36,6 +36,8 @@ Examples:
   rakata index query \"SELECT * FROM refs WHERE value = 'k_pman_aioff'\"
   rakata lua build.lua OUT --game DIR     a Lua script over the façade, writing below OUT
   rakata refs 42724 --kind strref          what refers to a strref, and where each lies
+  rakata lint --game DIR --known conformance/tree-known.toml
+                                           dangling references, strrefs past the TLK, Override faults
 
 Exit codes: 0 success, 1 errors reported, 2 bad invocation,
 3 a comparison found a difference, 101 internal error.";
@@ -171,4 +173,6 @@ pub enum Command {
     Index(crate::cmd::IndexArgs),
     /// Every reference to a strref, resref, tag or global, or every reference a resource makes, from the index.
     Refs(crate::cmd::RefsArgs),
+    /// The tree lints: references that resolve to nothing, strrefs past the talk table, case-variant and .tpc-shadowed Override files.
+    Lint(crate::cmd::LintArgs),
 }
