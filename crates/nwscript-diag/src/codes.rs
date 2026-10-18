@@ -20,22 +20,30 @@ pub struct Code {
     pub severity: Severity,
     pub summary: &'static str,
     pub explanation: &'static str,
+    /// The program whose `explain` subcommand prints the explanation, named
+    /// in rendered diagnostics: `nws` for the codes of this crate.
+    pub explainer: &'static str,
 }
 
 /// Declare a registry of codes: one `pub static` per code, named by its id,
 /// and `ALL`, every code in declaration order. `dir` is the directory of
 /// the explanations relative to the invoking crate's manifest; each code's
-/// explanation is `dir/ID.md`, read at compile time.
+/// explanation is `dir/ID.md`, read at compile time. `program` names the
+/// binary whose `explain` prints them, `nws` when it is left out.
 ///
 /// ```ignore
 /// nwscript_diag::codes! {
 ///     dir "explain";
+///     program "rakata";
 ///     RE0001 Error "an input file could not be read";
 /// }
 /// ```
 #[macro_export]
 macro_rules! codes {
     (dir $dir:literal; $( $id:ident $sev:ident $summary:literal; )*) => {
+        $crate::codes! { dir $dir; program "nws"; $( $id $sev $summary; )* }
+    };
+    (dir $dir:literal; program $program:literal; $( $id:ident $sev:ident $summary:literal; )*) => {
         $(
             #[doc = $summary]
             pub static $id: $crate::codes::Code = $crate::codes::Code {
@@ -45,6 +53,7 @@ macro_rules! codes {
                 explanation: include_str!(concat!(
                     env!("CARGO_MANIFEST_DIR"), "/", $dir, "/", stringify!($id), ".md"
                 )),
+                explainer: $program,
             };
         )*
         /// Every registered code, in declaration order.

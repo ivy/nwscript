@@ -30,6 +30,32 @@ fn explain_prints_the_explanation() {
 }
 
 #[test]
+fn a_diagnostic_points_at_rakata_explain_not_nws() {
+    let missing = std::env::temp_dir().join(format!("rakata-cli-missing-{}", std::process::id()));
+    let text = rakata()
+        .args(["--game", missing.to_str().unwrap(), "which", "x.utc"])
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&text.stderr);
+    assert!(stderr.contains("run `rakata explain RE"), "{stderr}");
+    assert!(!stderr.contains("nws explain"), "{stderr}");
+    let json = rakata()
+        .args([
+            "--format",
+            "json",
+            "--game",
+            missing.to_str().unwrap(),
+            "which",
+            "x.utc",
+        ])
+        .output()
+        .unwrap();
+    let doc: serde_json::Value = serde_json::from_slice(&json.stdout).unwrap();
+    let explain = doc["diagnostics"][0]["explain"].as_str().unwrap();
+    assert!(explain.starts_with("rakata explain RE"), "{explain}");
+}
+
+#[test]
 fn explain_unknown_code_is_a_usage_error() {
     for code in ["RE9999", "E0001"] {
         rakata()

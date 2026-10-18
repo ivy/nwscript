@@ -17,6 +17,7 @@ pub use nwscript_diag::codes::Code;
 
 nwscript_diag::codes! {
     dir "explain";
+    program "rakata";
     RE0001 Error "an input file could not be read";
     RE0101 Error "a resref longer than sixteen bytes";
     RE0102 Error "a resource id without an extension";

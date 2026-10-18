@@ -59,6 +59,6 @@ pub fn to_json(d: &Diagnostic, map: &SourceMap) -> JsonDiagnostic {
             .collect(),
         help: d.help.clone(),
         notes: d.notes.clone(),
-        explain: format!("nws explain {}", d.code.id),
+        explain: format!("{} explain {}", d.code.explainer, d.code.id),
     }
 }

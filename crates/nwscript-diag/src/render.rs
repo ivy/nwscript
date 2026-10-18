@@ -104,8 +104,8 @@ pub fn render(d: &Diagnostic, map: &SourceMap, color: Color) -> String {
     }
     notes.extend(d.notes.iter().cloned());
     notes.push(format!(
-        "run `nws explain {}` for the full explanation",
-        d.code.id
+        "run `{} explain {}` for the full explanation",
+        d.code.explainer, d.code.id
     ));
     let adapter = Adapter {
         d,
