@@ -83,9 +83,10 @@ def main() -> None:
         checks = [(PATTERN, str(tool_input.get(f, ""))) for f in FIELDS.get(tool, [])]
     # This repository names the reference projects in its own files (the clean-room rule, a spike that measures
     # TSLPatcher, its driver under conformance/) and never holds their source, so a path inside it is not a read of a
-    # reference: an absolute path under the project, or a relative one into docs/ or conformance/.
+    # reference: an absolute path under the project, or a relative one into docs/ or conformance/. A tool's logs are
+    # its output, which the rule permits reading, and no source checkout lives under a logs/ directory.
     project = re.escape(os.path.realpath(event.get("cwd") or os.getcwd()))
-    own = re.compile(rf"(?:{project}|(?<![\w/.-])(?:docs|conformance))/\S*")
+    own = re.compile(rf"(?:{project}|(?<![\w/.-])(?:docs|conformance))/\S*|\S*/logs/\S*")
     for pattern, text in checks:
         hit = pattern.search(own.sub("", text))
         if hit:
