@@ -10,6 +10,20 @@ use rakata_walkmesh::{
     Walkmesh, codes,
 };
 
+/// `bytes`, kept as a seed for the fuzz targets in the directory
+/// `$RAKATA_FUZZ_SEEDS` names, when it is set.
+fn seed(bytes: &[u8]) -> &[u8] {
+    if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        bytes.hash(&mut h);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+    }
+    bytes
+}
+
 /// A walkmesh's arrays, laid out as the vanilla files lay them out.
 #[derive(Default, Clone)]
 struct Build {
@@ -151,7 +165,7 @@ fn room() -> Build {
 #[test]
 fn an_area_room_reads_to_its_faces_adjacency_perimeter_and_tree() {
     let bytes = room().bytes();
-    let w = Walkmesh::parse(&bytes).unwrap();
+    let w = Walkmesh::parse(seed(&bytes)).unwrap();
     assert_eq!(w.kind, Kind::Area);
     assert_eq!(w.position, [0.5, -0.25, 0.25]);
     assert_eq!(w.vertices.len(), 5);
@@ -227,7 +241,7 @@ fn walkability_comes_from_the_tables_walk_column() {
     assert!(!table.is_walkable(99), "a material past the table");
 
     let bytes = room().bytes();
-    let w = Walkmesh::parse(&bytes).unwrap();
+    let w = Walkmesh::parse(seed(&bytes)).unwrap();
     assert_eq!(w.walkable_faces(&table).collect::<Vec<_>>(), [0, 1]);
     assert!(!w.faces[2].is_walkable(&table));
 
@@ -262,7 +276,7 @@ fn an_empty_placeable_reads_as_no_faces() {
     };
     let bytes = b.bytes();
     assert_eq!(bytes.len(), HEADER_LEN);
-    let w = Walkmesh::parse(&bytes).unwrap();
+    let w = Walkmesh::parse(seed(&bytes)).unwrap();
     assert_eq!(w.kind, Kind::Object);
     assert!(w.vertices.is_empty() && w.faces.is_empty());
     assert!(w.adjacency.is_empty() && w.perimeter_edges.is_empty() && w.aabb.is_empty());
@@ -289,7 +303,7 @@ fn a_door_reads_its_points_and_faces_without_a_tree() {
         ..Build::default()
     };
     let bytes = b.bytes();
-    let w = Walkmesh::parse(&bytes).unwrap();
+    let w = Walkmesh::parse(seed(&bytes)).unwrap();
     assert_eq!(w.kind, Kind::Object);
     assert_eq!(w.relative_points, rel);
     assert_eq!(w.absolute_points, abs);
@@ -299,7 +313,7 @@ fn a_door_reads_its_points_and_faces_without_a_tree() {
 }
 
 fn code(bytes: &[u8]) -> &'static str {
-    Walkmesh::parse(bytes).unwrap_err().code()
+    Walkmesh::parse(seed(bytes)).unwrap_err().code()
 }
 
 #[test]
@@ -312,7 +326,7 @@ fn bytes_that_are_not_a_walkmesh_are_refused() {
 #[test]
 fn a_header_or_array_cut_short_is_refused() {
     let bytes = room().bytes();
-    let e = Walkmesh::parse(&bytes[..100]).unwrap_err();
+    let e = Walkmesh::parse(seed(&bytes[..100])).unwrap_err();
     assert_eq!(
         e,
         Error::Truncated {
@@ -321,7 +335,7 @@ fn a_header_or_array_cut_short_is_refused() {
             available: 100
         }
     );
-    let e = Walkmesh::parse(&bytes[..bytes.len() - 1]).unwrap_err();
+    let e = Walkmesh::parse(seed(&bytes[..bytes.len() - 1])).unwrap_err();
     assert_eq!(e.code(), codes::TRUNCATED);
     assert!(e.to_string().contains("perimeter array"), "{e}");
     // A count so large its length overflows.
@@ -334,7 +348,7 @@ fn a_header_or_array_cut_short_is_refused() {
 fn a_type_other_than_object_or_area_is_refused() {
     let mut b = room();
     b.kind = 2;
-    let e = Walkmesh::parse(&b.bytes()).unwrap_err();
+    let e = Walkmesh::parse(seed(&b.bytes())).unwrap_err();
     assert_eq!(e, Error::UnknownKind { kind: 2 });
     assert_eq!(e.code(), codes::UNKNOWN_KIND);
 }
@@ -364,7 +378,7 @@ fn an_index_naming_nothing_is_refused() {
     for (what, edit) in cases {
         let mut b = room();
         edit(&mut b);
-        match Walkmesh::parse(&b.bytes()).unwrap_err() {
+        match Walkmesh::parse(seed(&b.bytes())).unwrap_err() {
             e @ Error::BadIndex { what: got, .. } => {
                 assert_eq!(got, what, "{e}");
                 assert_eq!(e.code(), codes::BAD_INDEX);
@@ -409,7 +423,7 @@ fn files_in_the_vanilla_layout_write_back_byte_for_byte() {
         ("empty room", empty_room),
     ] {
         let bytes = b.bytes();
-        let w = Walkmesh::parse(&bytes).unwrap();
+        let w = Walkmesh::parse(seed(&bytes)).unwrap();
         assert_eq!(w.to_bytes().unwrap(), bytes, "{what}");
         assert!(w.semantic_eq(&w), "{what}");
     }
@@ -420,7 +434,7 @@ fn the_unknown_header_field_and_bytes_after_the_last_array_are_kept() {
     let mut bytes = room().bytes();
     bytes[108..112].copy_from_slice(&0xdead_beef_u32.to_le_bytes());
     bytes.extend_from_slice(b"left by another tool");
-    let w = Walkmesh::parse(&bytes).unwrap();
+    let w = Walkmesh::parse(seed(&bytes)).unwrap();
     assert_eq!(w.unknown, 0xdead_beef);
     assert_eq!(w.trailer, b"left by another tool");
     assert_eq!(w.to_bytes().unwrap(), bytes);
@@ -430,7 +444,7 @@ fn the_unknown_header_field_and_bytes_after_the_last_array_are_kept() {
         ..w.clone()
     };
     assert!(!clean.semantic_eq(&w));
-    assert!(w.semantic_eq(&Walkmesh::parse(&bytes).unwrap()));
+    assert!(w.semantic_eq(&Walkmesh::parse(seed(&bytes)).unwrap()));
 }
 
 #[test]
@@ -481,7 +495,7 @@ fn a_walkmesh_built_in_memory_writes_and_reads_back_the_same() {
     // The header, three vertices, one face's five arrays, one node, one
     // adjacency row, three edges and one perimeter.
     assert_eq!(bytes.len(), HEADER_LEN + 36 + 32 + 44 + 12 + 24 + 4);
-    let again = Walkmesh::parse(&bytes).unwrap();
+    let again = Walkmesh::parse(seed(&bytes)).unwrap();
     assert!(again.semantic_eq(&w));
     assert_eq!(again, w);
     assert_eq!(again.to_bytes().unwrap(), bytes);
@@ -504,13 +518,13 @@ fn a_walkmesh_built_in_memory_writes_and_reads_back_the_same() {
     for at in [104, 116, 124, 132] {
         assert_eq!(bytes[at..at + 4], [0; 4], "offset field at {at}");
     }
-    assert!(Walkmesh::parse(&bytes).unwrap().semantic_eq(&object));
+    assert!(Walkmesh::parse(seed(&bytes)).unwrap().semantic_eq(&object));
 }
 
 #[test]
 fn a_value_too_large_for_its_field_is_refused_by_the_writer() {
     let bytes = room().bytes();
-    let w = Walkmesh::parse(&bytes).unwrap();
+    let w = Walkmesh::parse(seed(&bytes)).unwrap();
     type Edit = Box<dyn Fn(&mut Walkmesh)>;
     let cases: Vec<(&str, Edit)> = vec![
         (
