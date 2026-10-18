@@ -1,6 +1,6 @@
 [package]
 name = "rakata-save"
-description = "KotOR saved games by name: globals, the party, each module's creatures with their flags, effects and action queues, and the pending events, every GFF read without loss."
+description = "KotOR saved games by name: globals, the party, each module's creatures with their flags, effects and action queues, and the pending events, every GFF read without loss; a copy with changed globals or party, byte-identical elsewhere."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

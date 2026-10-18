@@ -21,9 +21,27 @@ pub mod codes {
     /// The names of the creatures' local variables could not be read, so
     /// they are shown by index alone.
     pub const NO_LOCAL_NAMES: &str = "RW1201";
+    /// A global the install's `globalcat.2da` does not declare, set without
+    /// `--declare`.
+    pub const UNDECLARED: &str = "RE1205";
+    /// A `NAME=VALUE` that does not parse, or whose value does not fit the
+    /// global's type.
+    pub const BAD_ASSIGNMENT: &str = "RE1206";
+    /// A party member the save holds no `AVAILNPC<n>.utc` for.
+    pub const NO_SUCH_NPC: &str = "RE1207";
+    /// A party the game cannot take: a member named twice, or more than two.
+    pub const BAD_PARTY: &str = "RE1208";
+    /// The new save's directory exists and is not empty, or is the save
+    /// being read.
+    pub const OUT_EXISTS: &str = "RE1209";
+    /// A file of the new save could not be written.
+    pub const WRITE: &str = "RE1210";
+    /// A global written that the install does not declare, so its scripts
+    /// do not read it.
+    pub const UNDECLARED_WRITTEN: &str = "RW1202";
 }
 
-/// An error in reading a save.
+/// An error in reading or writing a save.
 #[derive(Debug)]
 pub enum Error {
     /// The directory holds no `SAVEGAME.sav`.
@@ -69,6 +87,30 @@ pub enum Error {
         /// What was expected there.
         expected: &'static str,
     },
+    /// A global the install does not declare, set without `declare`.
+    Undeclared { name: String },
+    /// An assignment that does not parse or does not fit.
+    BadAssignment {
+        /// The assignment as given.
+        text: String,
+        reason: String,
+    },
+    /// A party member the save holds no `AVAILNPC<n>.utc` for.
+    NoSuchNpc {
+        /// The number or tag given.
+        name: String,
+        /// The NPCs the save holds, as `2 (carth)`.
+        available: Vec<String>,
+    },
+    /// A party the game cannot take.
+    BadParty { reason: String },
+    /// The new save's directory cannot take it.
+    OutExists { dir: PathBuf, reason: String },
+    /// A file of the new save could not be written.
+    Write {
+        path: PathBuf,
+        source: std::io::Error,
+    },
 }
 
 /// This crate's result type.
@@ -84,6 +126,12 @@ impl Error {
             Error::Gff { source, .. } => source.code(),
             Error::NoSuchModule { .. } => codes::NO_SUCH_MODULE,
             Error::BadShape { .. } => codes::BAD_SHAPE,
+            Error::Undeclared { .. } => codes::UNDECLARED,
+            Error::BadAssignment { .. } => codes::BAD_ASSIGNMENT,
+            Error::NoSuchNpc { .. } => codes::NO_SUCH_NPC,
+            Error::BadParty { .. } => codes::BAD_PARTY,
+            Error::OutExists { .. } => codes::OUT_EXISTS,
+            Error::Write { .. } => codes::WRITE,
         }
     }
 
@@ -119,7 +167,29 @@ impl Error {
                 member,
                 path,
                 expected,
+            } if path.is_empty() => format!("{member} is not {expected}"),
+            Error::BadShape {
+                member,
+                path,
+                expected,
             } => format!("{member}: `{path}` is not {expected}"),
+            Error::Undeclared { name } => format!(
+                "the install's globalcat.2da does not declare the global `{name}`, so the game's scripts would not read it"
+            ),
+            Error::BadAssignment { text, reason } => format!("`{text}`: {reason}"),
+            Error::NoSuchNpc { name, available } => format!(
+                "the save holds no AVAILNPC for party member `{name}`; it holds {}",
+                if available.is_empty() {
+                    "none".to_owned()
+                } else {
+                    available.join(", ")
+                }
+            ),
+            Error::BadParty { reason } => format!("the party cannot be written: {reason}"),
+            Error::OutExists { dir, reason } => {
+                format!("cannot write the new save to {}: {reason}", dir.display())
+            }
+            Error::Write { path, source } => format!("cannot write {}: {source}", path.display()),
         }
     }
 }
@@ -140,7 +210,7 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::Io { source, .. } => Some(source),
+            Error::Io { source, .. } | Error::Write { source, .. } => Some(source),
             Error::Archive { source, .. } => Some(source),
             Error::Gff { source, .. } => Some(source),
             _ => None,

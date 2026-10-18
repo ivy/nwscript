@@ -14,7 +14,9 @@
 //! types, animations, most action ids) stay numbers.
 //!
 //! Every GFF inside is read through `rakata-gff`, so it writes back as the
-//! bytes it came from; [`Save::gff_members`] lists them all. The layout
+//! bytes it came from; [`Save::gff_members`] lists them all. [`Save::write`]
+//! makes a copy of a save whose globals or party differ, every other file
+//! copied byte for byte, for fixtures. The layout
 //! follows the measured facts in `docs/formats/save.md`; this crate was
 //! written without sight of any other implementation.
 
@@ -26,9 +28,14 @@ mod fields;
 mod globals;
 mod names;
 mod save;
+mod write;
 
 pub use creature::{Action, Creature, Effect, OBJECT_INVALID, ObjectRef, Param, Place};
 pub use error::{Error, Result, codes};
 pub use globals::{Global, GlobalValue, Globals, Location};
 pub use names::{LocalNames, action_name};
 pub use save::{Available, Event, GffMember, Info, Member, Module, Party, Save};
+pub use write::{
+    Assignment, Declarations, Edits, FieldChange, GlobalChange, GlobalKind, PARTY_MAX, PartyChange,
+    Written,
+};

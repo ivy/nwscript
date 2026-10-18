@@ -12,7 +12,7 @@ use crate::globals::Globals;
 use crate::{Error, Result};
 
 /// The archive of a save's state.
-const SAVEGAME: &str = "SAVEGAME.sav";
+pub(crate) const SAVEGAME: &str = "SAVEGAME.sav";
 const GLOBALVARS: &str = "GLOBALVARS";
 const PARTYTABLE: &str = "PARTYTABLE";
 const SAVENFO: &str = "savenfo";
@@ -25,10 +25,10 @@ const AVAILNPC: &str = "AVAILNPC";
 /// state is read when asked for. Every GFF is read through `rakata-gff`, so
 /// any of them written back with [`Gff::to_bytes`] is the bytes it came from.
 pub struct Save {
-    dir: PathBuf,
+    pub(crate) dir: PathBuf,
     savegame: Vec<u8>,
-    globals: Option<(String, Gff)>,
-    party: Option<(String, Gff)>,
+    pub(crate) globals: Option<(String, Gff)>,
+    pub(crate) party: Option<(String, Gff)>,
     info: Option<Gff>,
 }
 
@@ -139,7 +139,7 @@ impl Save {
         &self.dir
     }
 
-    fn outer(&self) -> Result<Erf<'_>> {
+    pub(crate) fn outer(&self) -> Result<Erf<'_>> {
         Erf::parse(&self.savegame).map_err(|source| Error::Archive {
             member: SAVEGAME.to_owned(),
             source,
@@ -509,7 +509,7 @@ fn is_gff(bytes: &[u8]) -> bool {
     bytes.get(4..8) == Some(b"V3.2")
 }
 
-fn parse_gff(bytes: &[u8], member: &str) -> Result<Gff> {
+pub(crate) fn parse_gff(bytes: &[u8], member: &str) -> Result<Gff> {
     Gff::parse(bytes).map_err(|source| Error::Gff {
         member: member.to_owned(),
         source,
