@@ -1,0 +1,20 @@
+[package]
+name = "rakata-lua"
+description = "The Lua binding of the rakata façade, run hermetically by `rakata lua`."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+mlua = { version = "0.12", features = ["lua54", "vendored"] }
+rakata = { workspace = true }
+rakata-dialog = { workspace = true }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

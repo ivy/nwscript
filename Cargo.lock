@@ -1217,6 +1217,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rakata-lua"
+version = "0.0.0"
+dependencies = [
+ "mlua",
+ "rakata",
+ "rakata-dialog",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "rakata-patch"
 version = "0.0.0"
 dependencies = [

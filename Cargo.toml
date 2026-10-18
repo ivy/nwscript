@@ -33,6 +33,7 @@ rakata-save = { path = "crates/rakata-save" }
 rakata-cli = { path = "crates/rakata-cli" }
 rakata-dialog = { path = "crates/rakata-dialog" }
 rakata-index = { path = "crates/rakata-index" }
+rakata-lua = { path = "crates/rakata-lua" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

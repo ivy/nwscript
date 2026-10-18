@@ -139,6 +139,12 @@ nwscript_diag::codes! {
     RW1502 Warning "a file of the tree that could not be read";
     RW1503 Warning "a tree without nwscript.nss: calls name routines by number";
     RW1504 Warning "files new to the tree that the changed list does not name";
+    RE1801 Error "a path a Lua script reads or writes that is not one of its inputs";
+    RE1802 Error "a module a Lua script requires that is not in the script's directory";
+    RE1803 Error "a Lua script that opens the install when no --game was named";
+    RE1804 Error "a Lua script that raised an error without a code, or did not load";
+    RE1805 Error "a value of the wrong kind passed to a function of the Lua binding";
+    RE1806 Error "a file a Lua script writes that could not be written";
 }
 
 /// The rakata code with this id, if registered; case does not matter.
