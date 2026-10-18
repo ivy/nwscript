@@ -19,6 +19,7 @@ nwscript-vm = { path = "crates/nwscript-vm" }
 nwscript-codegen = { path = "crates/nwscript-codegen" }
 nwscript-decomp = { path = "crates/nwscript-decomp" }
 nwscript-lua = { path = "crates/nwscript-lua" }
+rakata-res = { path = "crates/rakata-res" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

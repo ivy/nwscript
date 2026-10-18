@@ -8,7 +8,7 @@ A Rust workspace: a toolset for the data of BioWare's Aurora-family games, KotOR
 
 | Crate | Responsibility | State |
 | --- | --- | --- |
-| `rakata-res` | `ResRef`, the resource type table, content hashes | planned |
+| `rakata-res` | `ResRef`, the resource type table, content hashes | present |
 | `rakata-archive` | KEY/BIF, ERF, RIM: read, write, add and replace members | planned |
 | `rakata-gff` | the GFF tree, lossless read, BioWare-layout write, paths, diff | planned |
 | `rakata-2da` | tables, every header variant the engine accepts, diff | planned |

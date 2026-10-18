@@ -1,0 +1,14 @@
+[package]
+name = "rakata-res"
+description = "Resource identity for Aurora-family games: ResRef, the resource type table, content hashes."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sha2 = "0.10"
+
+[lints]
+workspace = true
