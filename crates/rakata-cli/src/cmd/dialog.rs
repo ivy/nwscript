@@ -1,6 +1,7 @@
 //! `rakata dialog`: conversations through [`rakata::dialog`]. `show` prints
-//! a dialogue's transcript.
+//! a dialogue's transcript; `lint` reports its faults.
 
+use std::path::PathBuf;
 use std::time::Instant;
 
 use clap::{Args, Subcommand};
@@ -11,6 +12,7 @@ use crate::Exit;
 use crate::cli::ProfileArg;
 use rakata::codes;
 use rakata::diag::{Diagnostic, SourceMap};
+use rakata::dialog::lint::{self, Entry, Known, Linter};
 use rakata::dialog::{Session, TranscriptOptions};
 use rakata::game::{ModuleName, Profile};
 
@@ -20,7 +22,9 @@ Examples:
   rakata dialog show banter.dlg --game ~/games/swkotor
   rakata dialog show dan14_cutjuh.dlg --module danm14ac --game DIR
   rakata dialog show path/to/edited.dlg --module danm14ac --game DIR --scripts
-  rakata --format json dialog show banter.dlg --game DIR")]
+  rakata --format json dialog show banter.dlg --game DIR
+  rakata dialog lint --all --game DIR --known conformance/dialog-known.toml
+  rakata dialog lint dan14_juhani.dlg --module danm14ac --game DIR")]
 pub struct DialogArgs {
     #[command(subcommand)]
     pub action: DialogAction,
@@ -68,6 +72,56 @@ Examples:
         #[arg(long, value_enum, default_value_t = ProfileArg::K1)]
         profile: ProfileArg,
     },
+    /// Report a dialogue's faults, each under its code: a script or condition that resolves to nothing, a strref past the talk table, a voiced node without its voice-over or lip sync, a dangling link, a node no start reaches, a global a condition reads that globalcat.2da does not declare or whose name is computed, and a SoundExists that disagrees with the node's audio.
+    #[command(after_help = "\
+DIALOG is a .dlg file or NAME.dlg, loaded as `dialog show` loads it; several
+may be named. --all lints every dialogue of the install: each one a module's
+capsules hold, in that module, and each one of the global layers (Override/,
+the BIFs) against the install alone, a script or lip file no global layer
+holds counting as present when any module holds it, since a global dialogue
+plays in whichever module starts it. With --module, --all lints that module's
+dialogues only.
+
+A node is voiced when it names a VO_ResRef and its SoundExists is not 0;
+BioWare's tool writes 0 on a line it has no recording for, and the engine
+shows such a line silent. Reachability is structural: from the starts along
+every link, whatever the conditions answer.
+
+--known FILE names findings already accepted, as the TOML --write-known
+writes: [[finding]] tables of dialog, module, at (E3, R0, E3>R4, start>E0)
+and code. Known findings are counted and not reported. The exit status is 1
+when a finding is not in the known list, else 0.
+
+Codes: rakata explain RW1101, RW1102, RW1104 to RW1110.
+
+Examples:
+  rakata dialog lint --all --game DIR --known conformance/dialog-known.toml
+  rakata dialog lint dan14_cutjuh.dlg dan14_juhani.dlg --module danm14ac --game DIR
+  rakata --format json dialog lint --all --module danm14ac --game DIR")]
+    Lint {
+        /// The dialogues: .dlg files, or NAME.dlg in the install.
+        #[arg(
+            value_name = "DIALOG",
+            required_unless_present = "all",
+            conflicts_with = "all"
+        )]
+        dialogs: Vec<String>,
+        /// Every dialogue of the install, or of --module.
+        #[arg(long)]
+        all: bool,
+        /// The module whose capsules to search: the stem of modules/STEM.mod, STEM.rim and STEM_s.rim.
+        #[arg(long, short, value_name = "STEM")]
+        module: Option<String>,
+        /// Findings already accepted, which are not reported.
+        #[arg(long, value_name = "FILE")]
+        known: Option<PathBuf>,
+        /// Write every finding of this run as a known list.
+        #[arg(long, value_name = "FILE")]
+        write_known: Option<PathBuf>,
+        /// The game the install belongs to.
+        #[arg(long, value_enum, default_value_t = ProfileArg::K1)]
+        profile: ProfileArg,
+    },
 }
 
 fn diagnostic(code: &str, message: String) -> Diagnostic {
@@ -79,6 +133,24 @@ fn diagnostic(code: &str, message: String) -> Diagnostic {
 pub fn run(ctx: &Ctx, args: &DialogArgs) -> Exit {
     let map = SourceMap::new();
     match &args.action {
+        DialogAction::Lint {
+            dialogs,
+            all,
+            module,
+            known,
+            write_known,
+            profile,
+        } => run_lint(
+            ctx,
+            LintArgs {
+                dialogs,
+                all: *all,
+                module: module.as_deref(),
+                known: known.as_deref(),
+                write_known: write_known.as_deref(),
+                profile: *profile,
+            },
+        ),
         DialogAction::Show {
             dialog,
             module,
@@ -147,4 +219,146 @@ pub fn run(ctx: &Ctx, args: &DialogArgs) -> Exit {
             ctx.finish(env, &text, diags, &map, Exit::Ok)
         }
     }
+}
+
+struct LintArgs<'a> {
+    dialogs: &'a [String],
+    all: bool,
+    module: Option<&'a str>,
+    known: Option<&'a std::path::Path>,
+    write_known: Option<&'a std::path::Path>,
+    profile: ProfileArg,
+}
+
+fn run_lint(ctx: &Ctx, a: LintArgs<'_>) -> Exit {
+    let map = SourceMap::new();
+    let game = match ctx.require_game("dialog lint") {
+        Ok(g) => g.to_path_buf(),
+        Err(e) => return e,
+    };
+    let mut env = ctx.envelope("dialog lint");
+    let start = Instant::now();
+    let fail = |code: &str, message: String| vec![diagnostic(code, message)];
+    let known = match a.known.map(Known::read).transpose() {
+        Ok(k) => k.unwrap_or_default(),
+        Err(m) => return ctx.finish(env, "", fail(lint::BAD_KNOWN, m), &map, Exit::Ok),
+    };
+    let profile = match a.profile {
+        ProfileArg::K1 => Profile::K1,
+        ProfileArg::K2 => Profile::K2,
+    };
+    let mut linter = match Linter::open(&game, profile) {
+        Ok(l) => l,
+        Err(e) => return ctx.finish(env, "", fail(e.code(), e.message()), &map, Exit::Ok),
+    };
+    let module = a.module.map(ModuleName::new);
+    let mut diags: Vec<Diagnostic> = Vec::new();
+    let mut runs = Vec::new();
+    if a.all {
+        let targets = match linter.targets(module.as_ref()) {
+            Ok(t) => t,
+            Err(e) => return ctx.finish(env, "", fail(e.code(), e.message()), &map, Exit::Ok),
+        };
+        for t in &targets {
+            runs.push((t.id.to_string(), linter.lint_target(t)));
+        }
+    } else {
+        for d in a.dialogs {
+            crate::working_on(d.clone());
+            runs.push((d.clone(), linter.lint_named(d, module.clone())));
+        }
+    }
+    let mut found = Known::default();
+    let (mut dialogues, mut new, mut accepted) = (0usize, 0usize, 0usize);
+    let mut results = Vec::new();
+    let mut per_code: std::collections::BTreeMap<&str, usize> = Default::default();
+    for (name, run) in runs {
+        let linted = match run {
+            Ok(l) => l,
+            Err(e) => {
+                diags.push(diagnostic(e.code(), format!("{name}: {}", e.message())));
+                continue;
+            }
+        };
+        dialogues += 1;
+        let dialog = linted.loaded.dialog.name().to_string();
+        let module = linted.loaded.module.clone();
+        let mut items = Vec::new();
+        for f in &linted.findings {
+            let entry = Entry::of(&dialog, module.as_deref(), f);
+            let is_known = known.contains(&entry);
+            *per_code.entry(f.code).or_default() += 1;
+            let message = match &module {
+                Some(m) => format!("{} (module {m})", f.message(&dialog)),
+                None => f.message(&dialog),
+            };
+            if is_known {
+                accepted += 1;
+            } else {
+                new += 1;
+                diags.push(diagnostic(f.code, message.clone()));
+            }
+            items.push(json!({
+                "code": f.code,
+                "at": entry.at,
+                "key": f.key.to_string(),
+                "subject": f.subject,
+                "via": f.via,
+                "known": is_known,
+                "message": message,
+            }));
+            found.findings.insert(entry);
+        }
+        if !items.is_empty() {
+            results.push(json!({
+                "dialog": dialog,
+                "module": module,
+                "location": linted.loaded.location,
+                "findings": items,
+            }));
+        }
+    }
+    if let Some(path) = a.write_known
+        && let Err(e) = std::fs::write(path, found.to_toml())
+    {
+        diags.push(diagnostic(
+            "RE1306",
+            format!("cannot write {}: {e}", path.display()),
+        ));
+    }
+    let unmatched: Vec<&Entry> = if a.all && a.module.is_none() {
+        known
+            .findings
+            .iter()
+            .filter(|e| !found.contains(e))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let seconds = start.elapsed().as_secs_f64();
+    let mut text = format!(
+        "{dialogues} dialogues, {} findings: {new} new, {accepted} known",
+        new + accepted
+    );
+    if !unmatched.is_empty() {
+        text.push_str(&format!(
+            "; {} known findings no longer found",
+            unmatched.len()
+        ));
+    }
+    text.push_str(&format!("; {seconds:.2} s\n"));
+    for (code, n) in &per_code {
+        text.push_str(&format!("  {code}  {n}\n"));
+    }
+    env.result = json!({
+        "dialogues": dialogues,
+        "new": new,
+        "known": accepted,
+        "by_code": per_code,
+        "stale_known": unmatched,
+        "results": results,
+        "seconds": seconds,
+    });
+    let exit = if new > 0 { Exit::Errors } else { Exit::Ok };
+    ctx.finish(env, &text, diags, &map, exit)
 }

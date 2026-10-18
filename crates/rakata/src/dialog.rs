@@ -29,6 +29,8 @@ pub use rakata_dialog::{
 
 use crate::corpus::{FoldOutcome, Recovered, Recovery, find_ci};
 
+pub mod lint;
+
 /// Why a dialogue could not be loaded. Each variant has a registered code.
 #[derive(Debug)]
 pub enum Error {
