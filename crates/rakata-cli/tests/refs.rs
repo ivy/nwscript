@@ -105,6 +105,12 @@ fn refs_over_a_small_install_in_text_and_json() {
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&out.stderr).contains("RE1507"));
+
+    // The example report runs, and finds nothing of Canderous here.
+    let sql = include_str!("../../../docs/examples/canderous.sql");
+    let r = json(&["index", "query", "--db", s(&db), sql]);
+    assert_eq!(r["result"]["columns"][0], "module", "{r}");
+    assert_eq!(r["result"]["rows"], serde_json::json!([]));
 }
 
 /// `rakata refs ARGS` over `db`, timed, with the names of the resources it
