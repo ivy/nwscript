@@ -8,6 +8,7 @@ on stdin; prints a JSON deny on stdout when a path or command matches; prints no
 """
 
 import json
+import os
 import re
 import sys
 
@@ -79,10 +80,13 @@ def main() -> None:
         checks = [(COMMAND_PATTERN, str(tool_input.get("command", "")))]
     else:
         checks = [(PATTERN, str(tool_input.get(f, ""))) for f in FIELDS.get(tool, [])]
+    # This repository names the reference projects in its own files (the clean-room rule, a spike that measures
+    # TSLPatcher, its driver under conformance/) and never holds their source, so a path inside it is not a read of a
+    # reference: an absolute path under the project, or a relative one into docs/ or conformance/.
+    project = re.escape(os.path.realpath(event.get("cwd") or os.getcwd()))
+    own = re.compile(rf"(?:{project}|(?<![\w/.-])(?:docs|conformance))/\S*")
     for pattern, text in checks:
-        # This repository's documents name the reference projects (a spike that measures TSLPatcher, the clean-room
-        # rule itself) and reference source never lives under docs/, so a docs/ path is not a read of a reference.
-        hit = pattern.search(re.sub(r"docs/\S*", "docs/", text))
+        hit = pattern.search(own.sub("", text))
         if hit:
             deny(
                 f"clean room (AGENTS.md): `{hit.group(0)}` names a reference project whose source may not be read. "

@@ -29,6 +29,11 @@ cases = [
     ("allow", {"tool_name": "Bash", "tool_input": {"command": "sha256sum archives/*/TSLPatcher.exe; ls tslpatchdata/"}}),
     ("DENY", {"tool_name": "Bash", "tool_input": {"command": "cat ~/src/tslpatcher-src/Main.pas"}}),
     ("DENY", {"tool_name": "Read", "tool_input": {"file_path": "/home/ivy/src/TSLPatcher/Main.pas"}}),
+    ("allow", {"tool_name": "Write", "tool_input": {"file_path": "conformance/drivers/tslpatcher.sh", "content": "x"}}),
+    ("allow", {"tool_name": "Write", "tool_input": {"file_path": "/home/ivy/src/github.com/ivy/nwscript/conformance/drivers/tslpatcher.sh", "content": "x"}, "cwd": "/home/ivy/src/github.com/ivy/nwscript"}),
+    ("allow", {"tool_name": "Bash", "tool_input": {"command": "bash conformance/drivers/tslpatcher.sh data game 1"}}),
+    ("DENY", {"tool_name": "Bash", "tool_input": {"command": "cat /other/conformance/../PyKotor/x.py; cat ~/x/pykotor/docs/y"}}),
+    ("DENY", {"tool_name": "Read", "tool_input": {"file_path": "/home/ivy/src/github.com/OpenKotOR/PyKotor/conformance/x.py"}}),
 ]
 bad = 0
 for want, ev in cases:
