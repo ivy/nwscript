@@ -112,3 +112,82 @@ The globals are read from the condition's bytecode as `calls.jsonl` reads argume
 #### RW1110: `SoundExists` against the audio
 
 `SoundExists` 0 on a node whose voice-over is present, or nonzero on a node that names no audio. The Juhani mod's builder writes `SoundExists` 1 on every voiced line it adds. In vanilla: 36 nodes on the Endar Spire, 27 of them in `end_trask01.dlg` (`end_m01aa`), and `end_carth001.dlg` in `end_m01ab` E10 (`n_m1bncart01030_`). Whether the engine plays such a line has not been measured.
+
+## The tree lint
+
+`rakata lint` checks a game install for the faults a crash or a patcher error would otherwise find: what the files name that the install does not hold, and the `Override/` faults that make the game load the wrong file or none.
+
+```bash
+rakata lint --game DIR [--paths FILE] [--db FILE] [--known FILE] [--write-known FILE] [--format json]
+```
+
+| Code | Severity | What |
+| --- | --- | --- |
+| RW1901 | warning | a reference that resolves to nothing in the install |
+| RW1902 | warning | a strref in a GFF or 2DA at or past the end of `dialog.tlk` |
+| RW1903 | warning | two `Override/` files whose names differ only in case |
+| RE1901 | error | a `.tpc` in `Override/` beside a `.tga` or `.dds` of the same name |
+
+The `.tpc` shadow is an error because it has crashed the game; the others are warnings. A run exits 1 when it finds anything the known list does not hold, whatever the severity, and 0 otherwise. Each finding carries its code, its path relative to the tree (`PATH!MEMBER` for an archive member), its site and what it names; `--format json` gives them as `result.findings` beside the diagnostics.
+
+### RW1901: a reference that resolves to nothing
+
+Three kinds of site name a resource:
+
+- A GFF's `CResRef` field, at any depth, in every GFF type the index reads: a creature's scripts and conversation, a placeable's inventory, an instance's template, an area's models. The site is the field's path (`Creature List[2].TemplateResRef`).
+- A cell of a 2DA column that holds resrefs (`appearance.2da`'s `modela`, `spells.2da`'s `impactscript`). The site is `row N, column C`, the row by position. Numeric cells are not resrefs.
+- A string literal a script's bytecode passes to an engine routine's resref parameter: `ExecuteScript`'s `sScript`, `CreateObject`'s `sTemplate`, `StartNewModule`'s `sModuleName` and `sMovie1`. Which parameters take a resref is read from the install's own `nwscript.nss`, by the words of each parameter's name, as the index reads them (`refs` in [`index.md`](index.md#refsfrom_hash-kind-value-site)). The site is `@OFFSET Routine.param`.
+
+Each site names a type. A GFF field's and a 2DA column's come from the measured table below; a field the table does not type resolves as any type. A script parameter's follows its name: a script is an `ncs`, a dialogue a `dlg`, a sound a `wav`, a movie a `bik`, a module a module; a template is an item's `uti` when the name says item, else the blueprint the call's literal `OBJECT_TYPE_*` creates (constants from `nwscript.nss`), else any blueprint.
+
+A name resolves when the install holds a resource of that name and type where the site is loaded. A member of a module's capsule (`modules/STEM.mod`, `STEM.rim`, `STEM_s.rim`, `lips/STEM_loc.mod`) is loaded in that module: it sees the global layers and the module's own capsules. Anything else (`Override/`, a BIF, `patch.erf`, `rims/`) can be loaded in any module, so a name any module holds resolves. The global layers are `Override/` (its top level), `patch.erf`, the BIFs `chitin.key` indexes, `TexturePacks/`, `rims/`, the `lips/` capsules no module owns, and the files under `streamwaves/`, `streammusic/`, `streamsounds/` and `movies/`; a module is any capsule stem under `modules/` or `rims/`.
+
+Empty resrefs are not references. A dialogue node's `VO_ResRef` is not checked: BioWare's dialogues name a recording for lines whether or not one was made (24,755 of the 37,989 voice-over names in the vanilla dialogues resolve to nothing, every reply's among them), the engine shows an unvoiced line's text, and `rakata dialog lint` checks voices per dialogue (RW1104).
+
+### RW1902: a strref past the talk table
+
+A GFF's `CExoLocString` with a strref and every `StrRef` field, and every integer cell of a 2DA strref column, name a line of `dialog.tlk` by number. One at or past the table's length names nothing. `-1` and `4294967295` mean no line. The site is the field path or `row N, column C`.
+
+### RW1903: case-variant duplicates in Override
+
+Two or more files at the top level of `Override/` whose names are equal without regard to case, as `rakata which --duplicates` lists them ([`Install::override_case_variants`](../crates/rakata-game/src/install.rs)). Each file of a group is a finding, its path the file's, its value the others. Which of them the game opens under Wine is not established. With `--paths`, a group is reported when any of its files is listed.
+
+### RE1901: a `.tpc` shadowed by a `.tga` or `.dds`
+
+A `.tpc` at the top level of `Override/` with a `.tga` or `.dds` of the same stem, in any case. The finding's path is the `.tpc`, its value the files beside it. With `--paths`, it is reported when either is listed.
+
+### The measured table
+
+Which type a GFF field and a 2DA column name, and which 2DA columns hold strrefs, is [`crates/rakata/src/lint/sites.toml`](../crates/rakata/src/lint/sites.toml), measured over an index of the vanilla install by [`scripts/measure-resref-sites.py`](../scripts/measure-resref-sites.py); the file states the method. In short: a site (a GFF field label within a file type, a 2DA column within a table) is typed T when at least 80% of its vanilla values resolve as T and at least three distinct values do; a 2DA column whose values resolve as models only because a texture prefix the engine completes shares the model's name (`appearance.2da`'s `texa` to `texd`) is left out; a strref column is one whose name speaks of a string, whose cells are all integers, at least 60% of which name a line with text, and whose largest value is at least 100. The table holds 66 GFF fields, 129 2DA resref columns in 34 tables, and 75 2DA strref columns.
+
+### Paths, the index, and the known list
+
+`--paths FILE` checks only the files the list names, one per line relative to the tree, marked as a modshop checkpoint's `changed.txt` marks them (removed paths are skipped); a listed archive is checked member by member. Resolution still sees the whole install.
+
+`--db FILE` reads the contents from an index of the tree ([`index.md`](index.md)): the tree whose recorded root is the `--game` folder, its `refs` for the GFFs, `cells` for the 2DAs and `calls` for the scripts, and its `failed` coverage for what did not read. It finds what the walk finds; a test over a built install holds the two equal, and over the vanilla install and the modshop build they agree finding for finding. The `Override/` rules and the names the install holds are read from the folder in either case.
+
+`--known FILE` accepts the findings a list holds, by code, path and site: they are counted, not listed, and do not fail the run. `--write-known FILE` writes every finding of the run in that form:
+
+```toml
+[RW1901]
+"modules/danm13.rim!module.ifo" = ["Mod_OnPlrDeath", "Mod_OnPlrDying", "Mod_OnSpawnBtnDn"]
+```
+
+[`conformance/tree-known.toml`](../conformance/tree-known.toml) is the vanilla KotOR 1 install's own list. A finding the vanilla game has reappears under a new path when a mod repackages its file (a module's `.rim` pair rebuilt as a `.mod`, a table copied into `Override/`), and is new to the list there.
+
+### The vanilla game's findings
+
+Over the vanilla install, 24,801 GFFs, 2DAs and scripts: 537 RW1901, and no RW1902, RW1903 or RE1901. A few of each kind were checked by hand against the index; none of the names resolves as any type anywhere in the install.
+
+| Where | Findings | Example |
+| --- | --- | --- |
+| `module.ifo` event scripts | 189 | every module's `Mod_OnPlrDeath`, `Mod_OnPlrDying` and `Mod_OnSpawnBtnDn` name Neverwinter Nights' `nw_o0_death`, `nw_o0_dying` and `nw_o0_respawn` |
+| 2DA cells | 165 | `genericdoors.2da` rows 0 to 10 name models `t_door01` to `t_door11`; `modulesave.2da` rows 116 to 122 name modules `m12ac` to `m45mg` |
+| script literals | 52 | `k_pebn_exithawk.ncs` passes `lev_40ac` to `StartNewModule` (the module is `lev_m40ac`); `k_sup_galaxymap.ncs` passes the movie `5_9` |
+| dialogues | 38 | `dan13_tareelok.dlg` conditions on `k_pdan_taree01`, `03` and `05` |
+| GUIs | 25 | `partyselection.gui`'s `CONTROLS[1].BORDER.FILL` is `po_no` |
+| blueprints | 68 | the toolset templates `*.btc` and `*.bic` name NWN's `nw_e0_default*` and `nw_c2_default*` scripts; `c_sebulba.utc`'s `Portrait` is `po_mark1_` |
+
+### Measurements
+
+On the build host (16 threads), with the files in the page cache: the vanilla install in 0.75 s walked and 0.93 s from its index; the modshop build (45,979 resources, 319 findings beyond the vanilla list) in 0.45 s walked and 2.3 s from its index; a checkpoint's `changed.txt` over its tree in 0.2 to 0.3 s (184 paths for `mod:juhani-clones`, 1,209 for `138-crashed-republic-cruiser`). The index answers no faster than the walk: reading every row of `refs`, `cells` and `calls` through SQLite costs more than parsing the GFFs, which are small.
