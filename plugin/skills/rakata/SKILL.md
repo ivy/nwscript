@@ -1,7 +1,7 @@
 ---
 name: rakata
-description: Use when reading or changing the game data of Knights of the Old Republic (KotOR, K1/TSL) with the rakata command or its Python module — which copy of a resource the game loads, dialogues (.dlg) and their nodes, replies, links and conditions, globals and globalcat.2da, 2DA tables, GFF blueprints (.utc, .uti, .utp), dialog.tlk strings, textures (.tpc, .tga), layouts (.lyt, .vis), walkmeshes (.wok) and models (.mdl), what refers to a strref, script, tag or global, writing a mod's files into Override, linting a dialogue or an install, diffing two installs, diagnostic codes RE0xxx/RW1xxx.
-when_to_use: Add a reply to this conversation, make this line only show when a global is set, which globalcat.2da does the game use, what refers to this script, who sets this object's plot flag, what writes each entry of this quest, who speaks strref 42724, does my changed dialogue have dangling links, what did my mod change, what does RW1106 mean, declare a new global, edit a creature's blueprint.
+description: Use when reading or changing the game data of Knights of the Old Republic (KotOR, K1/TSL) with the rakata command, its Python module or its Lua scripts (rakata lua) — which copy of a resource the game loads, dialogues (.dlg) and their nodes, replies, links and conditions, globals and globalcat.2da, 2DA tables, GFF blueprints (.utc, .uti, .utp), dialog.tlk strings, textures (.tpc, .tga), layouts (.lyt, .vis), walkmeshes (.wok) and models (.mdl), an area's rooms with their models, textures and lightmaps, what refers to a strref, script, tag or global, writing a mod's files into Override, linting a dialogue or an install, diffing two installs, diagnostic codes RE0xxx/RW1xxx.
+when_to_use: Add a reply to this conversation, make this line only show when a global is set, which globalcat.2da does the game use, what refers to this script, who sets this object's plot flag, what writes each entry of this quest, who speaks strref 42724, does my changed dialogue have dangling links, what did my mod change, what does RW1106 mean, declare a new global, edit a creature's blueprint, which textures and lightmaps this area's rooms use and whether each resolves.
 allowed-tools:
   - Read
 ---
@@ -25,6 +25,7 @@ Read only the file the task needs, from this skill's `references/` directory:
 | Task | File |
 |---|---|
 | Which copy the game loads; read a resource, a table, a string, a dialogue, an item's properties, an area's instances, one script decompiled; a texture, an area's layout, a walkmesh or a model | `find.md` |
+| An area's rooms, their models, the textures and lightmaps those use and whether each resolves; the asset formats in Python or Lua | `assets.md` |
 | What refers to a strref, script, tag or global; which models use a texture and which layouts place a model; who sets and reads a flag or global; a quest's journal entries and their writers; search the install | `refs.md` |
 | Make a change: add dialogue nodes and links, declare a global, compile a condition, edit a table or blueprint, write to Override | `author.md` |
 | Check a change: lint a dialogue or the install, diff against the original | `check.md` |
@@ -47,4 +48,5 @@ The usual change runs through all four in order: find the copy, find what touche
 - "Give this character a new reply that only shows until the player has asked about X" → `find.md` (show the dialogue, pick the entry's voice key), `author.md` (compile the condition, declare the global, add the reply, link it with the condition, write), `check.md` (lint, diff).
 - "What uses the global `OAJ_DONE`?" → `refs.md`: `rakata refs OAJ_DONE --kind global --db FILE`.
 - "Which choice sets the statue's flag, and which journal entry does each sword write?" → `refs.md`: `rakata flags k37_inv_statue --module korr_m37aa --db FILE`, `rakata quest kor37_ajuntapall --db FILE`.
+- "Which textures do the rooms of area `m01aa` use, and are any missing?" → `assets.md`: `rakata lyt show`, then the lint's RW1906, an index report or a `rakata lua` script over the rooms' models.
 - "× RW1106 … reads the global …, and globalcat.2da does not declare it" → `rakata explain RW1106`, then `author.md`, "Globals".

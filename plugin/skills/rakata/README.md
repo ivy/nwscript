@@ -15,6 +15,7 @@ Gives Claude the working loop for KotOR's data with `rakata` and its Python modu
 | File | Covers |
 | --- | --- |
 | [`find.md`](references/find.md) | `which`, `cat`, `gff`, `2da` and `tlk show`, `texture`, `lyt`, `walkmesh` and `mdl show`, `dialog show` and the node keys it prints |
+| [`assets.md`](references/assets.md) | an area's rooms, models and textures worked through; the asset formats in the Python module and `rakata lua` |
 | [`refs.md`](references/refs.md) | `index build`, `refs`, `index query` and the index's tables |
 | [`author.md`](references/author.md) | the Python module: a scratch install, the order of a change, dialogue edits by stable key, key failures, globals, scripts, tables, writes |
 | [`check.md`](references/check.md) | `dialog lint`, `lint` with known lists, `diff` against the original |
