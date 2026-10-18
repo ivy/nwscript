@@ -606,215 +606,253 @@ fn local_decl(ty: &Type, table: &EngineTable) -> Option<(String, String)> {
 /// each of its functions, and index each function's shape.
 fn libraries(
     sources: &[(String, Vec<u8>)],
-    resolver: &dyn Fn() -> MemResolver,
+    resolver: &(dyn Fn() -> MemResolver + Sync),
     game: Game,
     declarations: Declarations,
     table: &EngineTable,
     warnings: &mut Vec<Diagnostic>,
 ) -> Vec<Library> {
-    let levels = nwscript::modes::Mode::Bioware.levels();
-    let mut checker = Checker::with_declarations(declarations, game);
-    let mut resolver = resolver();
-    let mut libs = Vec::new();
-    for (file, bytes) in sources {
-        let Some(name) = file.strip_suffix(".nss") else {
-            continue;
-        };
-        if name == "nwscript" {
-            continue;
-        }
-        let mut map = SourceMap::new();
-        let checked = checker.check(&mut resolver, &mut map, file, bytes);
-        let Some(analysis) = checked.analysis else {
-            continue;
-        };
-        if analysis.program.entry.is_some() {
-            continue;
-        }
-        let defined: Vec<_> = analysis
-            .program
-            .functions
-            .iter()
-            .filter(|f| f.definition.is_some())
-            .collect();
-        if defined.is_empty() {
-            continue;
-        }
-
-        let mut driver = format!("#include \"{name}\"\nvoid main()\n{{\n");
-        let mut locals: BTreeMap<String, String> = BTreeMap::new();
-        let mut calls = String::new();
-        for f in &defined {
-            let mut args = Vec::new();
-            for p in &f.params {
-                match local_decl(&p.ty, table) {
-                    Some((ty, var)) => {
-                        locals.insert(var.clone(), ty);
-                        args.push(var);
-                    }
-                    // An action argument is any void call.
-                    None => args.push("ClearAllActions()".to_string()),
+    let slots: Mutex<Vec<Option<LibraryOutcome>>> =
+        Mutex::new((0..sources.len()).map(|_| None).collect());
+    let next = AtomicUsize::new(0);
+    let workers = std::thread::available_parallelism()
+        .map_or(4, |n| n.get())
+        .min(sources.len())
+        .max(1);
+    std::thread::scope(|s| {
+        for _ in 0..workers {
+            let (slots, next) = (&slots, &next);
+            s.spawn(move || {
+                let mut checker = Checker::with_declarations(declarations, game);
+                let mut resolver = resolver();
+                loop {
+                    let i = next.fetch_add(1, Ordering::Relaxed);
+                    let Some((file, bytes)) = sources.get(i) else {
+                        break;
+                    };
+                    let lib = library(file, bytes, &mut checker, &mut resolver, game, table);
+                    slots.lock().unwrap_or_else(|e| e.into_inner())[i] = Some(lib);
                 }
-            }
-            calls.push_str(&format!("    {}({});\n", f.name, args.join(", ")));
+            });
         }
-        for (var, ty) in &locals {
-            driver.push_str(&format!("    {ty} {var};\n"));
+    });
+    let mut libs = Vec::new();
+    for slot in slots.into_inner().unwrap_or_else(|e| e.into_inner()) {
+        match slot {
+            Some(Ok(Some(lib))) => libs.push(lib),
+            Some(Err(w)) => warnings.push(w),
+            _ => {}
         }
-        driver.push_str(&calls);
-        driver.push_str("}\n");
+    }
+    libs
+}
 
-        let mut dmap = SourceMap::new();
-        let checked = checker.check(&mut resolver, &mut dmap, "driver.nss", driver.as_bytes());
-        let diags = nwscript::modes::finish(
-            checked.analysis.as_ref(),
-            checked.diagnostics,
-            &dmap,
-            &levels,
-        );
-        if let Some(e) = diags.iter().find(|d| d.is_error()) {
-            warnings.push(warn(
+/// An NSS read as an include library: `Ok(None)` when it is not one.
+type LibraryOutcome = std::result::Result<Option<Library>, Diagnostic>;
+
+/// One NSS as an include library: `None` when it is not one (it has an
+/// entry point or defines no function), a warning when it does not compile.
+fn library(
+    file: &str,
+    bytes: &[u8],
+    checker: &mut Checker,
+    resolver: &mut MemResolver,
+    game: Game,
+    table: &EngineTable,
+) -> LibraryOutcome {
+    let levels = nwscript::modes::Mode::Bioware.levels();
+    let Some(name) = file.strip_suffix(".nss") else {
+        return Ok(None);
+    };
+    if name == "nwscript" {
+        return Ok(None);
+    }
+    let mut map = SourceMap::new();
+    let checked = checker.check(resolver, &mut map, file, bytes);
+    let Some(analysis) = checked.analysis else {
+        return Ok(None);
+    };
+    if analysis.program.entry.is_some() {
+        return Ok(None);
+    }
+    let defined: Vec<_> = analysis
+        .program
+        .functions
+        .iter()
+        .filter(|f| f.definition.is_some())
+        .collect();
+    if defined.is_empty() {
+        return Ok(None);
+    }
+
+    let mut driver = format!("#include \"{name}\"\nvoid main()\n{{\n");
+    let mut locals: BTreeMap<String, String> = BTreeMap::new();
+    let mut calls = String::new();
+    for f in &defined {
+        let mut args = Vec::new();
+        for p in &f.params {
+            match local_decl(&p.ty, table) {
+                Some((ty, var)) => {
+                    locals.insert(var.clone(), ty);
+                    args.push(var);
+                }
+                // An action argument is any void call.
+                None => args.push("ClearAllActions()".to_string()),
+            }
+        }
+        calls.push_str(&format!("    {}({});\n", f.name, args.join(", ")));
+    }
+    for (var, ty) in &locals {
+        driver.push_str(&format!("    {ty} {var};\n"));
+    }
+    driver.push_str(&calls);
+    driver.push_str("}\n");
+
+    let mut dmap = SourceMap::new();
+    let checked = checker.check(resolver, &mut dmap, "driver.nss", driver.as_bytes());
+    let diags = nwscript::modes::finish(
+        checked.analysis.as_ref(),
+        checked.diagnostics,
+        &dmap,
+        &levels,
+    );
+    if let Some(e) = diags.iter().find(|d| d.is_error()) {
+        return Err(warn(
+            "RW1002",
+            format!(
+                "{name} does not compile as an include library, so its functions are not folded: {}",
+                e.message
+            ),
+        ));
+    }
+    let Some(driven) = checked.analysis else {
+        return Ok(None);
+    };
+    let program = match nwscript::compile::compile(&driven.program, game) {
+        Ok(p) => p,
+        Err(d) => {
+            return Err(warn(
                 "RW1002",
                 format!(
                     "{name} does not compile as an include library, so its functions are not folded: {}",
-                    e.message
+                    d.message
                 ),
             ));
-            continue;
         }
-        let Some(driven) = checked.analysis else {
-            continue;
-        };
-        let program = match nwscript::compile::compile(&driven.program, game) {
-            Ok(p) => p,
-            Err(d) => {
-                warnings.push(warn(
-                    "RW1002",
-                    format!(
-                        "{name} does not compile as an include library, so its functions are not folded: {}",
-                        d.message
-                    ),
-                ));
-                continue;
-            }
-        };
+    };
 
-        let ins = program.instructions();
-        let ranges = function_ranges(&program);
-        // With globals the entry stub jumps to their initialisation, which
-        // ends in `SAVEBP; JSR main`; without, it jumps to main itself.
-        let (globals_end, main_jsr) = match ins.iter().position(|x| x.opcode == Opcode::SaveBp) {
-            Some(save) => (save, save + 1),
-            None => (2.min(ins.len()), 0),
-        };
-        let main_range = ins
-            .get(main_jsr)
-            .and_then(|x| x.jump_target(program.offsets()[main_jsr]))
-            .and_then(|t| program.index_at(t))
-            .and_then(|t| ranges.iter().position(|&(s, e)| s <= t && t < e));
-        let Some(m) = main_range else {
-            warnings.push(warn(
-                "RW1002",
-                format!(
-                    "{name} does not compile as an include library, so its functions are not folded: the driver's bytecode has no entry point"
-                ),
-            ));
-            continue;
-        };
-        // Without globals main is the first range, which takes in the
-        // entry stub's own `JSR`.
-        let from = if ranges[m].0 == 0 { 2 } else { ranges[m].0 };
-        let mut called: Vec<usize> = Vec::new();
-        for (i, x) in ins.iter().enumerate().take(ranges[m].1).skip(from) {
-            if x.opcode == Opcode::Jsr
-                && let Some(t) = x
-                    .jump_target(program.offsets()[i])
-                    .and_then(|t| program.index_at(t))
-                && let Some(k) = ranges.iter().position(|&(s, e)| s <= t && t < e)
-            {
-                called.push(k);
-            }
-        }
-        if called.len() != defined.len() {
-            warnings.push(warn(
-                "RW1002",
-                format!(
-                    "{name} does not compile as an include library, so its functions are not folded: the driver calls {} functions but {} compiled",
-                    defined.len(),
-                    called.len()
-                ),
-            ));
-            continue;
-        }
-        let range_of = |i: usize| -> Option<usize> {
-            ins[i]
+    let ins = program.instructions();
+    let ranges = function_ranges(&program);
+    // With globals the entry stub jumps to their initialisation, which
+    // ends in `SAVEBP; JSR main`; without, it jumps to main itself.
+    let (globals_end, main_jsr) = match ins.iter().position(|x| x.opcode == Opcode::SaveBp) {
+        Some(save) => (save, save + 1),
+        None => (2.min(ins.len()), 0),
+    };
+    let main_range = ins
+        .get(main_jsr)
+        .and_then(|x| x.jump_target(program.offsets()[main_jsr]))
+        .and_then(|t| program.index_at(t))
+        .and_then(|t| ranges.iter().position(|&(s, e)| s <= t && t < e));
+    let Some(m) = main_range else {
+        return Err(warn(
+            "RW1002",
+            format!(
+                "{name} does not compile as an include library, so its functions are not folded: the driver's bytecode has no entry point"
+            ),
+        ));
+    };
+    // Without globals main is the first range, which takes in the
+    // entry stub's own `JSR`.
+    let from = if ranges[m].0 == 0 { 2 } else { ranges[m].0 };
+    let mut called: Vec<usize> = Vec::new();
+    for (i, x) in ins.iter().enumerate().take(ranges[m].1).skip(from) {
+        if x.opcode == Opcode::Jsr
+            && let Some(t) = x
                 .jump_target(program.offsets()[i])
                 .and_then(|t| program.index_at(t))
-                .and_then(|t| ranges.iter().position(|&(s, e)| s <= t && t < e))
-        };
-        let gb = globals_bytes(&program);
-        let functions = called
-            .iter()
-            .zip(&defined)
-            .map(|(&k, f)| LibFunction {
-                name: f.name.clone(),
-                shape: shape(&ins[ranges[k].0..ranges[k].1], gb),
-                ret: type_text(&f.ret, table),
-                params: f.params.iter().map(|p| type_text(&p.ty, table)).collect(),
-                callees: (ranges[k].0..ranges[k].1)
-                    .filter(|&i| ins[i].opcode == Opcode::Jsr)
-                    .map(|i| range_of(i).and_then(|r| called.iter().position(|&c| c == r)))
-                    .collect(),
-            })
-            .collect();
-        let files = analysis
-            .program
-            .files
-            .iter()
-            .map(|u| {
-                u.name
-                    .to_ascii_lowercase()
-                    .trim_end_matches(".nss")
-                    .to_string()
-            })
-            .collect();
-        let globals_init = ins[2.min(globals_end)..globals_end].to_vec();
-        let program = &analysis.program;
-        let globals: Vec<LibGlobal> = program
-            .globals
-            .iter()
-            .map(|g| LibGlobal {
-                name: g.name.clone(),
-                size: program.size_of(&g.ty),
-                struct_name: match &g.ty {
-                    Type::Struct(s) => Some(s.clone()),
-                    _ => None,
-                },
-                fields: match &g.ty {
-                    Type::Struct(s) => program
-                        .structs
-                        .iter()
-                        .find(|d| d.name == *s)
-                        .map(|d| {
-                            d.fields
-                                .iter()
-                                .map(|f| (f.name.clone(), program.size_of(&f.ty)))
-                                .collect()
-                        })
-                        .unwrap_or_default(),
-                    _ => Vec::new(),
-                },
-            })
-            .collect();
-        libs.push(Library {
-            name: name.to_string(),
-            files,
-            globals_init,
-            globals,
-            functions,
-        });
+            && let Some(k) = ranges.iter().position(|&(s, e)| s <= t && t < e)
+        {
+            called.push(k);
+        }
     }
-    libs
+    if called.len() != defined.len() {
+        return Err(warn(
+            "RW1002",
+            format!(
+                "{name} does not compile as an include library, so its functions are not folded: the driver calls {} functions but {} compiled",
+                defined.len(),
+                called.len()
+            ),
+        ));
+    }
+    let range_of = |i: usize| -> Option<usize> {
+        ins[i]
+            .jump_target(program.offsets()[i])
+            .and_then(|t| program.index_at(t))
+            .and_then(|t| ranges.iter().position(|&(s, e)| s <= t && t < e))
+    };
+    let gb = globals_bytes(&program);
+    let functions = called
+        .iter()
+        .zip(&defined)
+        .map(|(&k, f)| LibFunction {
+            name: f.name.clone(),
+            shape: shape(&ins[ranges[k].0..ranges[k].1], gb),
+            ret: type_text(&f.ret, table),
+            params: f.params.iter().map(|p| type_text(&p.ty, table)).collect(),
+            callees: (ranges[k].0..ranges[k].1)
+                .filter(|&i| ins[i].opcode == Opcode::Jsr)
+                .map(|i| range_of(i).and_then(|r| called.iter().position(|&c| c == r)))
+                .collect(),
+        })
+        .collect();
+    let files = analysis
+        .program
+        .files
+        .iter()
+        .map(|u| {
+            u.name
+                .to_ascii_lowercase()
+                .trim_end_matches(".nss")
+                .to_string()
+        })
+        .collect();
+    let globals_init = ins[2.min(globals_end)..globals_end].to_vec();
+    let program = &analysis.program;
+    let globals: Vec<LibGlobal> = program
+        .globals
+        .iter()
+        .map(|g| LibGlobal {
+            name: g.name.clone(),
+            size: program.size_of(&g.ty),
+            struct_name: match &g.ty {
+                Type::Struct(s) => Some(s.clone()),
+                _ => None,
+            },
+            fields: match &g.ty {
+                Type::Struct(s) => program
+                    .structs
+                    .iter()
+                    .find(|d| d.name == *s)
+                    .map(|d| {
+                        d.fields
+                            .iter()
+                            .map(|f| (f.name.clone(), program.size_of(&f.ty)))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                _ => Vec::new(),
+            },
+        })
+        .collect();
+    Ok(Some(Library {
+        name: name.to_string(),
+        files,
+        globals_init,
+        globals,
+        functions,
+    }))
 }
 
 /// A capsule's name as a directory: its stem, or its whole file name when
