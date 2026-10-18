@@ -6,7 +6,8 @@
 //! modded build: `Override/` first; then the module's capsules, `STEM.mod`
 //! over `STEM.rim` over `STEM_s.rim` (KotOR 2 adds `STEM_dlg.erf`) and the
 //! lip-sync pack `lips/STEM_loc.mod`; then KotOR 1's `patch.erf`; then the
-//! BIFs `chitin.key` indexes. Every copy the install holds is a
+//! texture packs, the selected quality pack over `swpc_tex_gui.erf`; then
+//! the BIFs `chitin.key` indexes. Every copy the install holds is a
 //! [`Candidate`], with where it lies, its content hash and why it lost.
 
 use std::collections::HashMap;
@@ -19,6 +20,7 @@ use rakata_res::{ContentHash, ResId, ResType};
 
 use crate::archive::{BifFile, Capsule};
 use crate::listing::Listing;
+use crate::texture_pack::{self, TexturePack};
 use crate::{Error, Profile, Result};
 
 /// A module's name: the stem its capsules share, `danm14ac` for
@@ -60,6 +62,9 @@ pub enum Layer {
     Module,
     /// A member of `patch.erf`.
     Patch,
+    /// A member of a texture pack under `TexturePacks/`: the selected
+    /// quality pack, then `swpc_tex_gui.erf`.
+    TexturePack,
     /// A member of a BIF, through `chitin.key`.
     Chitin,
 }
@@ -71,6 +76,7 @@ impl Layer {
             Layer::Override => "override",
             Layer::Module => "module",
             Layer::Patch => "patch",
+            Layer::TexturePack => "texturepack",
             Layer::Chitin => "chitin",
         }
     }
@@ -85,7 +91,7 @@ pub enum Location {
         path: PathBuf,
     },
     /// A member of a capsule: a module's `.mod`, `.rim` or `_s.rim`, a
-    /// lip-sync pack, or `patch.erf`.
+    /// lip-sync pack, `patch.erf`, or a texture pack.
     Capsule {
         /// The capsule.
         path: PathBuf,
@@ -237,6 +243,10 @@ pub struct Install {
     modules: HashMap<ModuleName, Module>,
     module_names: Vec<ModuleName>,
     patch: Option<Capsule>,
+    texture_packs_dir: Option<Listing>,
+    texture_pack: TexturePack,
+    /// The selected quality pack, then the GUI pack, those present.
+    texture_packs: Vec<Capsule>,
     pub(crate) inputs: Vec<nwscript::InputRecord>,
     pub(crate) resolver_module: Option<ModuleName>,
 }
@@ -253,10 +263,12 @@ impl fmt::Debug for Install {
 
 impl Install {
     /// Open the install at `dir`, the folder holding `chitin.key`. Reads the
-    /// KEY and lists `Override/`, `modules/` and `lips/`; every archive is
-    /// opened on first use. Fails with [`Error::NotAnInstall`] when there
-    /// is no `chitin.key`, and [`Error::MissingBif`] when the KEY names a
-    /// BIF the install lacks.
+    /// KEY and lists `Override/`, `modules/`, `lips/` and `TexturePacks/`;
+    /// every archive is opened on first use. The texture layer searches the
+    /// profile's [default pack](Profile::default_texture_pack);
+    /// [`Install::with_texture_pack`] selects another. Fails with
+    /// [`Error::NotAnInstall`] when there is no `chitin.key`, and
+    /// [`Error::MissingBif`] when the KEY names a BIF the install lacks.
     pub fn open(dir: impl AsRef<Path>, profile: Profile) -> Result<Self> {
         let root = dir.as_ref().to_path_buf();
         let listing = Listing::read(&root).map_err(|source| Error::Io {
@@ -327,6 +339,7 @@ impl Install {
         let override_dir = dir_listing("Override")?;
         let modules_dir = dir_listing("modules")?;
         let lips_dir = dir_listing("lips")?;
+        let texture_packs_dir = dir_listing(texture_pack::DIR)?;
         let patch = profile
             .has_patch_erf()
             .then(|| root_listing.files("patch.erf").into_iter().next())
@@ -369,9 +382,58 @@ impl Install {
             modules,
             module_names,
             patch,
+            texture_packs: texture_capsules(
+                texture_packs_dir.as_ref(),
+                profile.default_texture_pack(),
+            ),
+            texture_packs_dir,
+            texture_pack: profile.default_texture_pack(),
             inputs: Vec::new(),
             resolver_module: None,
         })
+    }
+
+    /// The install with `pack` as the quality pack its texture layer
+    /// searches, over `swpc_tex_gui.erf`.
+    pub fn with_texture_pack(mut self, pack: TexturePack) -> Self {
+        if pack != self.texture_pack {
+            self.texture_pack = pack;
+            self.texture_packs = texture_capsules(self.texture_packs_dir.as_ref(), pack);
+        }
+        self
+    }
+
+    /// The quality pack the texture layer searches.
+    pub fn texture_pack(&self) -> TexturePack {
+        self.texture_pack
+    }
+
+    /// The texture packs the layer searches, in order, by path: the
+    /// selected quality pack and `swpc_tex_gui.erf`, those the install
+    /// holds.
+    pub fn texture_pack_paths(&self) -> Vec<&Path> {
+        self.texture_packs.iter().map(Capsule::path).collect()
+    }
+
+    /// Where the selected quality pack would lie, when `TexturePacks/`
+    /// exists and does not hold it (`RW0402`): the texture layer then holds
+    /// only the GUI pack.
+    pub fn missing_texture_pack(&self) -> Option<PathBuf> {
+        let dir = self.texture_packs_dir.as_ref()?;
+        let name = self.texture_pack.file_name();
+        dir.files(name).is_empty().then(|| dir.path().join(name))
+    }
+
+    /// Every member of the texture packs the layer searches, in search
+    /// order then table order, without duplicates.
+    pub fn texture_pack_ids(&self) -> Result<Vec<ResId>> {
+        let mut out = Vec::new();
+        for capsule in &self.texture_packs {
+            out.extend(capsule.ids()?);
+        }
+        let mut seen = std::collections::HashSet::new();
+        out.retain(|id| seen.insert(*id));
+        Ok(out)
     }
 
     /// The folder the install was opened at.
@@ -540,6 +602,17 @@ impl Install {
                 return Ok(());
             }
         }
+        for pack in &self.texture_packs {
+            if let Some(bytes) = pack.get(id)? {
+                let location = Location::Capsule {
+                    path: pack.path().to_path_buf(),
+                    member: id,
+                };
+                if !visit(Layer::TexturePack, location, bytes)? {
+                    return Ok(());
+                }
+            }
+        }
         if let Some(entry) = self.key.get(id) {
             let bif = self
                 .bifs
@@ -602,11 +675,25 @@ fn module_capsules(
     out
 }
 
+/// The texture packs the layer searches under `TexturePacks/`: `pack`, then
+/// `swpc_tex_gui.erf`, each in every case variant the folder holds.
+fn texture_capsules(dir: Option<&Listing>, pack: TexturePack) -> Vec<Capsule> {
+    let Some(dir) = dir else {
+        return Vec::new();
+    };
+    [pack.file_name(), texture_pack::GUI]
+        .into_iter()
+        .flat_map(|name| dir.files(name))
+        .map(Capsule::new)
+        .collect()
+}
+
 /// Why `winner` outranks `loser`, as a sentence fragment.
 fn precedence(winner: &Candidate, loser: &Candidate) -> String {
     match (winner.layer, loser.layer) {
         (Layer::Override, Layer::Module) => "Override outranks the module's capsules".into(),
         (Layer::Override, Layer::Patch) => "Override outranks patch.erf".into(),
+        (Layer::Override, Layer::TexturePack) => "Override outranks the texture packs".into(),
         (Layer::Override, Layer::Chitin) => "Override outranks the BIFs".into(),
         (Layer::Module, Layer::Module) => format!(
             "{} outranks {}",
@@ -614,8 +701,18 @@ fn precedence(winner: &Candidate, loser: &Candidate) -> String {
             file_name(&loser.location)
         ),
         (Layer::Module, Layer::Patch) => "the module's capsules outrank patch.erf".into(),
+        (Layer::Module, Layer::TexturePack) => {
+            "the module's capsules outrank the texture packs".into()
+        }
         (Layer::Module, Layer::Chitin) => "the module's capsules outrank the BIFs".into(),
+        (Layer::Patch, Layer::TexturePack) => "patch.erf outranks the texture packs".into(),
         (Layer::Patch, Layer::Chitin) => "patch.erf outranks the BIFs".into(),
+        (Layer::TexturePack, Layer::TexturePack) => format!(
+            "{} outranks {}",
+            file_name(&winner.location),
+            file_name(&loser.location)
+        ),
+        (Layer::TexturePack, Layer::Chitin) => "the texture packs outrank the BIFs".into(),
         (w, l) => format!("{} outranks {}", w.name(), l.name()),
     }
 }

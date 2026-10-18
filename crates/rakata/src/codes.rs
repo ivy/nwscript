@@ -47,7 +47,9 @@ nwscript_diag::codes! {
     RE0402 Error "a BIF the KEY names is missing from the install";
     RE0403 Error "no module capsule carries the name";
     RE0404 Error "no layer of the install holds the resource";
+    RE0405 Error "a texture pack that is none of tpa, tpb and tpc";
     RW0401 Warning "Override files that differ only in case";
+    RW0402 Warning "the selected texture pack is not in the install";
     RE0501 Error "a directory that is not a game install";
     RE0601 Error "not a GFF V3.2 file";
     RE0602 Error "a GFF section or field lying beyond the end of the file";

@@ -183,7 +183,8 @@ impl Mod {
     /// The copy of `id` the game loads: this mod's own write when it made
     /// one (to `Override/`, or into this module's `.mod`), else the
     /// install's in the engine's order (`Override/`, the module's capsules,
-    /// `patch.erf`, the BIFs). Fails with `RE0404` when no layer holds it.
+    /// `patch.erf`, the texture packs, the BIFs). Fails with `RE0404` when
+    /// no layer holds it.
     pub fn loaded(&self, id: ResId) -> Result<Loaded> {
         if let Some((module, capsule)) = self.written_here(id) {
             let bytes = fs::read(capsule).map_err(|source| {

@@ -22,6 +22,11 @@ pub mod codes {
     /// Two Override files that differ only in case: the engine's choice
     /// between them is not established.
     pub const CASE_VARIANTS: &str = "RW0401";
+    /// A texture pack named by something other than `tpa`, `tpb` or `tpc`.
+    pub const UNKNOWN_TEXTURE_PACK: &str = "RE0405";
+    /// The selected quality pack is not under `TexturePacks/`: the texture
+    /// layer holds only the GUI pack.
+    pub const MISSING_TEXTURE_PACK: &str = "RW0402";
 }
 
 /// An error in opening or reading an install.
@@ -52,6 +57,11 @@ pub enum Error {
         id: ResId,
         /// The module it was asked in, if any.
         module: Option<String>,
+    },
+    /// A texture pack named by something other than `tpa`, `tpb` or `tpc`.
+    UnknownTexturePack {
+        /// The name as given.
+        name: String,
     },
     /// A file could not be read.
     Io {
@@ -92,6 +102,7 @@ impl Error {
             Error::MissingBif { .. } => codes::MISSING_BIF,
             Error::NoSuchModule { .. } => codes::NO_SUCH_MODULE,
             Error::NotFound { .. } => codes::NOT_FOUND,
+            Error::UnknownTexturePack { .. } => codes::UNKNOWN_TEXTURE_PACK,
             Error::Io { .. } => rakata_archive::codes::IO,
             Error::Archive { source, .. } => source.code(),
             Error::Unreadable { code, .. } => code,
@@ -153,12 +164,15 @@ impl fmt::Display for Error {
                 module: Some(m),
             } => write!(
                 f,
-                "{code}: no `{id}` in Override, module `{m}` or the game's own files"
+                "{code}: no `{id}` in Override, module `{m}`, the texture packs or the game's own files"
             ),
             Error::NotFound { id, module: None } => write!(
                 f,
-                "{code}: no `{id}` in Override or the game's own files; a module's copy needs its module named"
+                "{code}: no `{id}` in Override, the texture packs or the game's own files; a module's copy needs its module named"
             ),
+            Error::UnknownTexturePack { name } => {
+                write!(f, "{code}: `{name}` is not a texture pack: tpa, tpb or tpc")
+            }
             Error::Io { path, source } => {
                 write!(f, "{code}: cannot read `{}`: {source}", path.display())
             }

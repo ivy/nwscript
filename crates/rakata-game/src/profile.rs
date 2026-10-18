@@ -1,5 +1,7 @@
 //! `Profile`: which game, and the folders and capsule names that follow.
 
+use crate::TexturePack;
+
 /// The game an install belongs to. The two differ in which capsules a
 /// module ships as and whether a `patch.erf` sits over the BIFs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -31,6 +33,13 @@ impl Profile {
     /// which KotOR 1's updates shipped as a layer over the BIFs.
     pub const fn has_patch_erf(self) -> bool {
         matches!(self, Profile::K1)
+    }
+
+    /// The quality pack the texture layer searches unless the caller
+    /// selects another: [`TexturePack::DEFAULT`] for both games, a stated
+    /// choice rather than a reading of the game's `Texture Quality`.
+    pub const fn default_texture_pack(self) -> TexturePack {
+        TexturePack::DEFAULT
     }
 
     /// The profile's short name, as `--profile` spells it.
