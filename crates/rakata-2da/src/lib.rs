@@ -268,7 +268,9 @@ impl<'a> Header<'a> {
         }
         let rows = u32::from_le_bytes(r.take("the row count", 4)?.try_into().expect("four bytes"))
             as usize;
-        let mut labels = Vec::with_capacity(rows);
+        // Each label takes at least its terminator: no more than the bytes
+        // left, whatever the count says.
+        let mut labels = Vec::with_capacity(rows.min(bytes.len() - r.pos));
         for _ in 0..rows {
             labels.push(r.until("the row labels", terminator)?);
         }

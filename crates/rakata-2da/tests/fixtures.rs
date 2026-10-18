@@ -5,6 +5,20 @@
 
 use rakata_2da::{TwoDa, inspect};
 
+/// `bytes`, kept as a seed for the fuzz targets in the directory
+/// `$RAKATA_FUZZ_SEEDS` names, when it is set.
+fn seed(bytes: &[u8]) -> &[u8] {
+    if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        bytes.hash(&mut h);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+    }
+    bytes
+}
+
 fn table() -> TwoDa {
     let mut t = TwoDa::new(["label", "name", "description", "icon"]);
     t.add_row(
@@ -67,8 +81,8 @@ fn a_zero_size_field_reads_every_cell_and_writes_back_normal() {
     let patched = patched_to_zero(&normal);
     assert_ne!(normal, patched);
 
-    let from_normal = TwoDa::parse(&normal).unwrap();
-    let from_patched = TwoDa::parse(&patched).unwrap();
+    let from_normal = TwoDa::parse(seed(&normal)).unwrap();
+    let from_patched = TwoDa::parse(seed(&patched)).unwrap();
     assert_eq!(from_normal, t);
     assert_eq!(from_patched, t);
     assert!(from_normal.semantic_eq(&from_patched));
@@ -86,8 +100,8 @@ fn a_zero_size_field_reads_every_cell_and_writes_back_normal() {
 fn the_layout_line_tells_the_two_apart() {
     let normal = table().to_bytes().unwrap();
     let patched = patched_to_zero(&normal);
-    let a = inspect(&normal).unwrap();
-    let b = inspect(&patched).unwrap();
+    let a = inspect(seed(&normal)).unwrap();
+    let b = inspect(seed(&patched)).unwrap();
     assert_eq!(a.declared_size as usize, a.strings_len);
     assert_eq!(b.declared_size, 0);
     assert_eq!(b.strings_len, a.strings_len);
@@ -96,5 +110,20 @@ fn the_layout_line_tells_the_two_apart() {
         b.to_string()
             .starts_with("2da: tab-ended names, size 0 for "),
         "{b}"
+    );
+}
+
+#[test]
+fn a_row_count_past_the_bytes_is_refused_before_it_allocates() {
+    // 1.2 billion rows in a 50-byte file: the reader once reserved room
+    // for every label (18 GB) before reading one. Found by fuzzing.
+    let mut b = b"2DA V2.b\nlabel\tname\t\0".to_vec();
+    b.extend_from_slice(&0x4500_0003u32.to_le_bytes());
+    b.extend_from_slice(b"0\t1\t2\t");
+    let e = TwoDa::parse(seed(&b)).unwrap_err();
+    assert_eq!(e.code(), rakata_2da::codes::TRUNCATED);
+    assert_eq!(
+        inspect(&b).unwrap_err().code(),
+        rakata_2da::codes::TRUNCATED
     );
 }
