@@ -5,6 +5,8 @@ pub use conformance::ConformanceArgs;
 mod corpus;
 pub use corpus::CorpusArgs;
 mod cat;
+mod decompile;
+pub use decompile::DecompileArgs;
 mod dialog;
 pub use dialog::DialogArgs;
 mod diff;
@@ -19,6 +21,8 @@ mod lint;
 pub use lint::LintArgs;
 mod save;
 pub use save::SaveArgs;
+mod show;
+pub use show::ShowArgs;
 mod which;
 pub use cat::CatArgs;
 mod gff;
@@ -178,6 +182,8 @@ pub fn run(cli: Cli) -> Exit {
         Command::Lua(args) => lua::run(&ctx, &args),
         Command::Save(args) => save::run(&ctx, &args),
         Command::Dialog(args) => dialog::run(&ctx, &args),
+        Command::Decompile(args) => decompile::run(&ctx, &args),
+        Command::Show(args) => show::run(&ctx, &args),
         Command::Diff(args) => diff::run(&ctx, &args),
         Command::Index(args) => index::run(&ctx, &args),
         Command::Refs(args) => refs::run(&ctx, &args),

@@ -315,12 +315,12 @@ fn diff(ctx: &Ctx, args: &DiffArgs) -> Exit {
     ctx.finish(env, &text, Vec::new(), &map, exit)
 }
 
-fn version(g: &Gff) -> String {
+pub(super) fn version(g: &Gff) -> String {
     String::from_utf8_lossy(&g.version).into_owned()
 }
 
 /// The tree under `s`, one field per line at `depth`.
-fn tree(s: &Struct, depth: usize, out: &mut String) {
+pub(super) fn tree(s: &Struct, depth: usize, out: &mut String) {
     for f in &s.fields {
         field(f, depth, out);
     }
@@ -422,7 +422,7 @@ fn typed(v: &Value) -> Json {
     json!({ "type": v.field_type().name(), "value": value_json(v) })
 }
 
-fn struct_json(s: &Struct) -> Json {
+pub(super) fn struct_json(s: &Struct) -> Json {
     json!({
         "id": s.id,
         "fields": s.fields.iter().map(|f| json!({

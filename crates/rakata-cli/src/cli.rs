@@ -30,6 +30,10 @@ Examples:
   rakata save show SAVEDIR --module danm14ac --creature carth
                                            a creature as the save has it
   rakata dialog show banter.dlg --game DIR a conversation's transcript, conditions decompiled
+  rakata decompile k35_uth_hassword.ncs --module korr_m35aa --game DIR
+                                           one script, decompiled with includes folded, verified
+  rakata show k37_itm_ajunta.uti --module korr_m37aa --game DIR
+                                           an item with its name and properties resolved
   rakata diff PARENT/tree CHILD/tree       what a checkpoint changed, by field, row and node
   rakata index build --game DIR --tree vanilla
                                            index a tree: facts, references and full text
@@ -175,6 +179,10 @@ pub enum Command {
     Save(crate::cmd::SaveArgs),
     /// Conversations: show prints a dialogue's transcript, conditions decompiled.
     Dialog(crate::cmd::DialogArgs),
+    /// Decompile one script, the copy the engine loads, with its include libraries folded and every function verified by recompiling.
+    Decompile(crate::cmd::DecompileArgs),
+    /// Show a GFF for a reader: an item's properties through the 2DAs, a blueprint's scripts and inventory, an area's instances and what scripts spawn there.
+    Show(crate::cmd::ShowArgs),
     /// Compare two trees or two resources by field, row, strref and dialogue node; exit 3 on a difference.
     Diff(crate::cmd::DiffArgs),
     /// The index of a tree: facts, references and full text in SQLite; build, query, digest, coverage.

@@ -165,6 +165,7 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
             "cat",
             "conformance",
             "corpus",
+            "decompile",
             "dialog",
             "diff",
             "explain",
@@ -176,6 +177,7 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
             "lua",
             "refs",
             "save",
+            "show",
             "tlk",
             "which"
         ],
@@ -186,6 +188,7 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
         "cat",
         "conformance",
         "corpus",
+        "decompile",
         "dialog",
         "diff",
         "explain",
@@ -197,6 +200,7 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
         "lua",
         "refs",
         "save",
+        "show",
         "tlk",
         "which",
     ] {
