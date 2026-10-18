@@ -119,7 +119,7 @@ fn exit_codes_are_the_documented_table() {
 }
 
 #[test]
-fn every_help_has_an_example_and_lists_only_explain() {
+fn every_help_has_an_example_and_lists_only_built_commands() {
     let top = rakata().arg("--help").output().unwrap();
     let text = String::from_utf8_lossy(&top.stdout);
     assert!(text.contains("Examples:"));
@@ -131,7 +131,16 @@ fn every_help_has_an_example_and_lists_only_explain() {
         .filter_map(|l| l.split_whitespace().next())
         .filter(|c| *c != "help")
         .collect();
-    assert_eq!(commands, ["explain"], "--help lists commands not yet built");
-    let out = rakata().args(["explain", "--help"]).output().unwrap();
-    assert!(String::from_utf8_lossy(&out.stdout).contains("Example"));
+    assert_eq!(
+        commands,
+        ["install", "explain"],
+        "--help lists commands not yet built"
+    );
+    for cmd in ["explain", "install"] {
+        let out = rakata().args([cmd, "--help"]).output().unwrap();
+        assert!(
+            String::from_utf8_lossy(&out.stdout).contains("Example"),
+            "{cmd}"
+        );
+    }
 }

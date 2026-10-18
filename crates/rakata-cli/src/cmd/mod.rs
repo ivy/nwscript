@@ -1,6 +1,7 @@
 //! Command dispatch and the context every command shares.
 
 mod explain;
+mod install;
 
 use crate::Exit;
 use crate::cli::{Cli, Command};
@@ -38,10 +39,6 @@ impl Ctx {
     }
 
     /// The install, or a usage error naming the flag.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "no command reads the install yet")
-    )]
     pub fn require_game(&self, command: &str) -> Result<&Path, Exit> {
         self.game.as_deref().ok_or_else(|| {
             eprintln!("{}", missing_game(command));
@@ -51,10 +48,6 @@ impl Ctx {
 }
 
 /// The message a command needing an install prints without one.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "no command reads the install yet")
-)]
 fn missing_game(command: &str) -> String {
     format!(
         "error: `rakata {command}` needs a game install: pass --game DIR, the folder holding chitin.key"
@@ -68,6 +61,11 @@ pub fn run(cli: Cli) -> Exit {
     };
     match cli.command {
         Command::Explain { code } => explain::run(&ctx, &code),
+        Command::Install {
+            tslpatchdata,
+            option,
+            dry_run,
+        } => install::run(&ctx, &tslpatchdata, option, dry_run),
     }
 }
 

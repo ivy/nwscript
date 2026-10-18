@@ -8,6 +8,10 @@ const ABOUT: &str = "A toolset for the data of BioWare's Aurora-family games, Ko
 
 const EXAMPLES: &str = "\
 Examples:
+  rakata install MOD/tslpatchdata --game ~/games/swkotor --dry-run
+                                           print what installing the mod would do
+  rakata install MOD/tslpatchdata --game DIR --option 2 --dry-run --format json
+                                           the same for the installer's second option, as JSON
   rakata explain RE0001                    explain a diagnostic code
   rakata --format json explain RE0001      the same, as one JSON document
 
@@ -57,6 +61,26 @@ pub enum ColorArg {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
+    /// Install a TSLPatcher mod into the game, or with --dry-run print the plan.
+    ///
+    /// TSLPATCHDATA is the mod's tslpatchdata folder. An installer with a
+    /// namespaces.ini offers options; --option picks one by its number in
+    /// [Namespaces]. Today only --dry-run is implemented: the plan is the
+    /// operations in the order TSLPatcher runs them, with the 2DAMEMORY# and
+    /// StrRef# tokens as placeholders.
+    #[command(
+        after_help = "Examples:\n  rakata install MOD/tslpatchdata --game ~/games/swkotor --dry-run\n  rakata install MOD/tslpatchdata --game ~/games/swkotor --option 1 --dry-run --format json"
+    )]
+    Install {
+        /// The mod's tslpatchdata folder.
+        tslpatchdata: PathBuf,
+        /// Which option of a namespaces.ini to install, by its number in [Namespaces].
+        #[arg(long, value_name = "N")]
+        option: Option<u32>,
+        /// Print the plan and change nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Print the full explanation of a diagnostic code.
     #[command(
         after_help = "Example:\n  rakata explain RE0001\n  rakata --format json explain re0001"
