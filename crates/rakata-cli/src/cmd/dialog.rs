@@ -49,12 +49,20 @@ empty Speaker is spoken by the dialogue's owner, shown as (owner); replies
 are the player's. A link to a node already shown prints `-> E3 (shown
 above)`; nodes no start reaches follow the tree. Animation numbers and
 camera angles are the engine's own, printed without names. A voice-over's
-duration is read from the head of its file under streamwaves/. A Delay of
-0xFFFFFFFF is left out of the text and kept in the JSON.
+duration is read from the head of its file under streamwaves/; a voiced line
+without one says `no file under streamwaves/`, and a line nobody voiced (a
+player reply, an entry whose SoundExists is 0 or that plays a Sound instead)
+prints no voice line unless the file exists. A Delay of 0xFFFFFFFF is left
+out of the text and kept in the JSON.
 
 Each condition is decompiled with the decompiler `nws decompile` uses,
-include libraries folded out, and verified by recompiling: [verified, 1 of 1
-functions] means the source recompiles to the original bytes. Scripts are
+include libraries folded out (with their globals, named in the source), and
+verified by recompiling: [verified, 1 of 1 functions] means the source
+recompiles to the original bytes. A function that does not is marked in the
+source with E0602 and the reason. The starts list prints each condition's
+source; the tree refers back to it. --brief prints each node's speaker and
+text and the names of its conditions and script, and decompiles nothing;
+it cannot be combined with --scripts. Scripts are
 cached by content hash, so a condition shared by many nodes is decompiled
 once. --format json gives the same transcript as structured nodes, scripts
 and tree rows, with the timings; each node has its key and whether it is
@@ -72,6 +80,7 @@ Examples:
   rakata dialog show banter.dlg --game ~/games/swkotor
   rakata dialog show dan14_cutjuh.dlg --module danm14ac --game DIR --scripts
   rakata dialog show banter.dlg --node voice:nglobebant00089_ --node R2 --game DIR
+  rakata dialog show kor37_freedonnad.dlg --module korr_m37aa --game DIR --brief
   rakata --format json dialog show banter.dlg --game DIR")]
     Show {
         /// The dialogue: a .dlg file, or NAME.dlg in the install.
@@ -83,6 +92,9 @@ Examples:
         /// Decompile each node's action script too, not only the conditions.
         #[arg(long)]
         scripts: bool,
+        /// Each node's speaker and text, and the names of its conditions and script, without their source.
+        #[arg(long, conflicts_with = "scripts")]
+        brief: bool,
         /// Show only the node this key names, with its links and their conditions; repeatable.
         #[arg(long = "node", value_name = "KEY")]
         nodes: Vec<String>,
@@ -173,6 +185,7 @@ pub fn run(ctx: &Ctx, args: &DialogArgs) -> Exit {
             dialog,
             module,
             scripts,
+            brief,
             nodes,
             profile,
         } => {
@@ -214,8 +227,13 @@ pub fn run(ctx: &Ctx, args: &DialogArgs) -> Exit {
                 }
             }
             let opened = start.elapsed().as_secs_f64();
-            let transcript =
-                session.transcript(&loaded.dialog, TranscriptOptions { scripts: *scripts });
+            let transcript = session.transcript(
+                &loaded.dialog,
+                TranscriptOptions {
+                    scripts: *scripts,
+                    brief: *brief,
+                },
+            );
             let seconds = start.elapsed().as_secs_f64();
             let stats = session.stats().clone();
             // The include libraries' own warnings (RW1002) concern the
