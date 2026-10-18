@@ -153,6 +153,14 @@ nwscript_diag::codes! {
     RE1805 Error "a value of the wrong kind passed to a function of the Lua binding";
     RE1806 Error "a file a Lua script writes that could not be written";
     RW1505 Warning "a refs query that found nothing, qualified by what the index could not search";
+    RE1901 Error "a .tpc in Override beside a .tga or .dds of the same name";
+    RE1902 Error "a paths file or known list for rakata lint that cannot be read or does not parse";
+    RE1903 Error "an index database holding no tree built from the install";
+    RW1901 Warning "a reference that resolves to nothing in the install";
+    RW1902 Warning "a strref at or past the end of the talk table";
+    RW1903 Warning "Override files whose names differ only in case";
+    RW1904 Warning "a lint rule skipped: the install has no dialog.tlk or no nwscript.nss";
+    RW1905 Warning "resources the lint could not read, so what they name is unchecked";
 }
 
 /// The rakata code with this id, if registered; case does not matter.

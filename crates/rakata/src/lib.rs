@@ -16,6 +16,7 @@ pub mod diff;
 pub mod formats;
 pub mod index;
 pub mod inspect;
+pub mod lint;
 pub mod patch;
 pub mod save;
 
