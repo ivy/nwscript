@@ -357,3 +357,352 @@ fn the_users_saves_answer_by_tag() {
     }
     eprintln!("{n} saves hold a creature tagged mission");
 }
+
+// `rakata save set`.
+
+/// An install whose `Override/globalcat.2da` declares the fixture save's
+/// globals, and `NEW_DECL`, which the save lacks.
+fn install(dir: &Path) -> PathBuf {
+    let game = dir.join("game");
+    std::fs::create_dir_all(game.join("Override")).unwrap();
+    std::fs::write(
+        game.join("chitin.key"),
+        rakata_archive::Key::new().to_bytes().unwrap(),
+    )
+    .unwrap();
+    let mut t = rakata::twoda::TwoDa::new(["name", "type"]);
+    for (i, (name, ty)) in [
+        ("OAJ_DONE", "Boolean"),
+        ("OAJ_DOWN_0", "Boolean"),
+        ("TAR_X", "Boolean"),
+        ("OAJ_COUNT", "Number"),
+        ("NEW_DECL", "Number"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        t.add_row(i.to_string(), &[("name", name), ("type", ty)])
+            .unwrap();
+    }
+    std::fs::write(game.join("Override/globalcat.2da"), t.to_bytes().unwrap()).unwrap();
+    game
+}
+
+/// A save in `DIR/save` and an install in `DIR/game`.
+fn fixture(dir: &Path) -> (PathBuf, PathBuf) {
+    let src = dir.join("save");
+    std::fs::create_dir(&src).unwrap();
+    build(&src);
+    (src, install(dir))
+}
+
+fn set(game: &Path, src: &Path, out: &Path, args: &[&str]) -> (i32, String, String) {
+    let o = rakata()
+        .arg("--game")
+        .arg(game)
+        .args(["save", "set"])
+        .arg(src)
+        .arg("--out")
+        .arg(out)
+        .args(args)
+        .output()
+        .unwrap();
+    (
+        o.status.code().unwrap(),
+        String::from_utf8(o.stdout).unwrap(),
+        String::from_utf8(o.stderr).unwrap(),
+    )
+}
+
+/// The files of a save directory, by name, with their bytes.
+fn files(dir: &Path) -> Vec<(String, Vec<u8>)> {
+    let mut out: Vec<_> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| {
+            let p = e.unwrap().path();
+            let name = p.file_name().unwrap().to_string_lossy().into_owned();
+            (name, std::fs::read(&p).unwrap())
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+/// Every file and every GFF member of the two saves is byte for byte the
+/// same, but for the files named in `changed`; those the function returns,
+/// each with the number of bytes that differ.
+fn compare(src: &Path, dst: &Path, changed: &[&str]) -> Vec<(String, usize)> {
+    let (a, b) = (files(src), files(dst));
+    assert_eq!(
+        a.iter().map(|f| &f.0).collect::<Vec<_>>(),
+        b.iter().map(|f| &f.0).collect::<Vec<_>>(),
+        "the same files"
+    );
+    let mut differ = Vec::new();
+    for ((name, x), (_, y)) in a.iter().zip(&b) {
+        if changed.iter().any(|c| c.eq_ignore_ascii_case(name)) {
+            let n = x.iter().zip(y).filter(|(p, q)| p != q).count() + x.len().abs_diff(y.len());
+            differ.push((name.clone(), n));
+        } else {
+            assert!(x == y, "{name} differs");
+        }
+    }
+    let (sa, sb) = (
+        rakata::save::Save::open(src).unwrap(),
+        rakata::save::Save::open(dst).unwrap(),
+    );
+    let (ma, mb) = (sa.gff_members().unwrap(), sb.gff_members().unwrap());
+    assert_eq!(ma.len(), mb.len());
+    for (x, y) in ma.iter().zip(&mb) {
+        assert_eq!(x.location, y.location);
+        if !changed.iter().any(|c| c.eq_ignore_ascii_case(&x.location)) {
+            assert!(x.bytes == y.bytes, "member {} differs", x.location);
+        }
+    }
+    differ
+}
+
+#[test]
+fn set_changes_one_boolean_and_copies_everything_else() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("000001 - Game0");
+    std::fs::create_dir(&src).unwrap();
+    build(&src);
+    let game = install(tmp.path());
+    let dst = tmp.path().join("000002 - Game1");
+
+    // OAJ_DONE, OAJ_DOWN_0 and TAR_X share one byte, 1010_0000.
+    let (code, text, err) = set(&game, &src, &dst, &["oaj_down_0=true"]);
+    assert_eq!(code, 0, "{err}");
+    assert!(
+        text.contains("global   OAJ_DOWN_0  boolean  false -> true"),
+        "{text}"
+    );
+    assert!(
+        text.contains("field    GLOBALVARS.res ValBoolean byte 0: 0xa0 -> 0xe0"),
+        "{text}"
+    );
+    assert!(
+        text.contains("rewrote GLOBALVARS.res; copied PARTYTABLE.res, SAVEGAME.sav, savenfo.res"),
+        "{text}"
+    );
+    assert_eq!(
+        compare(&src, &dst, &["GLOBALVARS.res"]),
+        [("GLOBALVARS.res".to_owned(), 1)]
+    );
+
+    let (code, text, err) = show(&dst, &corpus(tmp.path()), &["--globals", "_"]);
+    assert_eq!(code, 0, "{err}");
+    assert!(text.contains("boolean  OAJ_DOWN_0  true"), "{text}");
+    assert!(text.contains("boolean  OAJ_DONE    true"), "{text}");
+    assert!(text.contains("boolean  TAR_X       true"), "{text}");
+}
+
+#[test]
+fn an_undeclared_global_is_refused_by_name_and_declare_writes_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (src, game) = fixture(tmp.path());
+    let dst = tmp.path().join("out");
+
+    let (code, _, err) = set(&game, &src, &dst, &["OAJ_NEW=boolean:1"]);
+    assert_eq!(code, 1);
+    assert!(err.contains("RE1205") && err.contains("`OAJ_NEW`"), "{err}");
+    assert!(!dst.exists(), "nothing is written when an edit is refused");
+
+    let (code, text, err) = set(&game, &src, &dst, &["OAJ_NEW=boolean:1", "--declare"]);
+    assert_eq!(code, 0, "{err}");
+    assert!(err.contains("RW1202") && err.contains("`OAJ_NEW`"), "{err}");
+    assert!(
+        text.contains("OAJ_NEW  boolean  (added to the save) -> true"),
+        "{text}"
+    );
+    let (_, text, _) = show(&dst, &corpus(tmp.path()), &["--globals", "oaj_new"]);
+    assert!(text.contains("boolean  OAJ_NEW  true"), "{text}");
+
+    // A name the install declares and the save lacks is added without
+    // --declare, with the install's type.
+    let dst2 = tmp.path().join("out2");
+    let (code, text, err) = set(&game, &src, &dst2, &["new_decl=-5"]);
+    assert_eq!(code, 0, "{err}");
+    assert!(!err.contains("RW1202"), "{err}");
+    assert!(
+        text.contains("NEW_DECL  number   (added to the save) -> -5"),
+        "{text}"
+    );
+}
+
+#[test]
+fn party_rewrites_only_the_party_table() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (src, game) = fixture(tmp.path());
+    let dst = tmp.path().join("out");
+    let (code, text, err) = set(&game, &src, &dst, &["--party", ""]);
+    assert_eq!(code, 0, "{err}");
+    assert!(
+        text.contains("party    AVAILNPC6 -> (the player alone)"),
+        "{text}"
+    );
+    let differ = compare(&src, &dst, &["PARTYTABLE.res"]);
+    assert!(differ[0].1 > 0);
+    let (_, text, _) = show(&dst, &corpus(tmp.path()), &[]);
+    assert!(text.contains("party    (the player alone)"), "{text}");
+
+    let dst2 = tmp.path().join("out2");
+    let (code, _, err) = set(&game, &dst, &dst2, &["--party", "MISSION"]);
+    assert_eq!(code, 0, "{err}");
+    let (_, text, _) = show(&dst2, &corpus(tmp.path()), &[]);
+    assert!(text.contains("party    mission (AVAILNPC6)"), "{text}");
+}
+
+#[test]
+fn set_errors_carry_their_codes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (src, game) = fixture(tmp.path());
+    let dst = tmp.path().join("out");
+    for (args, code) in [
+        (&["OAJ_DONE=maybe"][..], "RE1206"),
+        (&["OAJ_COUNT=300"], "RE1206"),
+        (&["OAJ_DONE=number:1"], "RE1206"),
+        (&["OAJ_NEW=1", "--declare"], "RE1206"),
+        (&["--party", "bastila"], "RE1207"),
+        (&["--party", "6,mission"], "RE1208"),
+    ] {
+        let (status, _, err) = set(&game, &src, &dst, args);
+        assert_eq!(status, 1, "{args:?}");
+        assert!(err.contains(code), "{args:?}: {err}");
+    }
+    std::fs::create_dir(&dst).unwrap();
+    std::fs::write(dst.join("x"), b"x").unwrap();
+    let (status, _, err) = set(&game, &src, &dst, &["OAJ_DONE=0"]);
+    assert_eq!(status, 1);
+    assert!(err.contains("RE1209"), "{err}");
+    let (status, _, err) = set(&game, &src, &src, &["OAJ_DONE=0"]);
+    assert_eq!(status, 1);
+    assert!(err.contains("RE1209"), "{err}");
+    let (status, _, err) = set(&game, &src, &src.join("inner"), &["OAJ_DONE=0"]);
+    assert_eq!(status, 1);
+    assert!(err.contains("RE1209"), "{err}");
+
+    // Without the install, or without anything to set, it is a usage error.
+    let o = rakata()
+        .args(["save", "set"])
+        .arg(&src)
+        .args(["--out", "x", "OAJ_DONE=0"])
+        .output()
+        .unwrap();
+    assert_eq!(o.status.code(), Some(2));
+    let (status, _, _) = set(&game, &src, &tmp.path().join("y"), &[]);
+    assert_eq!(status, 2);
+}
+
+#[test]
+fn set_json_reports_the_globals_and_fields() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (src, game) = fixture(tmp.path());
+    let dst = tmp.path().join("out");
+    let o = rakata()
+        .arg("--game")
+        .arg(&game)
+        .args(["--format", "json", "save", "set"])
+        .arg(&src)
+        .arg("--out")
+        .arg(&dst)
+        .args(["OAJ_COUNT=12", "OAJ_DONE=false"])
+        .output()
+        .unwrap();
+    assert_eq!(o.status.code(), Some(0));
+    let doc: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
+    assert_eq!(doc["command"], "save set");
+    let r = &doc["result"];
+    assert_eq!(r["globals"][0]["name"], "OAJ_COUNT");
+    assert_eq!(r["globals"][0]["before"], -1);
+    assert_eq!(r["globals"][0]["after"], 12);
+    assert_eq!(r["globals"][1]["after"], false);
+    assert_eq!(r["rewritten"][0], "GLOBALVARS.res");
+    let paths: Vec<_> = r["fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f["path"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(paths, ["ValBoolean", "ValNumber"]);
+    assert_eq!(r["fields"][1]["bytes"][0]["before"], 0xFF);
+    assert_eq!(r["fields"][1]["bytes"][0]["after"], 12);
+}
+
+/// The user's own saves, written through the user's build: one boolean
+/// flipped changes one byte of `GLOBALVARS.res` and nothing else; a party
+/// set changes `PARTYTABLE.res` and nothing else.
+#[test]
+fn the_users_saves_change_only_what_is_set() {
+    let (Ok(root), Ok(game)) = (std::env::var("RAKATA_SAVES"), std::env::var("RAKATA_BUILD"))
+    else {
+        eprintln!(
+            "skipped: $RAKATA_SAVES or $RAKATA_BUILD is unset; set them to a folder of save-game directories and the build they were made with"
+        );
+        return;
+    };
+    let game = PathBuf::from(game);
+    let tmp = tempfile::tempdir().unwrap();
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(&root)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.is_dir())
+        .collect();
+    dirs.sort();
+    for (i, src) in dirs.iter().enumerate() {
+        let save = rakata::save::Save::open(src).unwrap();
+        let globals = save.globals().unwrap();
+        let (name, was) = globals
+            .vars
+            .iter()
+            .find_map(|g| match g.value {
+                rakata::save::GlobalValue::Boolean(b) if g.name.starts_with("OAJ_") => {
+                    Some((g.name.clone(), b))
+                }
+                _ => None,
+            })
+            .or_else(|| {
+                globals.vars.iter().find_map(|g| match g.value {
+                    rakata::save::GlobalValue::Boolean(b) => Some((g.name.clone(), b)),
+                    _ => None,
+                })
+            })
+            .expect("a save holds a boolean");
+        let dst = tmp.path().join(format!("g{i}"));
+        let (code, text, err) = set(&game, src, &dst, &[&format!("{name}={}", !was)]);
+        assert_eq!(code, 0, "{}: {err}", src.display());
+        let differ = compare(src, &dst, &["GLOBALVARS.res"]);
+        assert_eq!(differ, [("GLOBALVARS.res".to_owned(), 1)], "{text}");
+        let after = rakata::save::Save::open(&dst).unwrap().globals().unwrap();
+        assert_eq!(
+            after.get(&name).unwrap().value,
+            rakata::save::GlobalValue::Boolean(!was)
+        );
+        let flipped = globals
+            .vars
+            .iter()
+            .zip(&after.vars)
+            .filter(|(a, b)| a != b)
+            .count();
+        assert_eq!(flipped, 1, "only {name} changes");
+        eprintln!(
+            "{}: {name} {was} -> {}; {} files and {} GFF members compared, GLOBALVARS.res differs in 1 byte",
+            src.display(),
+            !was,
+            files(src).len(),
+            save.gff_members().unwrap().len()
+        );
+
+        let npc = save.party_gffs().unwrap()[0].0;
+        let dst = tmp.path().join(format!("p{i}"));
+        let (code, _, err) = set(&game, src, &dst, &["--party", &npc.to_string()]);
+        assert_eq!(code, 0, "{}: {err}", src.display());
+        compare(src, &dst, &["PARTYTABLE.res"]);
+        let party = rakata::save::Save::open(&dst).unwrap().party().unwrap();
+        assert_eq!(
+            party.members.iter().map(|m| m.npc).collect::<Vec<_>>(),
+            [i64::from(npc)]
+        );
+    }
+}

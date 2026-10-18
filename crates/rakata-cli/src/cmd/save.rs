@@ -1,6 +1,8 @@
 //! `rakata save show DIR`: a saved game by name, through [`rakata::save`]:
 //! the party and the visited modules, the globals matching a pattern, a
 //! module's creatures and pending events, one creature in full.
+//! `rakata save set SRC --out DST NAME=VALUE...`: a copy of a save with
+//! changed globals or party, every other file byte for byte.
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -12,9 +14,10 @@ use super::Ctx;
 use crate::Exit;
 use rakata::codes;
 use rakata::diag::{Diagnostic, SourceMap, codes::Code};
+use rakata::gff::Value as GffValue;
 use rakata::save::{
-    Action, Creature, Effect, Event, GlobalValue, Globals, LocalNames, OBJECT_INVALID, ObjectRef,
-    Param, Party, Place, Save, action_name,
+    Action, Assignment, Creature, Edits, Effect, Event, GlobalValue, Globals, LocalNames,
+    OBJECT_INVALID, ObjectRef, Param, Party, Place, Save, Written, action_name,
 };
 
 /// What a number whose names live only in the engine is printed with.
@@ -30,7 +33,8 @@ Examples:
   rakata save show DIR --module danm14ac
   rakata save show DIR --module danm14ac --creature carth
   rakata save show DIR --globals OAJ_
-  rakata --format json save show DIR --creature mission")]
+  rakata --format json save show DIR --creature mission
+  rakata --game DIR save set \"Saves/000023 - Game22\" --out \"000026 - Game25\" OAJ_DONE=1")]
 pub struct SaveArgs {
     #[command(subcommand)]
     pub action: SaveAction,
@@ -67,6 +71,50 @@ Examples:
         #[arg(long, value_name = "PATTERN")]
         globals: Option<String>,
     },
+    /// Write a copy of a save with globals set in GLOBALVARS.res and, with --party, the party set in PARTYTABLE.res; every other file and member is copied byte for byte. Needs --game: the install's globalcat.2da decides which globals exist.
+    #[command(after_help = "\
+An assignment is NAME=VALUE, or NAME=TYPE:VALUE with TYPE one of boolean,
+number, string, location. The type is the save's when it holds the name, else
+the install's globalcat.2da's; a name neither holds needs TYPE. Values:
+  boolean    true, false, 1 or 0 (the other booleans in its byte are kept)
+  number     -128 to 127, one signed byte
+  string     any text
+  location   x,y,z,fx,fy,fz: the position and the facing
+Names compare without regard to case. A name the install's globalcat.2da
+does not declare is refused (RE1205) unless --declare, which writes it into
+the save, adding it to the save's catalogue when the save lacks it (RW1202:
+no script reads it until the install declares it).
+
+--party lists the members to travel with the player, in order, by NPC number
+or by the tag of their AVAILNPC<n>.utc (carth); --party '' is the player
+alone. Without --party, PARTYTABLE.res is copied as it is; with --party and
+no NAME=VALUE, GLOBALVARS.res is.
+
+DST must not exist, or be an empty directory. savenfo.res, the load menu's
+entry, is copied as it is, so the new save shows the original's name and
+screenshot: give DST a slot number above the newest save (docs/saves.md).
+
+Examples:
+  rakata --game DIR save set \"Saves/000023 - Game22\" --out \"000026 - Game25\" OAJ_DONE=1
+  rakata --game DIR save set SRC --out DST OAJ_DOWN_2=false --party carth,mission
+  rakata --game DIR save set SRC --out DST MY_TEST=boolean:1 --declare
+  rakata --game DIR --format json save set SRC --out DST K_SWG_HELENA=3")]
+    Set {
+        /// The save to read: the directory holding SAVEGAME.sav.
+        src: PathBuf,
+        /// The directory to write the new save to.
+        #[arg(long, short, value_name = "DST")]
+        out: PathBuf,
+        /// The globals to set: NAME=VALUE or NAME=TYPE:VALUE.
+        #[arg(value_name = "NAME=VALUE")]
+        assignments: Vec<String>,
+        /// The party members, by NPC number or tag, comma-separated.
+        #[arg(long, value_name = "NPC,...")]
+        party: Option<String>,
+        /// Write globals the install's globalcat.2da does not declare.
+        #[arg(long)]
+        declare: bool,
+    },
 }
 
 /// The registered code for an error the save crate reports.
@@ -92,6 +140,263 @@ pub fn run(ctx: &Ctx, args: &SaveArgs) -> Exit {
             creature.as_deref(),
             globals.as_deref(),
         ),
+        SaveAction::Set {
+            src,
+            out,
+            assignments,
+            party,
+            declare,
+        } => set(ctx, src, out, assignments, party.as_deref(), *declare),
+    }
+}
+
+fn set(
+    ctx: &Ctx,
+    src: &Path,
+    out: &Path,
+    assignments: &[String],
+    party: Option<&str>,
+    declare: bool,
+) -> Exit {
+    if assignments.is_empty() && party.is_none() {
+        eprintln!("error: `rakata save set` needs a NAME=VALUE to set, or --party");
+        return Exit::Usage;
+    }
+    let game = match ctx.require_game("save set") {
+        Ok(g) => g,
+        Err(e) => return e,
+    };
+    let mut env = ctx.envelope("save set");
+    let map = SourceMap::new();
+    crate::working_on(src.display().to_string());
+    let lookup = rakata::inspect::Lookup {
+        game: Some(game),
+        module: None,
+        profile: rakata::game::Profile::K1,
+    };
+    let (declarations, table) = match rakata::save::declarations(&lookup) {
+        Ok(d) => d,
+        Err(d) => return ctx.finish(env, "", vec![d], &map, Exit::Ok),
+    };
+    env.inputs.push(rakata::InputRecord {
+        role: "globalcat".to_owned(),
+        path: table.source.clone(),
+        sha256: rakata::res::ContentHash::of(&table.bytes).to_hex(),
+    });
+    let written = match edits(assignments, party, declare)
+        .and_then(|edits| Save::open(src)?.write(out, &edits, &declarations))
+    {
+        Ok(w) => w,
+        Err(e) => return ctx.finish(env, "", vec![error(&e)], &map, Exit::Ok),
+    };
+    for f in &written.rewritten {
+        let path = out.join(f);
+        if let Ok(bytes) = std::fs::read(&path) {
+            env.outputs.push(rakata::OutputRecord {
+                path: path.display().to_string(),
+                sha256: rakata::res::ContentHash::of(&bytes).to_hex(),
+                bytes: bytes.len(),
+            });
+        }
+    }
+    let diags: Vec<Diagnostic> = written
+        .globals
+        .iter()
+        .filter(|g| !g.declared)
+        .map(|g| {
+            Diagnostic::new(
+                code_of(rakata::save::codes::UNDECLARED_WRITTEN),
+                format!(
+                    "`{}` is written to the save, but the install's globalcat.2da does not declare it, so no script reads it",
+                    g.name
+                ),
+            )
+        })
+        .collect();
+    let (text, result) = set_report(src, &written);
+    env.result = result;
+    ctx.finish(env, &text, diags, &map, Exit::Ok)
+}
+
+fn edits(
+    assignments: &[String],
+    party: Option<&str>,
+    declare: bool,
+) -> rakata::save::Result<Edits> {
+    Ok(Edits {
+        globals: assignments
+            .iter()
+            .map(|a| Assignment::parse(a))
+            .collect::<rakata::save::Result<_>>()?,
+        party: party.map(|p| {
+            p.split(',')
+                .map(str::trim)
+                .filter(|n| !n.is_empty())
+                .map(str::to_owned)
+                .collect()
+        }),
+        declare,
+    })
+}
+
+fn party_ids(ids: &[i64]) -> String {
+    if ids.is_empty() {
+        return "(the player alone)".to_owned();
+    }
+    ids.iter()
+        .map(|n| format!("AVAILNPC{n}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn set_report(src: &Path, w: &Written) -> (String, Value) {
+    let mut text = String::new();
+    let _ = writeln!(text, "save     {} -> {}", src.display(), w.dir.display());
+    let width = w.globals.iter().map(|g| g.name.len()).max().unwrap_or(0);
+    for g in &w.globals {
+        let before = g
+            .before
+            .as_ref()
+            .map_or_else(|| "(added to the save)".to_owned(), global_text);
+        let _ = writeln!(
+            text,
+            "global   {:<width$}  {:<8} {before} -> {}",
+            g.name,
+            g.after.kind(),
+            global_text(&g.after)
+        );
+    }
+    if let Some(p) = &w.party {
+        let _ = writeln!(
+            text,
+            "party    {} -> {}",
+            party_ids(&p.before),
+            party_ids(&p.after)
+        );
+    }
+    let mut fields = Vec::new();
+    for f in &w.fields {
+        let c = &f.change;
+        let bytes = void_bytes(c.before.as_ref(), c.after.as_ref());
+        match &bytes {
+            Some(b) => {
+                for (o, x, y) in b {
+                    let _ = writeln!(
+                        text,
+                        "field    {} {} byte {o}: {} -> {}",
+                        f.member,
+                        c.path,
+                        byte_text(*x),
+                        byte_text(*y)
+                    );
+                }
+            }
+            None => {
+                let _ = writeln!(
+                    text,
+                    "field    {} {}: {} -> {}",
+                    f.member,
+                    c.path,
+                    field_text(c.before.as_ref()),
+                    field_text(c.after.as_ref())
+                );
+            }
+        }
+        fields.push(json!({
+            "member": f.member,
+            "path": c.path.to_string(),
+            "before": field_text(c.before.as_ref()),
+            "after": field_text(c.after.as_ref()),
+            "bytes": bytes.map(|b| b.iter().map(|(o, x, y)| json!({
+                "offset": o, "before": x, "after": y,
+            })).collect::<Vec<_>>()),
+        }));
+    }
+    let _ = writeln!(
+        text,
+        "wrote    {}: rewrote {}; copied {}",
+        w.dir.display(),
+        list_or_none(&w.rewritten),
+        list_or_none(&w.copied)
+    );
+    let result = json!({
+        "source": src,
+        "output": w.dir,
+        "globals": w.globals.iter().map(|g| json!({
+            "name": g.name,
+            "type": g.after.kind(),
+            "before": g.before.as_ref().map(global_json),
+            "after": global_json(&g.after),
+            "added": g.before.is_none(),
+            "declared": g.declared,
+        })).collect::<Vec<_>>(),
+        "party": w.party.as_ref().map(|p| json!({"before": p.before, "after": p.after})),
+        "fields": fields,
+        "rewritten": w.rewritten,
+        "copied": w.copied,
+    });
+    (text, result)
+}
+
+fn list_or_none(l: &[String]) -> String {
+    if l.is_empty() {
+        "nothing".to_owned()
+    } else {
+        l.join(", ")
+    }
+}
+
+fn byte_text(b: Option<u8>) -> String {
+    b.map_or_else(|| "(absent)".to_owned(), |b| format!("{b:#04x}"))
+}
+
+/// One byte of a `VOID` field that differs: its offset and each side.
+type ByteChange = (usize, Option<u8>, Option<u8>);
+
+/// The bytes that differ, when both sides are `VOID` fields.
+fn void_bytes(a: Option<&GffValue>, b: Option<&GffValue>) -> Option<Vec<ByteChange>> {
+    let (Some(GffValue::Void(a)), Some(GffValue::Void(b))) = (a, b) else {
+        return None;
+    };
+    Some(
+        (0..a.len().max(b.len()))
+            .filter_map(|i| {
+                let (x, y) = (a.get(i).copied(), b.get(i).copied());
+                (x != y).then_some((i, x, y))
+            })
+            .collect(),
+    )
+}
+
+/// A field's value in one line: scalars as they read, a list by its
+/// length, a struct by its id and fields.
+fn field_text(v: Option<&GffValue>) -> String {
+    let Some(v) = v else {
+        return "(absent)".to_owned();
+    };
+    match v {
+        GffValue::Byte(x) => x.to_string(),
+        GffValue::Char(x) => x.to_string(),
+        GffValue::Word(x) => x.to_string(),
+        GffValue::Short(x) => x.to_string(),
+        GffValue::Dword(x) => x.to_string(),
+        GffValue::Int(x) => x.to_string(),
+        GffValue::Dword64(x) => x.to_string(),
+        GffValue::Int64(x) => x.to_string(),
+        GffValue::Float(x) => x.to_string(),
+        GffValue::Double(x) => x.to_string(),
+        GffValue::String(b) => format!("{:?}", String::from_utf8_lossy(b)),
+        GffValue::Void(b) => format!("{} bytes", b.len()),
+        GffValue::List(l) => format!("list [{}]", l.len()),
+        GffValue::Struct(s) => {
+            let inner: Vec<String> = s
+                .fields
+                .iter()
+                .map(|f| format!("{}={}", f.label, field_text(Some(&f.value))))
+                .collect();
+            format!("struct {} {{{}}}", s.id, inner.join(", "))
+        }
+        other => format!("a {} value", other.field_type()),
     }
 }
 
