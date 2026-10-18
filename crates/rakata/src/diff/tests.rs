@@ -1,6 +1,6 @@
 //! The diff over fixtures built here: GFF fields, 2DA rows, archives by
-//! member, dialogues by node, and trees with renames, links and Override
-//! files compared with the copies they replace.
+//! member, dialogues by node, and trees with renames, links, and Override
+//! files and new module `.mod`s compared with the copies they replace.
 
 use std::path::{Path, PathBuf};
 
@@ -325,6 +325,59 @@ fn an_override_file_is_compared_with_the_copy_it_replaces() {
     let n = &d.entries[1];
     assert_eq!(n.path, "Override/new.ncs");
     assert!(n.against.is_empty() && n.b.is_some() && n.a.is_none());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_new_module_mod_is_compared_with_the_rims_it_replaces() {
+    let dir = scratch("module-mod");
+    let (a, b) = (dir.join("a"), dir.join("b"));
+    tree(&a, &utc("one"));
+    tree(&b, &utc("one"));
+    let mut s = Rim::new();
+    s.add(ResId::parse("k_same.ncs").unwrap(), b"NCS".to_vec())
+        .unwrap();
+    s.add(ResId::parse("k_gone.ncs").unwrap(), b"NCS".to_vec())
+        .unwrap();
+    for t in [&a, &b] {
+        write(&t.join("modules/danm14ac_s.rim"), &s.to_bytes().unwrap());
+    }
+    write(
+        &b.join("modules/danm14ac.mod"),
+        &module(&[
+            ("juhani.utc", bytes(&utc("two"))),
+            ("k_same.ncs", b"NCS".to_vec()),
+            ("k_new.ncs", b"NCS".to_vec()),
+        ]),
+    );
+    let d = diff_trees(&a, &b, &Options::default()).unwrap();
+    let paths: Vec<(&str, Change)> = d
+        .entries
+        .iter()
+        .map(|e| (e.path.as_str(), e.change))
+        .collect();
+    assert_eq!(
+        paths,
+        [
+            ("modules/danm14ac.mod", Change::Added),
+            ("modules/danm14ac.mod!juhani.utc", Change::Added),
+            ("modules/danm14ac.mod!k_gone.ncs", Change::Removed),
+            ("modules/danm14ac.mod!k_new.ncs", Change::Added),
+        ],
+        "{}",
+        d.text()
+    );
+    assert_eq!(
+        d.entries[0].against,
+        ["modules/danm14ac.rim", "modules/danm14ac_s.rim"]
+    );
+    let e = &d.entries[1];
+    assert_eq!(e.against, ["modules/danm14ac.rim!juhani.utc"]);
+    assert!(
+        matches!(&e.sites[..], [Site::Field(f)] if f.path == "Tag"),
+        "{}",
+        d.text()
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 

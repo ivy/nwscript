@@ -15,6 +15,10 @@
 //! the copies the other tree's install loads in its place, from `patch.erf`
 //! and the BIFs or else from the modules' capsules: a mod that puts a
 //! changed dialogue in Override shows the nodes it changed, not a new file.
+//! A module's `STEM.mod` one tree has and the other lacks is compared the
+//! same way with the RIMs the other tree's module loads in its place, by
+//! member: a mod that writes a dialogue into one module's `.mod` shows the
+//! nodes it changed, not a capsule of every member the RIMs hold.
 //!
 //! The result is a [`Diff`]: entries grouped by path, each with its sites,
 //! which `rakata diff` renders as text ([`Diff::text`]) and serialises as

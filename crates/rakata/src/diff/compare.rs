@@ -320,6 +320,12 @@ impl Cx {
                 return;
             }
         };
+        if id.is_none()
+            && let Some(rims) = self.replaced_rims(other, &w.rel)
+        {
+            self.module_mod(w, change, &bytes, &rims);
+            return;
+        }
         let copies = match id {
             Some(id) => self.copies(other, id),
             None => Vec::new(),
@@ -365,6 +371,147 @@ impl Cx {
                 against: vec![location],
                 sites: found.sites,
             });
+        }
+    }
+
+    /// For a module's `STEM.mod` (under a `modules` folder) one side lacks:
+    /// the RIMs it replaces in the engine, as the other side holds them,
+    /// `STEM.rim` then `STEM_s.rim` (and KotOR 2's `STEM_dlg.erf`), each
+    /// by its path from the tree's root, with its bytes. `None` when the
+    /// file is no module's `.mod` or the other side has none of its RIMs.
+    fn replaced_rims(&mut self, side: usize, rel: &str) -> Option<Vec<(String, Vec<u8>)>> {
+        let (dir, file) = rel.rsplit_once('/')?;
+        let lower = file.to_ascii_lowercase();
+        let stem = lower.strip_suffix(".mod").filter(|s| !s.is_empty())?;
+        if lower.ends_with("_loc.mod")
+            || !dir
+                .rsplit('/')
+                .next()
+                .is_some_and(|d| d.eq_ignore_ascii_case("modules"))
+        {
+            return None;
+        }
+        let mut at = self.sides[side].root.clone()?;
+        for part in dir.split('/') {
+            at = crate::inspect::child_ci(&at, part)?;
+        }
+        let mut suffixes = vec![".rim", "_s.rim"];
+        if self.profile == Profile::K2 {
+            suffixes.push("_dlg.erf");
+        }
+        let mut out = Vec::new();
+        for suffix in suffixes {
+            if let Some(path) = crate::inspect::child_ci(&at, &format!("{stem}{suffix}"))
+                && let Some(bytes) = self.read(&path)
+            {
+                let name = path.file_name()?.to_string_lossy().into_owned();
+                out.push((format!("{dir}/{name}"), bytes));
+            }
+        }
+        (!out.is_empty()).then_some(out)
+    }
+
+    /// A module's `.mod` one side lacks, compared with the RIMs the other
+    /// side's module loads in its place: the `.mod` listed over them, each
+    /// member whose bytes differ from the RIMs' first copy of its name
+    /// compared with that copy, a member the RIMs lack as added, and a
+    /// member of the RIMs the `.mod` lacks as dropped from the module.
+    fn module_mod(&mut self, w: &Walked, change: Change, bytes: &[u8], rims: &[(String, Vec<u8>)]) {
+        let mut theirs: Vec<(ResId, String, Vec<u8>)> = Vec::new();
+        for (rel, data) in rims {
+            let members = match capsule_members(data) {
+                Ok(m) => m,
+                Err(message) => {
+                    self.warn(
+                        "RW1601",
+                        format!("`{rel}` does not read as an archive: {message}; it is left out"),
+                    );
+                    continue;
+                }
+            };
+            for (id, data) in members {
+                if !theirs.iter().any(|(t, _, _)| *t == id) {
+                    theirs.push((id, rel.clone(), data));
+                }
+            }
+        }
+        let ours = match capsule_members(bytes) {
+            Ok(m) => m,
+            Err(message) => {
+                self.warn(
+                    "RW1601",
+                    format!(
+                        "`{}` does not read as an archive: {message}; compared by hash",
+                        w.rel
+                    ),
+                );
+                Vec::new()
+            }
+        };
+        let f = facts(&w.rel, bytes);
+        self.entries.push(Entry {
+            path: w.rel.clone(),
+            change,
+            renamed_from: None,
+            format: Some("archive".to_owned()),
+            compared: false,
+            a: (change == Change::Removed).then(|| f.clone()),
+            b: (change == Change::Added).then_some(f),
+            against: rims.iter().map(|(rel, _)| rel.clone()).collect(),
+            sites: Vec::new(),
+        });
+        let dropped = if change == Change::Added {
+            Change::Removed
+        } else {
+            Change::Added
+        };
+        for (id, data) in &ours {
+            let here = format!("{}!{id}", w.rel);
+            let ext = id.ty.extension().map(str::to_owned);
+            let Some((_, rel, rim)) = theirs.iter().find(|(t, _, _)| t == id) else {
+                let m = Member {
+                    name: id.to_string(),
+                    ext,
+                    data: data.clone(),
+                };
+                self.member_alone(&here, &m, change);
+                continue;
+            };
+            self.compared += 1;
+            if rim == data {
+                continue;
+            }
+            let (xa, xb) = if change == Change::Added {
+                (rim, data)
+            } else {
+                (data, rim)
+            };
+            let found = self.contents(&here, ext.as_deref(), xa, xb);
+            if found.compared && found.sites.is_empty() {
+                self.same_data += 1;
+                continue;
+            }
+            self.entries.push(Entry {
+                path: here.clone(),
+                change,
+                renamed_from: None,
+                format: found.format,
+                compared: found.compared,
+                a: Some(facts(&here, xa)),
+                b: Some(facts(&here, xb)),
+                against: vec![format!("{rel}!{id}")],
+                sites: found.sites,
+            });
+        }
+        for (id, _, data) in &theirs {
+            if !ours.iter().any(|(o, _)| o == id) {
+                let m = Member {
+                    name: id.to_string(),
+                    ext: id.ty.extension().map(str::to_owned),
+                    data: data.clone(),
+                };
+                self.member_alone(&format!("{}!{id}", w.rel), &m, dropped);
+            }
         }
     }
 
@@ -653,6 +800,23 @@ fn link_site(a: Option<&PathBuf>, b: Option<&PathBuf>) -> Site {
         field: "link".into(),
         before: show(a).or_else(|| a.is_none().then(|| "file".to_owned())),
         after: show(b).or_else(|| b.is_none().then(|| "file".to_owned())),
+    }
+}
+
+/// The members of a RIM or an ERF-family capsule, in table order.
+fn capsule_members(bytes: &[u8]) -> Result<Vec<(ResId, Vec<u8>)>, String> {
+    if bytes.starts_with(b"RIM ") {
+        let r = Rim::parse(bytes).map_err(|e| e.to_string())?;
+        Ok(r.members()
+            .iter()
+            .map(|m| (m.id, m.data().to_vec()))
+            .collect())
+    } else {
+        let e = Erf::parse(bytes).map_err(|e| e.to_string())?;
+        Ok(e.members()
+            .iter()
+            .map(|m| (m.id, m.data().to_vec()))
+            .collect())
     }
 }
 
