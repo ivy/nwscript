@@ -14,7 +14,7 @@ A Rust workspace: a toolset for the data of BioWare's Aurora-family games, KotOR
 | `rakata-2da` | tables, every header variant the engine accepts, diff | planned |
 | `rakata-tlk` | `dialog.tlk` and `LocalizedString`, append | planned |
 | `rakata-lip` | lip-sync files | planned |
-| `rakata-game` | the install: search order, `which`, the `Resolver` for nwscript | planned |
+| `rakata-game` | the install: search order, `which`, the `Resolver` for nwscript | present |
 | `rakata-dialog` | DLG model, stable keys, transcript, lints | planned |
 | `rakata-save` | save games by name | planned |
 | `rakata-index` | facts, references and full text in SQLite | planned |

@@ -1075,6 +1075,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rakata-game"
+version = "0.0.0"
+dependencies = [
+ "nwscript",
+ "rakata-archive",
+ "rakata-res",
+]
+
+[[package]]
 name = "rakata-patch"
 version = "0.0.0"
 dependencies = [

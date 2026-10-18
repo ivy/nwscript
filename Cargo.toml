@@ -23,6 +23,7 @@ rakata-res = { path = "crates/rakata-res" }
 rakata-archive = { path = "crates/rakata-archive" }
 rakata-patch = { path = "crates/rakata-patch" }
 rakata = { path = "crates/rakata" }
+rakata-game = { path = "crates/rakata-game" }
 rakata-cli = { path = "crates/rakata-cli" }
 
 [workspace.lints.rust]

@@ -1,0 +1,16 @@
+[package]
+name = "rakata-game"
+description = "The install of an Aurora-family game: the engine's search order, module capsule precedence, case-insensitive paths, `which` with provenance, and the resolver for nwscript's includes."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+nwscript = { workspace = true }
+rakata-archive = { workspace = true }
+rakata-res = { workspace = true }
+
+[lints]
+workspace = true
