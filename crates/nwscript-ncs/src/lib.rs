@@ -24,6 +24,7 @@
 pub mod asm;
 pub mod cfg;
 pub mod facts;
+pub mod flow;
 mod instruction;
 mod opcode;
 
