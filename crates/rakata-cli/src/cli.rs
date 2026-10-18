@@ -31,6 +31,9 @@ Examples:
                                            a creature as the save has it
   rakata dialog show banter.dlg --game DIR a conversation's transcript, conditions decompiled
   rakata diff PARENT/tree CHILD/tree       what a checkpoint changed, by field, row and node
+  rakata index build --game DIR --tree vanilla
+                                           index a tree: facts, references and full text
+  rakata index query \"SELECT * FROM refs WHERE value = 'k_pman_aioff'\"
 
 Exit codes: 0 success, 1 errors reported, 2 bad invocation,
 3 a comparison found a difference, 101 internal error.";
@@ -160,4 +163,6 @@ pub enum Command {
     Dialog(crate::cmd::DialogArgs),
     /// Compare two trees or two resources by field, row, strref and dialogue node; exit 3 on a difference.
     Diff(crate::cmd::DiffArgs),
+    /// The index of a tree: facts, references and full text in SQLite; build, query, digest, coverage.
+    Index(crate::cmd::IndexArgs),
 }

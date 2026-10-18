@@ -10,6 +10,8 @@ pub use dialog::DialogArgs;
 mod diff;
 pub use diff::DiffArgs;
 mod explain;
+mod index;
+pub use index::IndexArgs;
 mod install;
 mod save;
 pub use save::SaveArgs;
@@ -99,6 +101,7 @@ pub fn run(cli: Cli) -> Exit {
         Command::Save(args) => save::run(&ctx, &args),
         Command::Dialog(args) => dialog::run(&ctx, &args),
         Command::Diff(args) => diff::run(&ctx, &args),
+        Command::Index(args) => index::run(&ctx, &args),
         Command::Which {
             name,
             module,
