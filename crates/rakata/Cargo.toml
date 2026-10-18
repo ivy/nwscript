@@ -9,6 +9,8 @@ repository.workspace = true
 build = "build.rs"
 
 [dependencies]
+nwscript = { workspace = true }
+nwscript-decomp = { workspace = true }
 nwscript-diag = { workspace = true }
 rakata-archive = { workspace = true }
 rakata-2da = { workspace = true }
@@ -20,12 +22,10 @@ rakata-patch = { workspace = true }
 rakata-tlk = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 toml = "0.8"
 
 [build-dependencies]
-sha2 = "0.10"
-
-[dev-dependencies]
 sha2 = "0.10"
 
 [lints]

@@ -8,11 +8,10 @@
 //! (`rakata-res`), `RE02xx` archives (`rakata-archive`), `RE03xx` and
 //! `RW03xx` the installer's change files (`rakata-patch`), `RE04xx` the
 //! install (`rakata-game`), `RE05xx` the round-trip suite
-//! ([`crate::conformance`]), `RE07xx` tables (`rakata-2da`), `RE08xx` the
-//! talk table (`rakata-tlk`), `RE09xx` lip-sync files (`rakata-lip`). Each
-//! format crate takes a range of its own as it lands.
-//! ([`crate::conformance`]), `RE06xx` GFF (`rakata-gff`). Each format crate
-//! takes a range of its own as it lands.
+//! ([`crate::conformance`]), `RE06xx` GFF (`rakata-gff`), `RE07xx` tables
+//! (`rakata-2da`), `RE08xx` the talk table (`rakata-tlk`), `RE09xx` lip-sync
+//! files (`rakata-lip`), `RE10xx` and `RW10xx` the corpus
+//! ([`crate::corpus`]). Each crate takes a range of its own as it lands.
 
 pub use nwscript_diag::codes::Code;
 
@@ -73,6 +72,11 @@ nwscript_diag::codes! {
     RE0903 Error "a lip-sync keyframe with a shape above 15";
     RE0904 Error "bytes after the last keyframe of a lip-sync file";
     RE0905 Error "more keyframes than a lip-sync file's 32-bit count holds";
+    RE1001 Error "a file of the corpus could not be written";
+    RE1002 Error "an install with no nwscript.nss to read the engine's declarations from";
+    RE1003 Error "a corpus manifest that does not read";
+    RW1001 Warning "a script whose bytecode the decompiler could not read";
+    RW1002 Warning "an include library that does not compile, so its functions are not folded";
 }
 
 /// The rakata code with this id, if registered; case does not matter.

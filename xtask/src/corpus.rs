@@ -1,20 +1,17 @@
-//! Extract the script corpus from a game install, write its manifest, and
-//! verify a corpus against a manifest. The corpus is game data and is never
-//! committed; the manifest holds only names and hashes.
+//! `cargo xtask corpus`: the corpus commands of the `rakata` façade under
+//! their development name, so the recipes in the documents keep working.
+//! `rakata corpus extract|decompile|verify` is the same code.
 
-use rakata_archive::{Bif, Erf, Key, KeyEntry, Member, Rim, Source};
-use rakata_res::ResType;
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use rakata::corpus::ExtractOptions;
+pub use rakata::corpus::default_out;
 use std::error::Error;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 const USAGE: &str = "\
 cargo xtask corpus: the script corpus, extracted from your own game
+(the same as `rakata corpus`; `rakata corpus decompile` recovers the module scripts)
 
 USAGE:
   cargo xtask corpus extract --game-dir DIR [--out DIR] [--manifest FILE --source TEXT]
@@ -24,51 +21,10 @@ USAGE:
 --manifest defaults to conformance/k1.toml; module hashes go beside it in
 k1-modules.toml. extract writes the manifest only when --manifest is given.
 
-Layout written:
-  nss/NAME.nss, ncs/NAME.ncs     every NSS and NCS chitin.key lists
-  nwscript.nss                    as shipped
-  oracle/                         nss/ with nwscript.nss's line 5145 typo fixed,
-                                  the include directory for nwnnsscomp, which
-                                  hangs on the shipped file
-  modules/STEM/NAME.ncs           NCS from modules/*.rim|*.mod|*.erf
-  rims/STEM/NAME.ncs              NCS from rims/*.rim
-
 EXAMPLE:
   cargo xtask corpus extract --game-dir ~/games/swkotor
   NWSCRIPT_CORPUS=~/.cache/nwscript/corpus/k1 cargo xtask corpus verify
 ";
-
-/// The manifest of the base scripts, committed as `conformance/k1.toml`.
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Manifest {
-    pub game: String,
-    pub source: String,
-    pub counts: Counts,
-    /// Script name to the sha256 of its shipped NSS and NCS, either may be absent.
-    pub scripts: BTreeMap<String, Hashes>,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct Counts {
-    pub nss: usize,
-    pub ncs: usize,
-    pub pairs: usize,
-    pub module_ncs: usize,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
-pub struct Hashes {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub nss: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ncs: Option<String>,
-}
-
-/// Module NCS hashes, `conformance/k1-modules.toml`: archive path to name to sha256.
-#[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
-pub struct ModuleManifest {
-    pub archives: BTreeMap<String, BTreeMap<String, String>>,
-}
 
 struct Opts {
     game_dir: Option<PathBuf>,
@@ -92,7 +48,7 @@ fn parse(args: &[String]) -> Result<Opts> {
                 .ok_or_else(|| format!("{a} needs a value"))
         };
         match a.as_str() {
-            "--game-dir" => o.game_dir = Some(val()?.into()),
+            "--game-dir" | "--game" => o.game_dir = Some(val()?.into()),
             "--out" => o.out = val()?.into(),
             "--manifest" => o.manifest = Some(val()?.into()),
             "--source" => o.source = val()?,
@@ -102,292 +58,47 @@ fn parse(args: &[String]) -> Result<Opts> {
     Ok(o)
 }
 
-pub fn default_out() -> PathBuf {
-    if let Some(p) = std::env::var_os("NWSCRIPT_CORPUS") {
-        return p.into();
-    }
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_default();
-    home.join(".cache/nwscript/corpus/k1")
-}
-
 pub fn main(args: &[String]) -> Result<()> {
     match args.first().map(String::as_str) {
-        Some("extract") => extract(parse(&args[1..])?),
+        Some("extract") => {
+            let o = parse(&args[1..])?;
+            let game = o.game_dir.ok_or("extract needs --game-dir")?;
+            let x = rakata::corpus::extract(&ExtractOptions {
+                game,
+                out: o.out,
+                manifest: o.manifest,
+                source: o.source,
+            })?;
+            println!("corpus written to {}", x.out.display());
+            for (bif, (nss, ncs)) in &x.per_bif {
+                println!("  {bif}: {nss} nss, {ncs} ncs");
+            }
+            println!(
+                "  total: {} nss, {} ncs, {} pairs, {} module ncs in {} archives",
+                x.counts.nss, x.counts.ncs, x.counts.pairs, x.counts.module_ncs, x.archives
+            );
+            if let Some(m) = &x.manifest {
+                println!("manifest written to {}", m.display());
+            }
+            Ok(())
+        }
         Some("verify") => {
-            let mut o = parse(&args[1..])?;
-            o.manifest
-                .get_or_insert_with(|| "conformance/k1.toml".into());
-            verify(&o)
+            let o = parse(&args[1..])?;
+            let manifest = o.manifest.unwrap_or_else(|| "conformance/k1.toml".into());
+            let v = rakata::corpus::verify(&o.out, &manifest)?;
+            if v.is_ok() {
+                println!("{} files match {}", v.files, manifest.display());
+                Ok(())
+            } else {
+                for p in v.problems.iter().take(20) {
+                    eprintln!("  {p}");
+                }
+                Err(format!("{} of {} files do not match", v.problems.len(), v.files).into())
+            }
         }
         _ => {
             print!("{USAGE}");
             Ok(())
         }
-    }
-}
-
-fn sha256(b: &[u8]) -> String {
-    Sha256::digest(b)
-        .iter()
-        .map(|x| format!("{x:02x}"))
-        .collect()
-}
-
-/// Find a path case-insensitively below `root`, as the game itself does.
-fn find_ci(root: &Path, rel: &str) -> Option<PathBuf> {
-    let mut cur = root.to_path_buf();
-    for part in rel.split(['\\', '/']).filter(|p| !p.is_empty()) {
-        let hit = fs::read_dir(&cur)
-            .ok()?
-            .filter_map(|e| e.ok())
-            .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(part))?;
-        cur = hit.path();
-    }
-    Some(cur)
-}
-
-/// The extension of the two types the corpus keeps; `None` for the rest.
-fn ext(ty: ResType) -> Option<&'static str> {
-    match ty {
-        ResType::Nss => Some("nss"),
-        ResType::Ncs => Some("ncs"),
-        _ => None,
-    }
-}
-
-/// A resource name as the corpus files it: lowercase, as the engine compares
-/// it, whatever the archive's spelling.
-fn lower(m: &rakata_res::ResRef) -> String {
-    m.to_string().to_ascii_lowercase()
-}
-
-/// Files in `dir` whose extension is one of `exts`, sorted by name.
-fn listed(dir: &Path, exts: &[&str]) -> Vec<PathBuf> {
-    let mut v: Vec<PathBuf> = fs::read_dir(dir)
-        .map(|rd| {
-            rd.filter_map(|e| e.ok().map(|e| e.path()))
-                .filter(|p| {
-                    p.extension()
-                        .and_then(|e| e.to_str())
-                        .is_some_and(|e| exts.iter().any(|x| e.eq_ignore_ascii_case(x)))
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    v.sort();
-    v
-}
-
-/// Correct BioWare's typo at line 5145 of K1's nwscript.nss, which makes
-/// nwnnsscomp hang: `INT` and `OBJECT_ID` where `int` and `object` belong.
-fn fix_nwscript(src: &[u8]) -> Vec<u8> {
-    let text = String::from_utf8_lossy(src);
-    let mut out = String::with_capacity(text.len());
-    for (i, line) in text.split_inclusive('\n').enumerate() {
-        if i + 1 == 5145 && line.contains("SetAvailableNPCId") {
-            out.push_str(
-                &line
-                    .replace("INT ", "int ")
-                    .replace("OBJECT_ID ", "object "),
-            );
-        } else {
-            out.push_str(line);
-        }
-    }
-    out.into_bytes()
-}
-
-/// A BIF read into memory with its resource table.
-fn write(path: &Path, data: &[u8]) -> Result<()> {
-    if let Some(dir) = path.parent() {
-        fs::create_dir_all(dir)?;
-    }
-    fs::write(path, data)?;
-    Ok(())
-}
-
-fn extract(o: Opts) -> Result<()> {
-    let game = o.game_dir.as_deref().ok_or("extract needs --game-dir")?;
-    let key_path = find_ci(game, "chitin.key").ok_or("no chitin.key under --game-dir")?;
-    let key = Key::parse(&Source::read(&key_path)?)?;
-
-    // Rewrite from scratch so a rerun is byte-identical and nothing stale survives.
-    for sub in ["nss", "ncs", "oracle", "modules", "rims"] {
-        let p = o.out.join(sub);
-        if p.exists() {
-            fs::remove_dir_all(&p)?;
-        }
-    }
-
-    let mut scripts: BTreeMap<String, Hashes> = BTreeMap::new();
-    let mut per_bif: BTreeMap<String, (usize, usize)> = BTreeMap::new();
-    // One pass per BIF: each is mapped once and its scripts copied out.
-    let mut by_bif: BTreeMap<u32, Vec<&KeyEntry>> = BTreeMap::new();
-    for e in key.entries().iter().filter(|e| ext(e.id.ty).is_some()) {
-        by_bif.entry(e.bif).or_default().push(e);
-    }
-    for (bif, entries) in &by_bif {
-        let rel = key
-            .bifs()
-            .get(*bif as usize)
-            .ok_or("key names a missing bif")?
-            .name_str();
-        let path = find_ci(game, &rel).ok_or_else(|| format!("missing {rel}"))?;
-        let source = Source::map(&path)?;
-        let archive = Bif::parse(&source)?;
-        for e in entries {
-            let x = ext(e.id.ty).expect("filtered to nss and ncs");
-            let name = lower(&e.id.name);
-            let data = archive
-                .get(e.index as usize)
-                .ok_or_else(|| format!("{name}.{x}: index beyond bif table"))?;
-            write(&o.out.join(x).join(format!("{name}.{x}")), data)?;
-            let h = scripts.entry(name).or_default();
-            let c = per_bif.entry(rel.clone()).or_default();
-            if e.id.ty == ResType::Nss {
-                h.nss = Some(sha256(data));
-                c.0 += 1;
-            } else {
-                h.ncs = Some(sha256(data));
-                c.1 += 1;
-            }
-        }
-    }
-
-    let shipped =
-        fs::read(o.out.join("nss/nwscript.nss")).map_err(|_| "chitin.key lists no nwscript.nss")?;
-    write(&o.out.join("nwscript.nss"), &shipped)?;
-    for p in listed(&o.out.join("nss"), &["nss"]) {
-        let name = p.file_name().unwrap();
-        let data = fs::read(&p)?;
-        let data = if name == "nwscript.nss" {
-            fix_nwscript(&data)
-        } else {
-            data
-        };
-        write(&o.out.join("oracle").join(name), &data)?;
-    }
-
-    let mut modules = ModuleManifest::default();
-    for (dir, sub) in [("modules", "modules"), ("rims", "rims")] {
-        let Some(d) = find_ci(game, dir) else {
-            continue;
-        };
-        for p in listed(&d, &["rim", "mod", "erf"]) {
-            let source = Source::map(&p)?;
-            let rim;
-            let erf;
-            let entries: &[Member] = if source.starts_with(b"RIM ") {
-                rim = Rim::parse(&source)?;
-                rim.members()
-            } else {
-                erf = Erf::parse(&source)?;
-                erf.members()
-            };
-            let file = p
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .to_ascii_lowercase();
-            let stem = p
-                .file_stem()
-                .unwrap()
-                .to_string_lossy()
-                .to_ascii_lowercase();
-            for e in entries.iter().filter(|e| e.id.ty == ResType::Ncs) {
-                let name = lower(&e.id.name);
-                write(
-                    &o.out.join(sub).join(&stem).join(format!("{name}.ncs")),
-                    e.data(),
-                )?;
-                modules
-                    .archives
-                    .entry(format!("{sub}/{file}"))
-                    .or_default()
-                    .insert(name, sha256(e.data()));
-            }
-        }
-    }
-
-    let counts = Counts {
-        nss: scripts.values().filter(|h| h.nss.is_some()).count(),
-        ncs: scripts.values().filter(|h| h.ncs.is_some()).count(),
-        pairs: scripts
-            .values()
-            .filter(|h| h.nss.is_some() && h.ncs.is_some())
-            .count(),
-        module_ncs: modules.archives.values().map(BTreeMap::len).sum(),
-    };
-    println!("corpus written to {}", o.out.display());
-    for (bif, (nss, ncs)) in &per_bif {
-        println!("  {bif}: {nss} nss, {ncs} ncs");
-    }
-    println!(
-        "  total: {} nss, {} ncs, {} pairs, {} module ncs in {} archives",
-        counts.nss,
-        counts.ncs,
-        counts.pairs,
-        counts.module_ncs,
-        modules.archives.len()
-    );
-
-    if let Some(path) = &o.manifest {
-        let m = Manifest {
-            game: "k1".into(),
-            source: o.source.clone(),
-            counts,
-            scripts,
-        };
-        write(path, toml::to_string(&m)?.as_bytes())?;
-        write(&modules_path(path), toml::to_string(&modules)?.as_bytes())?;
-        println!("manifest written to {}", path.display());
-    }
-    Ok(())
-}
-
-fn modules_path(manifest: &Path) -> PathBuf {
-    let stem = manifest.file_stem().unwrap_or_default().to_string_lossy();
-    manifest.with_file_name(format!("{stem}-modules.toml"))
-}
-
-fn verify(o: &Opts) -> Result<()> {
-    let path = o.manifest.as_deref().unwrap();
-    let m: Manifest = toml::from_str(&fs::read_to_string(path)?)?;
-    let modules: ModuleManifest = toml::from_str(&fs::read_to_string(modules_path(path))?)?;
-    let mut problems = Vec::new();
-    let mut check = |rel: PathBuf, want: &str| match fs::read(o.out.join(&rel)) {
-        Ok(b) if sha256(&b) == want => {}
-        Ok(_) => problems.push(format!("{}: hash differs", rel.display())),
-        Err(_) => problems.push(format!("{}: missing", rel.display())),
-    };
-    let mut n = 0;
-    for (name, h) in &m.scripts {
-        if let Some(want) = &h.nss {
-            check(PathBuf::from(format!("nss/{name}.nss")), want);
-            n += 1;
-        }
-        if let Some(want) = &h.ncs {
-            check(PathBuf::from(format!("ncs/{name}.ncs")), want);
-            n += 1;
-        }
-    }
-    for (archive, files) in &modules.archives {
-        let (sub, file) = archive.split_once('/').ok_or("bad archive key")?;
-        let stem = file.rsplit_once('.').map_or(file, |(s, _)| s);
-        for (name, want) in files {
-            check(PathBuf::from(format!("{sub}/{stem}/{name}.ncs")), want);
-            n += 1;
-        }
-    }
-    if problems.is_empty() {
-        println!("{n} files match {}", path.display());
-        Ok(())
-    } else {
-        for p in problems.iter().take(20) {
-            eprintln!("  {p}");
-        }
-        Err(format!("{} of {n} files do not match", problems.len()).into())
     }
 }

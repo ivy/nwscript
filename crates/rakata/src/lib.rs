@@ -9,6 +9,7 @@
 
 pub mod codes;
 pub mod conformance;
+pub mod corpus;
 pub mod formats;
 pub mod patch;
 
