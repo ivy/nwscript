@@ -425,7 +425,7 @@ class Walkmesh:
     @property
     def aabb(self) -> list[AabbNode]: ...
     def walkable_faces(self, surfacemat: TwoDa) -> list[int]:
-        """RE2505 for a table without a `Walk` column."""
+        """RE2505 for a table without a `walk` column."""
     def set_material(self, face: int, material: int) -> int:
         """Returns the material the face had; `IndexError` past the last face."""
     def semantic_eq(self, other: Walkmesh) -> bool: ...

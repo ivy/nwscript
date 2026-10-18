@@ -244,7 +244,7 @@ impl PyWalkmesh {
 
     /// The indices of the faces whose material `surfacemat` (the table
     /// `surfacemat.2da` holds) says is walkable. Raises `RE2505` for a
-    /// table without its `Walk` column.
+    /// table without its `walk` column.
     fn walkable_faces(&self, surfacemat: &PyTwoDa) -> PyResult<Vec<usize>> {
         let table = SurfaceMaterials::from_2da(&surfacemat.inner).map_err(fail)?;
         Ok(self.walkmesh().walkable_faces(&table).collect())
