@@ -283,6 +283,20 @@ impl Lip {
 mod tests {
     use super::*;
 
+    /// `bytes`, kept as a seed for the fuzz targets in the directory
+    /// `$RAKATA_FUZZ_SEEDS` names, when it is set.
+    fn seed(bytes: &[u8]) -> &[u8] {
+        if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+            use std::hash::{DefaultHasher, Hash, Hasher};
+            let mut h = DefaultHasher::new();
+            bytes.hash(&mut h);
+            let dir = std::path::Path::new(&dir);
+            std::fs::create_dir_all(dir).unwrap();
+            std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+        }
+        bytes
+    }
+
     fn three() -> Lip {
         Lip {
             length: 1.5,
@@ -301,7 +315,7 @@ mod tests {
         assert_eq!(bytes.len(), HEADER_LEN + 3 * KEY_LEN);
         assert_eq!(&bytes[..8], SIGNATURE);
         assert_eq!(&bytes[12..16], &3u32.to_le_bytes());
-        let again = Lip::parse(&bytes).unwrap();
+        let again = Lip::parse(seed(&bytes)).unwrap();
         assert!(again.bits_eq(&lip));
         assert_eq!(again.to_bytes().unwrap(), bytes);
     }
@@ -310,7 +324,7 @@ mod tests {
     fn a_shape_above_fifteen_is_a_diagnostic() {
         let mut bytes = three().to_bytes().unwrap();
         bytes[HEADER_LEN + KEY_LEN + 4] = 16;
-        let err = Lip::parse(&bytes).unwrap_err();
+        let err = Lip::parse(seed(&bytes)).unwrap_err();
         assert_eq!(err.code(), codes::BAD_SHAPE);
         assert!(matches!(
             err,
@@ -320,14 +334,20 @@ mod tests {
             }
         ));
         bytes[HEADER_LEN + KEY_LEN + 4] = 255;
-        assert_eq!(Lip::parse(&bytes).unwrap_err().code(), codes::BAD_SHAPE);
+        assert_eq!(
+            Lip::parse(seed(&bytes)).unwrap_err().code(),
+            codes::BAD_SHAPE
+        );
     }
 
     #[test]
     fn a_wrong_signature_or_version_is_refused() {
         let mut bytes = three().to_bytes().unwrap();
         bytes[0..8].copy_from_slice(b"LIP V1.1");
-        assert_eq!(Lip::parse(&bytes).unwrap_err().code(), codes::NOT_A_LIP);
+        assert_eq!(
+            Lip::parse(seed(&bytes)).unwrap_err().code(),
+            codes::NOT_A_LIP
+        );
         assert_eq!(Lip::parse(b"RIM ").unwrap_err().code(), codes::NOT_A_LIP);
         assert_eq!(Lip::parse(b"").unwrap_err().code(), codes::NOT_A_LIP);
     }
@@ -345,14 +365,17 @@ mod tests {
         );
         let mut huge = bytes[..HEADER_LEN].to_vec();
         huge[12..16].copy_from_slice(&u32::MAX.to_le_bytes());
-        assert_eq!(Lip::parse(&huge).unwrap_err().code(), codes::TRUNCATED);
+        assert_eq!(
+            Lip::parse(seed(&huge)).unwrap_err().code(),
+            codes::TRUNCATED
+        );
     }
 
     #[test]
     fn trailing_bytes_are_refused() {
         let mut bytes = three().to_bytes().unwrap();
         bytes.push(0);
-        let err = Lip::parse(&bytes).unwrap_err();
+        let err = Lip::parse(seed(&bytes)).unwrap_err();
         assert_eq!(err.code(), codes::TRAILING_BYTES);
         assert!(matches!(err, Error::TrailingBytes { len: 1 }));
     }
@@ -365,7 +388,7 @@ mod tests {
         };
         let bytes = lip.to_bytes().unwrap();
         assert_eq!(bytes.len(), HEADER_LEN);
-        assert!(Lip::parse(&bytes).unwrap().bits_eq(&lip));
+        assert!(Lip::parse(seed(&bytes)).unwrap().bits_eq(&lip));
     }
 
     #[test]
@@ -375,7 +398,7 @@ mod tests {
             keys: vec![Key::new(f32::from_bits(0x7fc0_0001), Shape::K)],
         };
         let bytes = lip.to_bytes().unwrap();
-        let again = Lip::parse(&bytes).unwrap();
+        let again = Lip::parse(seed(&bytes)).unwrap();
         assert!(again.bits_eq(&lip));
         assert_eq!(again.to_bytes().unwrap(), bytes);
     }
