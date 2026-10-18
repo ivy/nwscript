@@ -1,7 +1,7 @@
 //! The formats the benchmark measures, and Rakata's reader and writer for
 //! each, through the adapters `rakata conformance` registers.
 
-use rakata::conformance::Format;
+use rakata::conformance::{Format, PairFormat};
 use rakata::formats as f;
 
 /// One benchmarked format: a name, the extensions its files carry.
@@ -94,9 +94,8 @@ pub struct Input<'a> {
     pub mdx: Option<&'a [u8]>,
 }
 
-/// Whether Rakata writes this format.
-pub fn writes(format: &str) -> bool {
-    format != "mdl"
+fn problem(p: rakata::conformance::Problem) -> String {
+    format!("{}: {}", p.code, p.message)
 }
 
 fn read_with<F: Format>(fmt: &F, bytes: &[u8]) -> Result<(), String> {
@@ -104,15 +103,15 @@ fn read_with<F: Format>(fmt: &F, bytes: &[u8]) -> Result<(), String> {
         .map(|m| {
             std::hint::black_box(&m);
         })
-        .map_err(|p| format!("{}: {}", p.code, p.message))
+        .map_err(problem)
 }
 
-fn write_with<F: Format>(fmt: &F, bytes: &[u8]) -> Result<Vec<u8>, String> {
-    let m = fmt
-        .read(bytes)
-        .map_err(|p| format!("{}: {}", p.code, p.message))?;
-    fmt.write(&m)
-        .map_err(|p| format!("the writer failed: {}: {}", p.code, p.message))
+fn write_with<F: Format>(fmt: &F, bytes: &[u8]) -> Result<Written, String> {
+    let m = fmt.read(bytes).map_err(problem)?;
+    let bytes = fmt
+        .write(&m)
+        .map_err(|p| format!("the writer failed: {}", problem(p)))?;
+    Ok(Written { bytes, mdx: None })
 }
 
 /// `Ok(true)` when both read to the same data; `Err` names the side that
@@ -120,11 +119,24 @@ fn write_with<F: Format>(fmt: &F, bytes: &[u8]) -> Result<Vec<u8>, String> {
 fn same_with<F: Format>(fmt: &F, a: &[u8], b: &[u8]) -> Result<bool, String> {
     let ma = fmt
         .read(a)
-        .map_err(|p| format!("the original does not read: {}: {}", p.code, p.message))?;
+        .map_err(|p| format!("the original does not read: {}", problem(p)))?;
     let mb = fmt
         .read(b)
-        .map_err(|p| format!("does not read: {}: {}", p.code, p.message))?;
+        .map_err(|p| format!("does not read: {}", problem(p)))?;
     Ok(fmt.semantic_eq(&ma, &mb))
+}
+
+/// What a writer produced: the file, and a model's MDX.
+pub struct Written {
+    pub bytes: Vec<u8>,
+    pub mdx: Option<Vec<u8>>,
+}
+
+impl Written {
+    /// Byte for byte the input, both halves of a model.
+    pub fn is(&self, input: &Input) -> bool {
+        self.bytes == input.bytes && self.mdx.as_deref() == input.mdx
+    }
 }
 
 macro_rules! dispatch {
@@ -147,35 +159,43 @@ macro_rules! dispatch {
     };
 }
 
-/// Read a file as Rakata does.
+/// Read a file as Rakata does; a model with its MDX.
 pub fn read(format: &str, input: &Input) -> Result<(), String> {
     dispatch!(
         format,
         read_with(input.bytes),
-        rakata_mdl::parse(input.bytes, input.mdx.unwrap_or_default())
+        PairFormat::read(&f::Mdl, input.bytes, input.mdx.unwrap_or_default())
             .map(|m| {
                 std::hint::black_box(&m);
             })
-            .map_err(|e| e.to_string())
+            .map_err(problem)
     )
 }
 
 /// Read a file and write it again as Rakata does.
-pub fn write(format: &str, input: &Input) -> Result<Vec<u8>, String> {
-    dispatch!(
-        format,
-        write_with(input.bytes),
-        Err("Rakata does not write MDL".to_string())
-    )
+pub fn write(format: &str, input: &Input) -> Result<Written, String> {
+    dispatch!(format, write_with(input.bytes), {
+        let m = PairFormat::read(&f::Mdl, input.bytes, input.mdx.unwrap_or_default())
+            .map_err(problem)?;
+        let [bytes, mdx] = PairFormat::write(&f::Mdl, &m)
+            .map_err(|p| format!("the writer failed: {}", problem(p)))?;
+        Ok(Written {
+            bytes,
+            mdx: Some(mdx),
+        })
+    })
 }
 
 /// Whether `other` holds the data of `original`, as Rakata reads both.
-pub fn same(format: &str, original: &[u8], other: &[u8]) -> Result<bool, String> {
-    dispatch!(
-        format,
-        same_with(original, other),
-        Err("Rakata does not compare MDL".to_string())
-    )
+pub fn same(format: &str, original: &Input, other: &Input) -> Result<bool, String> {
+    dispatch!(format, same_with(original.bytes, other.bytes), {
+        let fmt = &f::Mdl;
+        let ma = PairFormat::read(fmt, original.bytes, original.mdx.unwrap_or_default())
+            .map_err(|p| format!("the original does not read: {}", problem(p)))?;
+        let mb = PairFormat::read(fmt, other.bytes, other.mdx.unwrap_or_default())
+            .map_err(|p| format!("does not read: {}", problem(p)))?;
+        Ok(PairFormat::semantic_eq(fmt, &ma, &mb))
+    })
 }
 
 /// The first place two files differ, as `rakata diff` words it; `None`

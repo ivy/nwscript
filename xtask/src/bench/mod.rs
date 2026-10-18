@@ -394,8 +394,7 @@ fn run(args: &[String]) -> Result<(), String> {
     }
     report.host.after = host::state();
     if let Some(old) = &opts.compare {
-        let text =
-            std::fs::read_to_string(old).map_err(|e| format!("{}: {e}", old.display()))?;
+        let text = std::fs::read_to_string(old).map_err(|e| format!("{}: {e}", old.display()))?;
         let old: report::Report =
             serde_json::from_str(&text).map_err(|e| format!("{}: {e}", old.display()))?;
         report.compared = report::compare(&old, &report);

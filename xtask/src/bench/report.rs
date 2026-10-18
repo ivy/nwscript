@@ -182,7 +182,11 @@ pub fn compare(old: &Report, new: &Report) -> Vec<Rerun> {
             .iter()
             .find(|o| o.case == i.case && o.installer == i.installer)
         {
-            push(format!("{} {} install", i.installer, i.case), &o.time, &i.time);
+            push(
+                format!("{} {} install", i.installer, i.case),
+                &o.time,
+                &i.time,
+            );
         }
     }
     out
@@ -284,7 +288,10 @@ pub fn markdown(r: &Report) -> String {
             .unwrap_or_default()
     );
     if let Some(f) = &r.files {
-        let _ = writeln!(s, "## Files\n\n| Format | Files | MB | Duplicates |\n| --- | --- | --- | --- |");
+        let _ = writeln!(
+            s,
+            "## Files\n\n| Format | Files | MB | Duplicates |\n| --- | --- | --- | --- |"
+        );
         for (name, c) in &f.formats {
             let _ = writeln!(
                 s,

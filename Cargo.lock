@@ -1961,7 +1961,6 @@ dependencies = [
  "rakata",
  "rakata-archive",
  "rakata-gff",
- "rakata-mdl",
  "rakata-patch",
  "rakata-res",
  "serde",

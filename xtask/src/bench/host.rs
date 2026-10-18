@@ -107,8 +107,8 @@ pub fn gnu_time() -> Option<PathBuf> {
         .stdin(Stdio::null())
         .output()
         .ok()?;
-    let text = String::from_utf8_lossy(&out.stdout).into_owned()
-        + &String::from_utf8_lossy(&out.stderr);
+    let text =
+        String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr);
     text.contains("GNU").then_some(p)
 }
 
@@ -188,11 +188,9 @@ pub fn run(
         }
     };
     let wall = start.elapsed().as_secs_f64();
-    let rss_kb = fs::read_to_string(&rss_file).ok().and_then(|t| {
-        t.lines()
-            .rev()
-            .find_map(|l| l.trim().parse::<u64>().ok())
-    });
+    let rss_kb = fs::read_to_string(&rss_file)
+        .ok()
+        .and_then(|t| t.lines().rev().find_map(|l| l.trim().parse::<u64>().ok()));
     let stderr = fs::read(&err_file)
         .map(|b| {
             let t = strip_ansi(&String::from_utf8_lossy(&b));

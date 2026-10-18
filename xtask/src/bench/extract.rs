@@ -210,7 +210,11 @@ pub fn extract(game: &Path, out: &Path) -> Result<Manifest, String> {
     let mut bif_index: HashMap<String, u32> = HashMap::new();
     for (i, b) in key.bifs().iter().enumerate() {
         let name = b.name_str().replace('\\', "/");
-        let base = name.rsplit('/').next().unwrap_or(&name).to_ascii_lowercase();
+        let base = name
+            .rsplit('/')
+            .next()
+            .unwrap_or(&name)
+            .to_ascii_lowercase();
         bif_index.insert(base, i as u32);
     }
 

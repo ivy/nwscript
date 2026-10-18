@@ -216,12 +216,10 @@ fn prepare(
 /// `namespaces.ini`'s `[Namespaces]`; `None` without a namespaces.ini.
 fn option_number(data: &Path, index: u32) -> Result<Option<u32>, String> {
     let Some(ns) = fs::read_dir(data).ok().and_then(|d| {
-        d.flatten()
-            .map(|e| e.path())
-            .find(|p| {
-                p.file_name()
-                    .is_some_and(|n| n.eq_ignore_ascii_case("namespaces.ini"))
-            })
+        d.flatten().map(|e| e.path()).find(|p| {
+            p.file_name()
+                .is_some_and(|n| n.eq_ignore_ascii_case("namespaces.ini"))
+        })
     }) else {
         return Ok(None);
     };
@@ -310,8 +308,7 @@ fn changed(before: &Path, after: &Path) -> Vec<String> {
         match a.get(p) {
             None => out.push(p.clone()),
             Some(ma) => {
-                let same_stat = ma.len() == mb.len()
-                    && ma.modified().ok() == mb.modified().ok();
+                let same_stat = ma.len() == mb.len() && ma.modified().ok() == mb.modified().ok();
                 if !same_stat && fs::read(before.join(p)).ok() != fs::read(after.join(p)).ok() {
                     out.push(p.clone());
                 }
@@ -354,7 +351,12 @@ fn compare_path(cmp: &mut Comparison, rel: &str, ours: &Path, theirs: &Path) {
     }
     let ext = rel.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
     let name = rel.rsplit('/').next().unwrap_or(rel);
-    match formats::by_extension(ext).map(|f| formats::same(f.name, &a, &b)) {
+    // A model is compared by its MDL alone here; its MDX is a path of its own.
+    let input = |bytes| formats::Input { bytes, mdx: None };
+    match formats::by_extension(ext)
+        .filter(|f| f.name != "mdl")
+        .map(|f| formats::same(f.name, &input(&a), &input(&b)))
+    {
         Some(Ok(true)) => cmp.add("equal data", rel, String::new()),
         Some(Ok(false)) => cmp.add(
             "different data",

@@ -11,7 +11,6 @@ publish = false
 rakata = { workspace = true }
 rakata-archive = { workspace = true }
 rakata-gff = { workspace = true }
-rakata-mdl = { workspace = true }
 rakata-res = { workspace = true }
 rakata-patch = { workspace = true }
 serde = { version = "1", features = ["derive"] }

@@ -7,7 +7,9 @@
 //! - `read`: read every file.
 //! - `write`: read every file and write it again, in memory.
 //! - `check`: read and write every file; a written file that differs from
-//!   the original is saved as `OUT.d/I.EXT`.
+//!   the original is saved as `OUT.d/I.EXT` (a model's MDX beside it as
+//!   `OUT.d/I.mdx`). A model's list names its `.mdl`; its `.mdx` lies
+//!   beside it under the same stem.
 //!
 //! OUT receives one JSON line per file: `{"i": I, "ok": true}` or
 //! `{"i": I, "error": "..."}`, and in `check` mode `"write"`: `identical`,
@@ -33,13 +35,8 @@ pub fn main(args: &[String]) -> Result<std::process::ExitCode, String> {
     let mut sink = std::io::BufWriter::new(
         fs::File::create(&out).map_err(|e| format!("{}: {e}", out.display()))?,
     );
-    let writes = formats::writes(format);
     match mode.as_str() {
         "start" => return Ok(std::process::ExitCode::SUCCESS),
-        "write" if !writes => {
-            eprintln!("unsupported: Rakata does not write {format}");
-            return Ok(std::process::ExitCode::from(UNSUPPORTED));
-        }
         "read" | "write" | "check" => {}
         other => return Err(format!("unknown mode `{other}`")),
     }
@@ -61,7 +58,7 @@ pub fn main(args: &[String]) -> Result<std::process::ExitCode, String> {
                     bytes: &bytes,
                     mdx: mdx.as_deref(),
                 };
-                one(mode, format, writes, &input, path, i, &saved)
+                one(mode, format, &input, path, i, &saved)
             }
         };
         writeln!(sink, "{record}").map_err(|e| e.to_string())?;
@@ -73,7 +70,6 @@ pub fn main(args: &[String]) -> Result<std::process::ExitCode, String> {
 fn one(
     mode: &str,
     format: &str,
-    writes: bool,
     input: &Input,
     path: &Path,
     i: usize,
@@ -95,11 +91,8 @@ fn one(
             if let Err(e) = formats::read(format, input) {
                 return serde_json::json!({"i": i, "error": e});
             }
-            if !writes {
-                return serde_json::json!({"i": i, "ok": true});
-            }
             match formats::write(format, input) {
-                Ok(w) if w == input.bytes => {
+                Ok(w) if w.is(input) => {
                     serde_json::json!({"i": i, "ok": true, "write": "identical"})
                 }
                 Ok(w) => {
@@ -108,11 +101,17 @@ fn one(
                         .map(|e| e.to_string_lossy().into_owned())
                         .unwrap_or_default();
                     let p = saved.join(format!("{i}.{ext}"));
-                    match fs::write(&p, &w) {
+                    let saved = fs::write(&p, &w.bytes).and_then(|()| match &w.mdx {
+                        Some(x) => fs::write(p.with_extension("mdx"), x),
+                        None => Ok(()),
+                    });
+                    match saved {
                         Ok(()) => serde_json::json!({
                             "i": i, "ok": true, "write": "different", "out": p.display().to_string()
                         }),
-                        Err(e) => serde_json::json!({"i": i, "ok": true, "write_error": e.to_string()}),
+                        Err(e) => {
+                            serde_json::json!({"i": i, "ok": true, "write_error": e.to_string()})
+                        }
                     }
                 }
                 Err(e) => serde_json::json!({"i": i, "ok": true, "write_error": e}),

@@ -191,7 +191,11 @@ fn batch(
         let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else {
             continue;
         };
-        let Some(i) = v["i"].as_u64().map(|i| i as usize).filter(|&i| i < files.len()) else {
+        let Some(i) = v["i"]
+            .as_u64()
+            .map(|i| i as usize)
+            .filter(|&i| i < files.len())
+        else {
             continue;
         };
         let file = &files[i];
@@ -244,7 +248,8 @@ fn batch(
         s.push(m.wall);
         let m = go("read");
         if m.code != Some(0) {
-            row.notes.push(format!("a timed read exited {:?}: {}", m.code, m.stderr));
+            row.notes
+                .push(format!("a timed read exited {:?}: {}", m.code, m.stderr));
         }
         r.push(m.wall);
         rss_r = rss_r.max(m.rss_kb);
@@ -276,6 +281,11 @@ fn classify_written(
     theirs: Option<&Path>,
     opts: &RunOpts,
 ) {
+    let mdx = |p: &Path| {
+        (format == "mdl")
+            .then(|| fs::read(p.with_extension("mdx")).ok())
+            .flatten()
+    };
     let (Ok(a), Some(Ok(b))) = (fs::read(original), theirs.map(fs::read)) else {
         counts.failed += 1;
         row.list(Listed {
@@ -285,7 +295,16 @@ fn classify_written(
         });
         return;
     };
-    match formats::same(format, &a, &b) {
+    let (xa, xb) = (mdx(original), theirs.and_then(mdx));
+    let ia = formats::Input {
+        bytes: &a,
+        mdx: xa.as_deref(),
+    };
+    let ib = formats::Input {
+        bytes: &b,
+        mdx: xb.as_deref(),
+    };
+    match formats::same(format, &ia, &ib) {
         Ok(true) => counts.equal += 1,
         Ok(false) => {
             counts.different += 1;
@@ -339,15 +358,8 @@ fn per_file(
             .map(|a| a.replace("{file}", &f.display().to_string()))
             .collect()
     };
-    let go = |argv: &[String]| {
-        host::run(
-            argv,
-            None,
-            opts.time.as_deref(),
-            &opts.work,
-            opts.timeout,
-        )
-    };
+    let go =
+        |argv: &[String]| host::run(argv, None, opts.time.as_deref(), &opts.work, opts.timeout);
     let mut oks = vec![false; files.len()];
     for (i, f) in files.iter().enumerate() {
         let m = go(&argv(f));
