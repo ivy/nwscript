@@ -19,6 +19,10 @@ pub mod codes {
     pub const QUERY: &str = "RE1504";
     /// A file of changed paths that could not be read.
     pub const CHANGED_LIST: &str = "RE1505";
+    /// A `refs` symbol that cannot be of the kind asked for.
+    pub const SYMBOL: &str = "RE1506";
+    /// A `refs --from` resource the index does not hold.
+    pub const NO_SUCH_RESOURCE: &str = "RE1507";
     /// A changed path the tree does not hold.
     pub const CHANGED_MISSING: &str = "RW1501";
     /// A file of the tree that could not be read.
@@ -28,6 +32,9 @@ pub mod codes {
     /// Files absent from the parent tree that the changed list does not
     /// name.
     pub const UNLISTED: &str = "RW1504";
+    /// A `refs` query that found nothing, with the resources it could not
+    /// search.
+    pub const NO_REFS: &str = "RW1505";
 }
 
 /// An error of the index.
@@ -61,6 +68,14 @@ pub enum Error {
         path: PathBuf,
         source: std::io::Error,
     },
+    /// A symbol that cannot be of the kind asked for.
+    Symbol {
+        thing: String,
+        kind: &'static str,
+        why: &'static str,
+    },
+    /// A resource the index does not hold under that name.
+    NoSuchResource { name: String },
 }
 
 impl Error {
@@ -77,6 +92,8 @@ impl Error {
             Error::NoSuchTree { .. } => codes::NO_SUCH_TREE,
             Error::Query { .. } => codes::QUERY,
             Error::Changed { .. } => codes::CHANGED_LIST,
+            Error::Symbol { .. } => codes::SYMBOL,
+            Error::NoSuchResource { .. } => codes::NO_SUCH_RESOURCE,
         }
     }
 
@@ -113,6 +130,12 @@ impl Error {
                     "cannot read the changed paths in {}: {source}",
                     path.display()
                 )
+            }
+            Error::Symbol { thing, kind, why } => {
+                format!("`{thing}` cannot be a {kind}: {why}")
+            }
+            Error::NoSuchResource { name } => {
+                format!("the index holds no resource named `{name}`")
             }
         }
     }

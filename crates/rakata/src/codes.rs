@@ -140,6 +140,8 @@ nwscript_diag::codes! {
     RE1503 Error "a tree the index database does not hold";
     RE1504 Error "an index query SQLite rejects";
     RE1505 Error "a changed-paths file that could not be read";
+    RE1506 Error "a refs symbol that cannot be of the kind asked for";
+    RE1507 Error "a refs --from resource the index does not hold";
     RW1501 Warning "a changed path the tree does not hold";
     RW1502 Warning "a file of the tree that could not be read";
     RW1503 Warning "a tree without nwscript.nss: calls name routines by number";
@@ -150,6 +152,7 @@ nwscript_diag::codes! {
     RE1804 Error "a Lua script that raised an error without a code, or did not load";
     RE1805 Error "a value of the wrong kind passed to a function of the Lua binding";
     RE1806 Error "a file a Lua script writes that could not be written";
+    RW1505 Warning "a refs query that found nothing, qualified by what the index could not search";
 }
 
 /// The rakata code with this id, if registered; case does not matter.

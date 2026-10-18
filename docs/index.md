@@ -9,6 +9,7 @@ rakata index build --game DIR --tree LABEL [--db FILE] [--parent LABEL --changed
 rakata index query [--db FILE] SQL              # rows as a table, or --format json
 rakata index digest [--db FILE] [--tree LABEL]  # the content digest
 rakata index coverage [--db FILE] [--tree LABEL] [--list]
+rakata refs THING [--kind strref|resref|tag|global|auto] [--to|--from] [--direct] [--tree LABEL] [--db FILE]
 ```
 
 The database is `--db FILE`, or `index.sqlite` under `$XDG_CACHE_HOME/rakata/` (`~/.cache/rakata/`). It is derived from the game's bytes, so it never goes in git and can always be built again. A build loads the file into memory, works there, and writes it back once (`VACUUM INTO` a file beside it, renamed over it). `query`, `digest` and `coverage` open it read-only.
@@ -161,6 +162,12 @@ JOIN trees t ON t.id = r.first_tree
 WHERE l.tree = (SELECT id FROM trees WHERE label = 'ckpt:ba55d9e0db548e33') AND l.type = 'dlg';
 ```
 
+## `rakata refs`
+
+`rakata refs THING` reads the `refs` table. With `--to`, the default, it lists what refers to THING; with `--from`, what the resource THING (`name` or `name.ext`) refers to. `--kind auto`, the default, tries every kind THING can be (a strref only when it is a number) and the answer says which matched. Each hit is the resource holding the reference, the site, and every location of that resource, each marked with the copy the game loads instead when there is one: an `Override/` file of the same name and type holding other bytes, or for a member of `modules/STEM.rim` or `STEM_s.rim`, the `STEM.mod` that replaces both. A script's site carries the instruction that pushes the literal, `CONSTS` for a string and `CONSTI` for a strref.
+
+Toward a symbol, indirect hits follow the direct ones, each naming what it goes through, unless `--direct` is given: a resref that names a blueprint (`utc`, `utd`, `ute`, `uti`, `utm`, `utp`, `uts`, `utt`, `utw`) also finds the references to that blueprint's `Tag`, other than objects' own `Tag` fields, since a script finds an object by its tag; and every script among the hits is followed to the references that run it (a dialogue's `Script` and `Active`, an object's `On…` and `Script…` events, `ExecuteScript`). An empty answer carries RW1505 with the count of resources the index has no reader for or failed to read, since a reference in one of them cannot be found. `--format json` gives the hits as the `result` of the envelope, with `tried`, `matched`, `coverage` (on an empty answer) and `seconds`.
+
 ## Diagnostics
 
-The index reports under `RE15xx` and `RW15xx`: RE1501 the database could not be read or written, RE1502 another schema version, RE1503 a tree the database does not hold, RE1504 a query SQLite rejects (the database is opened read-only, so a write is rejected too), RE1505 a changed-paths file that could not be read; RW1501 a changed path the tree does not hold, RW1502 a file that could not be read, RW1503 a tree without `nwscript.nss`, RW1504 files new to the tree the changed list does not name. `rakata explain CODE` gives each in full.
+The index reports under `RE15xx` and `RW15xx`: RE1501 the database could not be read or written, RE1502 another schema version, RE1503 a tree the database does not hold, RE1504 a query SQLite rejects (the database is opened read-only, so a write is rejected too), RE1505 a changed-paths file that could not be read, RE1506 a `refs` symbol that cannot be of the kind asked for, RE1507 a `refs --from` resource the index does not hold; RW1501 a changed path the tree does not hold, RW1502 a file that could not be read, RW1503 a tree without `nwscript.nss`, RW1504 files new to the tree the changed list does not name, RW1505 a `refs` query that found nothing, with what the index could not search. `rakata explain CODE` gives each in full.

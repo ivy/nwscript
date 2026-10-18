@@ -9,6 +9,7 @@ use nwscript::diag::{Diagnostic, SourceMap};
 use nwscript::sema::Type;
 use rakata_game::{Install, Profile};
 
+pub use rakata_index::{Answer, Direction, Hit, Location, RefKind, RefsQuery, refs};
 pub use rakata_index::{
     ArgType, BuildReport, COUNTED, CoverageRow, Error, Param, Routine, Rows, SCHEMA_VERSION,
     Status, Timings, TreeCoverage, Warning, codes, coverage, digest, open, parse_changed, query,

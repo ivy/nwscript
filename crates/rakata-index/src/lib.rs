@@ -21,7 +21,7 @@
 //! memory and written once. [`digest`] proves two databases hold the same
 //! facts about a tree, [`coverage`] says what each file contributed, and
 //! [`query`] is the query surface: SQL over the tables `docs/index.md`
-//! describes.
+//! describes, with [`refs`] reading the references in either direction.
 
 #![forbid(unsafe_code)]
 
@@ -30,6 +30,7 @@ mod digest;
 mod error;
 mod extract;
 mod query;
+mod refs;
 mod schema;
 mod store;
 
@@ -39,5 +40,7 @@ pub use error::{Error, Result, Warning, codes};
 pub use extract::{Param, Routine, Status};
 pub use nwscript_ncs::facts::ArgType;
 pub use query::{CoverageRow, Rows, TreeCoverage, coverage, query};
+pub use rakata_res::RefKind;
+pub use refs::{Answer, Direction, Hit, Location, RefsQuery, refs};
 pub use schema::VERSION as SCHEMA_VERSION;
 pub use store::{COUNTED, open};
