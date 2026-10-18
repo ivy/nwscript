@@ -305,79 +305,212 @@ fn warn(code: &str, message: String) -> Diagnostic {
     Diagnostic::new(code, message)
 }
 
+/// What recovering any one script of an install needs, built once: every
+/// NSS the install holds (the copy the engine loads), the engine's
+/// declarations from its `nwscript.nss`, and the include libraries compiled
+/// and indexed by function shape for folding. `rakata corpus decompile`
+/// runs it over every script; a dialogue's transcript over its conditions.
+pub struct Recovery {
+    game: Game,
+    declarations: Declarations,
+    sources: Vec<(String, Vec<u8>)>,
+    table: EngineTable,
+    libs: Vec<Library>,
+    index: HashMap<Vec<u8>, Vec<(usize, usize)>>,
+}
+
+/// A script recovered by [`Recovery::recover`]: the source, each function
+/// verified or not, and what folding did.
+pub struct Recovered<'t> {
+    pub decompiled: Decompiled<'t>,
+    pub fold: FoldOutcome,
+}
+
+/// What folding include libraries out of a recovered script did.
+pub enum FoldOutcome {
+    /// No function matched a library's.
+    None,
+    /// `functions` were replaced by the `includes`; `ranges` are their byte
+    /// ranges in the original program.
+    Folded {
+        functions: usize,
+        includes: Vec<String>,
+        ranges: Vec<(u32, u32)>,
+    },
+    /// The folded source recompiled differently (`why`), so none was
+    /// replaced. `attempt` is that source when `RAKATA_CORPUS_DUMP` is set.
+    Refused {
+        functions: usize,
+        includes: Vec<String>,
+        why: String,
+        attempt: Option<Vec<u8>>,
+    },
+}
+
+impl Recovery {
+    /// Read the install's NSS, its declarations and its include libraries.
+    /// Libraries that do not compile are left out with an RW1002 warning;
+    /// an install without `nwscript.nss` is RE1002.
+    pub fn new(install: &Install, warnings: &mut Vec<Diagnostic>) -> Result<Self> {
+        let game = game_of(install.profile());
+        let declarations = Declarations::BioWare;
+        // Every NSS the install holds, the copy the engine loads: the
+        // includes a script could have included, and nwscript.nss.
+        let mut nss_ids: BTreeSet<ResId> = install
+            .key()
+            .entries()
+            .iter()
+            .filter(|e| e.id.ty == ResType::Nss)
+            .map(|e| e.id)
+            .collect();
+        nss_ids.extend(
+            install
+                .override_ids()
+                .into_iter()
+                .filter(|id| id.ty == ResType::Nss),
+        );
+        let mut sources: Vec<(String, Vec<u8>)> = Vec::new();
+        for id in &nss_ids {
+            if let Some((_, bytes)) = install.read(*id, None)? {
+                sources.push((id.to_string().to_ascii_lowercase(), bytes));
+            }
+        }
+        let mut recovery = Recovery {
+            game,
+            declarations,
+            sources,
+            table: EngineTable::default(),
+            libs: Vec::new(),
+            index: HashMap::new(),
+        };
+
+        let mut map = SourceMap::new();
+        let mut table = match nwscript::engine::load_table(&mut recovery.resolver(), &mut map) {
+            Ok(Some((t, _))) => t,
+            Ok(None) => {
+                return Err(Error::NoNwscript {
+                    dir: install.root().to_path_buf(),
+                });
+            }
+            Err(source) => {
+                return Err(Error::Read {
+                    path: install.root().join("nwscript.nss"),
+                    source,
+                });
+            }
+        };
+        if let Some((name, text)) = declarations.overlay(game) {
+            let file = map.add(name, text.as_bytes().to_vec());
+            let _ = table.overlay(file, text.as_bytes());
+        }
+
+        let libs = libraries(
+            &recovery.sources,
+            &|| recovery.resolver(),
+            game,
+            declarations,
+            &table,
+            warnings,
+        );
+        let mut index: HashMap<Vec<u8>, Vec<(usize, usize)>> = HashMap::new();
+        for (li, lib) in libs.iter().enumerate() {
+            for (fi, f) in lib.functions.iter().enumerate() {
+                index.entry(f.shape.clone()).or_default().push((li, fi));
+            }
+        }
+        recovery.table = table;
+        recovery.libs = libs;
+        recovery.index = index;
+        Ok(recovery)
+    }
+
+    /// The engine's declarations, from the install's `nwscript.nss`.
+    pub fn table(&self) -> &EngineTable {
+        &self.table
+    }
+
+    /// The include libraries indexed for folding, by name.
+    pub fn libraries(&self) -> impl Iterator<Item = &str> {
+        self.libs.iter().map(|l| l.name.as_str())
+    }
+
+    /// A resolver over the install's NSS.
+    fn resolver(&self) -> MemResolver {
+        let mut r = MemResolver::new();
+        for (name, bytes) in &self.sources {
+            r = r.with(name, bytes.clone());
+        }
+        r
+    }
+
+    /// A compiler for verifying, one per thread.
+    pub fn compiler(&self) -> ProjectCompiler<MemResolver> {
+        ProjectCompiler::new(self.resolver(), self.game, self.declarations)
+    }
+
+    /// Decompile `bytes` (decoded as `program`), verify every function by
+    /// recompiling, and fold out the include libraries whose functions it
+    /// embeds when the folded source recompiles to the same bytes.
+    /// `display` names the script in messages. Fails with the decompiler's
+    /// diagnostic when the bytecode cannot be read back.
+    pub fn recover(
+        &self,
+        display: &str,
+        bytes: &[u8],
+        program: &Program,
+        compiler: &mut ProjectCompiler<MemResolver>,
+    ) -> std::result::Result<Recovered<'_>, Diagnostic> {
+        let mut map = SourceMap::new();
+        let (mut d, _) = nwscript::decompile::decompile(
+            display,
+            bytes,
+            &self.table,
+            Some(&mut *compiler),
+            &mut map,
+        )?;
+        let Some(fold) = plan_fold(&d, program, &self.libs, &self.index) else {
+            return Ok(Recovered {
+                decompiled: d,
+                fold: FoldOutcome::None,
+            });
+        };
+        let functions = fold.functions.len();
+        let includes = fold.includes.clone();
+        let ranges: Vec<(u32, u32)> = fold
+            .functions
+            .iter()
+            .map(|(i, _)| (d.functions[*i].start, d.functions[*i].end))
+            .collect();
+        let attempt =
+            std::env::var_os("RAKATA_CORPUS_DUMP").and_then(|_| d.folded_source(&fold).ok());
+        let fold = match d.fold(fold, program, compiler) {
+            Ok(()) => FoldOutcome::Folded {
+                functions,
+                includes,
+                ranges,
+            },
+            Err(why) => FoldOutcome::Refused {
+                functions,
+                includes,
+                why: why.to_string(),
+                attempt,
+            },
+        };
+        Ok(Recovered {
+            decompiled: d,
+            fold,
+        })
+    }
+}
+
 /// Decompile every bytecode-only script of the install at `o.game` into
 /// `o.out/decompiled/`. The warnings name scripts the decompiler could not
 /// read (RW1001) and libraries that did not compile (RW1002).
 pub fn decompile(o: &Options) -> Result<(Report, Vec<Diagnostic>)> {
     let start = Instant::now();
     let install = Install::open(&o.game, o.profile)?;
-    let game = game_of(o.profile);
-    let declarations = Declarations::BioWare;
     let mut warnings = Vec::new();
-
-    // Every NSS the install holds, the copy the engine loads: the includes a
-    // script could have included, and nwscript.nss.
-    let mut nss_ids: BTreeSet<ResId> = install
-        .key()
-        .entries()
-        .iter()
-        .filter(|e| e.id.ty == ResType::Nss)
-        .map(|e| e.id)
-        .collect();
-    nss_ids.extend(
-        install
-            .override_ids()
-            .into_iter()
-            .filter(|id| id.ty == ResType::Nss),
-    );
-    let mut sources: Vec<(String, Vec<u8>)> = Vec::new();
-    for id in &nss_ids {
-        if let Some((_, bytes)) = install.read(*id, None)? {
-            sources.push((id.to_string().to_ascii_lowercase(), bytes));
-        }
-    }
-    let resolver = || {
-        let mut r = MemResolver::new();
-        for (name, bytes) in &sources {
-            r = r.with(name, bytes.clone());
-        }
-        r
-    };
-
-    let mut map = SourceMap::new();
-    let mut table = match nwscript::engine::load_table(&mut resolver(), &mut map) {
-        Ok(Some((t, _))) => t,
-        Ok(None) => {
-            return Err(Error::NoNwscript {
-                dir: o.game.clone(),
-            });
-        }
-        Err(source) => {
-            return Err(Error::Read {
-                path: o.game.join("nwscript.nss"),
-                source,
-            });
-        }
-    };
-    if let Some((name, text)) = declarations.overlay(game) {
-        let file = map.add(name, text.as_bytes().to_vec());
-        let _ = table.overlay(file, text.as_bytes());
-    }
-
-    let libs = libraries(
-        &sources,
-        &resolver,
-        game,
-        declarations,
-        &table,
-        &mut warnings,
-    );
-    let mut index: HashMap<Vec<u8>, Vec<(usize, usize)>> = HashMap::new();
-    for (li, lib) in libs.iter().enumerate() {
-        for (fi, f) in lib.functions.iter().enumerate() {
-            index.entry(f.shape.clone()).or_default().push((li, fi));
-        }
-    }
+    let recovery = Recovery::new(&install, &mut warnings)?;
 
     let jobs = jobs(&install)?;
     let out = o.out.join("decompiled");
@@ -399,17 +532,16 @@ pub fn decompile(o: &Options) -> Result<(Report, Vec<Diagnostic>)> {
     };
     std::thread::scope(|s| {
         for _ in 0..workers {
-            let (outcomes, next, jobs, table, libs, index, copies, out, resolver) = (
-                &outcomes, &next, &jobs, &table, &libs, &index, &copies, &out, &resolver,
-            );
+            let (outcomes, next, jobs, recovery, copies, out) =
+                (&outcomes, &next, &jobs, &recovery, &copies, &out);
             s.spawn(move || {
-                let mut compiler = ProjectCompiler::new(resolver(), game, declarations);
+                let mut compiler = recovery.compiler();
                 loop {
                     let i = next.fetch_add(1, Ordering::Relaxed);
                     let Some(job) = jobs.get(i) else {
                         break;
                     };
-                    let outcome = one(job, &copies[i], table, libs, index, &mut compiler, out);
+                    let outcome = one(job, &copies[i], recovery, &mut compiler, out);
                     outcomes.lock().unwrap_or_else(|e| e.into_inner())[i] = Some(outcome);
                 }
             });
@@ -443,7 +575,7 @@ pub fn decompile(o: &Options) -> Result<(Report, Vec<Diagnostic>)> {
     Ok((
         Report {
             out,
-            libraries: libs.into_iter().map(|l| l.name).collect(),
+            libraries: recovery.libraries().map(str::to_owned).collect(),
             sources: sources_tally,
             total,
             seconds: start.elapsed().as_secs_f64(),
@@ -851,9 +983,7 @@ fn copies(install: &Install, jobs: &[Job]) -> Result<Vec<Copies>> {
 fn one(
     job: &Job,
     copies: &Copies,
-    table: &EngineTable,
-    libs: &[Library],
-    index: &HashMap<Vec<u8>, Vec<(usize, usize)>>,
+    recovery: &Recovery,
     compiler: &mut ProjectCompiler<MemResolver>,
     out: &Path,
 ) -> Outcome {
@@ -874,22 +1004,23 @@ fn one(
             };
         }
     };
-    let calls = calls(&program, table, job);
+    let calls = calls(&program, recovery.table(), job);
     tally.calls = calls.len();
-    let mut map = SourceMap::new();
-    let (mut d, _) =
-        match nwscript::decompile::decompile(&display, &job.bytes, table, Some(compiler), &mut map)
-        {
-            Ok(x) => x,
-            Err(diag) => {
-                tally.failed = 1;
-                return Outcome {
-                    tally,
-                    calls,
-                    warnings: vec![warn("RW1001", format!("{display}: {}", diag.message))],
-                };
-            }
-        };
+    let Recovered {
+        mut decompiled,
+        fold,
+    } = match recovery.recover(&display, &job.bytes, &program, compiler) {
+        Ok(r) => r,
+        Err(diag) => {
+            tally.failed = 1;
+            return Outcome {
+                tally,
+                calls,
+                warnings: vec![warn("RW1001", format!("{display}: {}", diag.message))],
+            };
+        }
+    };
+    let d = &mut decompiled;
     tally.functions = d.functions.len();
     tally.verified = d.verified();
 
@@ -897,57 +1028,56 @@ fn one(
     // The engine calls with string arguments that the fold moved out of the
     // file, so a grep for a script or tag name still finds this script.
     let mut folded_calls: Vec<String> = Vec::new();
-    if let Some(fold) = plan_fold(&d, &program, libs, index) {
-        let n = fold.functions.len();
-        let includes = fold.includes.clone();
-        let ranges: Vec<(u32, u32)> = fold
-            .functions
-            .iter()
-            .map(|(i, _)| (d.functions[*i].start, d.functions[*i].end))
-            .collect();
-        // `RAKATA_CORPUS_DUMP=DIR` keeps every refused fold's source there,
-        // for reading why it recompiled differently.
-        let attempt = std::env::var_os("RAKATA_CORPUS_DUMP")
-            .map(|dir| (PathBuf::from(dir), d.folded_source(&fold)));
-        match d.fold(fold, &program, compiler) {
-            Ok(()) => {
-                tally.folded_functions = n;
-                tally.folded_scripts = 1;
-                fold_note = format!(
-                    "{n} replaced by {}",
-                    includes
-                        .iter()
-                        .map(|i| format!("#include \"{i}\""))
-                        .collect::<Vec<_>>()
-                        .join(" and ")
-                );
-                for c in &calls {
-                    let inside = ranges.iter().any(|&(s, e)| s <= c.offset && c.offset < e);
-                    let strings: Vec<String> = c
-                        .args
-                        .iter()
-                        .filter_map(|a| a.as_str())
-                        .map(|s| format!("\"{s}\""))
-                        .collect();
-                    if inside && !strings.is_empty() {
-                        folded_calls.push(format!("{}({})", c.routine, strings.join(", ")));
-                    }
+    match fold {
+        FoldOutcome::None => {}
+        FoldOutcome::Folded {
+            functions: n,
+            includes,
+            ranges,
+        } => {
+            tally.folded_functions = n;
+            tally.folded_scripts = 1;
+            fold_note = format!(
+                "{n} replaced by {}",
+                includes
+                    .iter()
+                    .map(|i| format!("#include \"{i}\""))
+                    .collect::<Vec<_>>()
+                    .join(" and ")
+            );
+            for c in &calls {
+                let inside = ranges.iter().any(|&(s, e)| s <= c.offset && c.offset < e);
+                let strings: Vec<String> = c
+                    .args
+                    .iter()
+                    .filter_map(|a| a.as_str())
+                    .map(|s| format!("\"{s}\""))
+                    .collect();
+                if inside && !strings.is_empty() {
+                    folded_calls.push(format!("{}({})", c.routine, strings.join(", ")));
                 }
-                folded_calls.sort();
-                folded_calls.dedup();
             }
-            Err(why) => {
-                tally.unfolded = 1;
-                fold_note = format!(
-                    "{n} matched {} but the fold recompiled differently ({why}), so none replaced",
-                    includes.join(", ")
+            folded_calls.sort();
+            folded_calls.dedup();
+        }
+        FoldOutcome::Refused {
+            functions: n,
+            includes,
+            why,
+            attempt,
+        } => {
+            tally.unfolded = 1;
+            fold_note = format!(
+                "{n} matched {} but the fold recompiled differently ({why}), so none replaced",
+                includes.join(", ")
+            );
+            // `RAKATA_CORPUS_DUMP=DIR` keeps every refused fold's source
+            // there, for reading why it recompiled differently.
+            if let (Some(dir), Some(source)) = (std::env::var_os("RAKATA_CORPUS_DUMP"), attempt) {
+                let _ = write(
+                    &PathBuf::from(dir).join(format!("{}-{}.folded.nss", job.capsule, job.name)),
+                    &source,
                 );
-                if let Some((dir, Ok(source))) = attempt {
-                    let _ = write(
-                        &dir.join(format!("{}-{}.folded.nss", job.capsule, job.name)),
-                        &source,
-                    );
-                }
             }
         }
     }

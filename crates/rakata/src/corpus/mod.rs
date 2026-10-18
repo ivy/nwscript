@@ -12,7 +12,10 @@
 
 mod decompile;
 
-pub use decompile::{Options as DecompileOptions, Report as DecompileReport, Tally, decompile};
+pub use decompile::{
+    FoldOutcome, Options as DecompileOptions, Recovered, Recovery, Report as DecompileReport,
+    Tally, decompile,
+};
 
 use rakata_archive::{Bif, Erf, Key, KeyEntry, Member, Rim, Source};
 use rakata_res::ResType;
