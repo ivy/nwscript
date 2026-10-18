@@ -34,7 +34,7 @@ The usual change runs through all four in order: find the copy, find what touche
 
 ## Traps that cross every area
 
-- **One name, several copies.** The engine searches `Override/`, then the module's capsules, then `patch.erf`, then the BIFs. A file in `Override/` replaces every copy of that name in every module. `rakata which NAME.EXT --module STEM --game DIR` shows the winner and every loser; check it before writing a name to Override.
+- **One name, several copies.** The engine searches `Override/`, then the module's capsules, then `patch.erf`, then the texture packs (`TexturePacks/swpc_tex_tpa.erf` unless `--texture-pack` names `tpb` or `tpc`, then `swpc_tex_gui.erf`), then the BIFs. A file in `Override/` replaces every copy of that name in every module. `rakata which NAME.EXT --module STEM --game DIR` shows the winner and every loser; check it before writing a name to Override.
 - **Address nodes by stable key, never by index alone.** `voice:RESREF` or `strref:N` survive other mods' insertions; `E3` and `R0` move and are marked fragile. Text keys often match several nodes.
 - **Write what a dialogue refers to before the dialogue.** A dialogue write is checked against the install and refused (RE1407) if a script, condition or global it adds is missing: compile and write scripts, declare globals, then write the dialogue.
 - **`--format json` writes exactly one document to stdout**; parse it instead of scraping text. Exit codes: 0 ok, 1 errors reported (a lint with a finding), 2 bad invocation, 3 a diff found a difference.

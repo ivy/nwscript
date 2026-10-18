@@ -4,7 +4,8 @@
 //!
 //! The global layers are `Override/` (its top level, as
 //! [`Install::override_ids`] lists it), `patch.erf`, the BIFs `chitin.key`
-//! indexes, the texture packs, the capsules under `rims/`, `lips/`
+//! indexes, the texture packs the install searches
+//! ([`Install::texture_pack_ids`]), the capsules under `rims/`, `lips/`
 //! capsules no module owns, and the loose files under `streamwaves/`,
 //! `streammusic/`, `streamsounds/` and `movies/`. Each module adds its own
 //! capsules ([`Install::module_ids`]). The capsule files themselves are
@@ -217,11 +218,11 @@ impl Universe {
             for f in files {
                 if let Some((stem, ty)) = ident(&f) {
                     add(&mut global, &stem, ty);
-                    if ty == ResType::Erf {
-                        capsules.push(f);
-                    }
                 }
             }
+        }
+        for id in install.texture_pack_ids().unwrap_or_default() {
+            add_id(&mut global, &id);
         }
         for c in capsules {
             for id in capsule_ids(&c) {
