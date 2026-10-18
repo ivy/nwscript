@@ -14,4 +14,4 @@ A test that writes builds a scratch install over the user's: a reflink copy, or 
 
 ## Keeping this skill right
 
-`crates/rakata-cli/tests/plugin.rs` checks that every `rakata` command and subcommand this plugin names exists and that every flag it uses appears in that command's `--help`, and that every name of the Python module the skill cites is in the module's stubs. A change to the command line or the module that breaks the skill fails `cargo test --workspace`.
+`crates/rakata-cli/tests/plugin.rs` checks that every `rakata` command and subcommand this plugin names exists and that every flag it uses appears in that command's `--help`, that every name of the Python module the skill cites is in the module's stubs, and that every name of the Lua binding it cites is in the binding's `rakata` table or `rakata lua --reference`. A change to the command line or the module that breaks the skill fails `cargo test --workspace`.

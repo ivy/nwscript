@@ -1,7 +1,8 @@
 //! The plugin's skills defer to `--help` and to the Python module's stubs:
 //! every `rakata` command and subcommand they name exists, every flag they
-//! use is in that command's help or the global options, and every name of
-//! the module the data skill cites is in the stubs.
+//! use is in that command's help or the global options, every name of the
+//! Python module the data skill cites is in the stubs, and every name of the
+//! Lua binding it cites is in the binding or `rakata lua --reference`.
 
 use assert_cmd::Command;
 use std::collections::BTreeSet;
@@ -68,6 +69,7 @@ fn commands(help: &str) -> BTreeSet<String> {
 struct Code {
     text: String,
     python: bool,
+    lua: bool,
     inline: bool,
 }
 
@@ -87,12 +89,14 @@ fn code(text: &str) -> Vec<Code> {
             out.push(Code {
                 text: line.to_string(),
                 python: lang == "python",
+                lua: lang == "lua",
                 inline: false,
             });
         } else {
             out.extend(line.split('`').skip(1).step_by(2).map(|s| Code {
                 text: s.to_string(),
                 python: false,
+                lua: false,
                 inline: true,
             }));
         }
@@ -320,11 +324,15 @@ fn every_python_name_the_rakata_skill_cites_is_in_the_stubs() {
     ] {
         assert!(names.contains(n), "the stubs lost `{n}`");
     }
+    let lua = lua_paths();
     let builtin = ["print", "help", "python3"];
     let mut checked = 0;
     for (f, text) in markdown(&root().join("plugin/skills/rakata")) {
         let mut python = String::new();
         for c in code(&text) {
+            if c.inline && looks_like_lua(&c.text, &names, &lua) {
+                continue;
+            }
             if c.python || (c.inline && looks_like_python(&c.text)) {
                 python.push_str(&c.text);
                 python.push('\n');
@@ -343,4 +351,184 @@ fn every_python_name_the_rakata_skill_cites_is_in_the_stubs() {
         }
     }
     assert!(checked > 20, "only {checked} Python names found");
+}
+
+/// Every name the Lua binding's `rakata` table holds, as a dotted path
+/// (`rakata.mdl.load`), read from the binding itself.
+fn lua_paths() -> BTreeSet<String> {
+    let dir = tempfile::tempdir().unwrap();
+    let script = dir.path().join("names.lua");
+    std::fs::write(
+        &script,
+        r#"
+local seen = {}
+local function walk(t, path)
+  if seen[t] then return end
+  seen[t] = true
+  for k, v in pairs(t) do
+    if type(k) == "string" then
+      print(path .. "." .. k)
+      if type(v) == "table" then walk(v, path .. "." .. k) end
+    end
+  end
+end
+walk(rakata, "rakata")
+"#,
+    )
+    .unwrap();
+    let out = Command::cargo_bin("rakata")
+        .unwrap()
+        .arg("lua")
+        .arg(&script)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "rakata lua failed to list the binding"
+    );
+    let mut paths: BTreeSet<String> = String::from_utf8(out.stdout)
+        .unwrap()
+        .lines()
+        .map(str::to_string)
+        .collect();
+    paths.insert("rakata".into());
+    // Set only when `--game` is given.
+    paths.insert("rakata.game".into());
+    paths
+}
+
+/// The words of `rakata lua --reference`: every method and field it
+/// documents.
+fn lua_reference() -> BTreeSet<String> {
+    let out = Command::cargo_bin("rakata")
+        .unwrap()
+        .args(["lua", "--reference"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "rakata lua --reference failed");
+    String::from_utf8(out.stdout)
+        .unwrap()
+        .split(|c: char| !(c.is_alphanumeric() || c == '_'))
+        .filter(|w| !w.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// Lua source with its string literals and comments removed.
+fn strip_lua(text: &str) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while !rest.is_empty() {
+        if let Some(r) = rest.strip_prefix("--") {
+            rest = r.split_once('\n').map_or("", |(_, after)| after);
+            out.push('\n');
+        } else if let Some(q) = rest.chars().next().filter(|c| *c == '"' || *c == '\'') {
+            rest = rest[1..].split_once(q).map_or("", |(_, after)| after);
+            out.push_str("\"\"");
+        } else {
+            let ch = rest.chars().next().unwrap();
+            out.push(ch);
+            rest = &rest[ch.len_utf8()..];
+        }
+    }
+    out
+}
+
+/// What a piece of Lua names: each `rakata.a.b` path, and each method
+/// (`x:name(`) or field (`x.name`) of anything else.
+fn lua_names(code: &str) -> (Vec<String>, Vec<String>) {
+    let chars: Vec<char> = code.chars().collect();
+    let word = |c: char| c.is_alphanumeric() || c == '_';
+    let (mut paths, mut members) = (Vec::new(), Vec::new());
+    let mut i = 0;
+    while i < chars.len() {
+        if !(chars[i].is_alphabetic() || chars[i] == '_') {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        let mut parts = Vec::new();
+        loop {
+            let s = i;
+            while i < chars.len() && word(chars[i]) {
+                i += 1;
+            }
+            parts.push(chars[s..i].iter().collect::<String>());
+            if chars.get(i) == Some(&'.') && chars.get(i + 1).is_some_and(|c| c.is_alphabetic()) {
+                i += 1;
+            } else {
+                break;
+            }
+        }
+        let member = start > 0 && matches!(chars[start - 1], '.' | ':');
+        if parts[0] == "rakata" && !member {
+            paths.push(parts.join("."));
+        } else {
+            members.extend(parts.into_iter().skip(usize::from(!member)));
+        }
+    }
+    (paths, members)
+}
+
+/// An inline span that is Lua: a method call (`lyt:rooms()`), or a path of
+/// the binding the Python module does not have (`rakata.mdl.load`).
+fn looks_like_lua(span: &str, python: &BTreeSet<String>, lua: &BTreeSet<String>) -> bool {
+    let method = span.split_once(':').is_some_and(|(a, b)| {
+        a.chars().last().is_some_and(char::is_alphanumeric)
+            && b.chars().next().is_some_and(char::is_alphabetic)
+            && b.contains('(')
+    });
+    let path = span.strip_prefix("rakata.").is_some_and(|rest| {
+        let first: String = rest
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .collect();
+        !python.contains(&first) && lua.contains(&format!("rakata.{first}"))
+    });
+    method || path
+}
+
+#[test]
+fn every_lua_name_the_rakata_skill_cites_is_in_the_binding() {
+    let paths = lua_paths();
+    for p in ["rakata.Install.open", "rakata.lyt.load", "rakata.mdl.load"] {
+        assert!(paths.contains(p), "the Lua binding lost `{p}`");
+    }
+    let reference = lua_reference();
+    let python = stub_names();
+    // Lua's own string methods.
+    let builtin = [
+        "upper", "lower", "format", "sub", "gsub", "find", "match", "len", "rep",
+    ];
+    let mut checked = 0;
+    for (f, text) in markdown(&root().join("plugin/skills/rakata")) {
+        let mut lua = String::new();
+        for c in code(&text) {
+            if c.lua || (c.inline && looks_like_lua(&c.text, &python, &paths)) {
+                lua.push_str(&c.text);
+                lua.push('\n');
+            }
+        }
+        let (used, members) = lua_names(&strip_lua(&lua));
+        for p in used {
+            assert!(
+                paths.contains(&p),
+                "{}: `{p}` is not in the Lua binding",
+                f.display()
+            );
+            checked += 1;
+        }
+        for m in members {
+            if builtin.contains(&m.as_str()) {
+                continue;
+            }
+            assert!(
+                reference.contains(&m),
+                "{}: `{m}` is not in `rakata lua --reference`",
+                f.display()
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked > 20, "only {checked} Lua names found");
 }
