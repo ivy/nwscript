@@ -11,9 +11,10 @@
 //! ([`crate::conformance`]), `RE06xx` GFF (`rakata-gff`), `RE07xx` tables
 //! (`rakata-2da`), `RE08xx` the talk table (`rakata-tlk`), `RE09xx` lip-sync
 //! files (`rakata-lip`), `RE10xx` and `RW10xx` the corpus
-//! ([`crate::corpus`]), `RE12xx` and `RW12xx` saves (`rakata-save`), `RE13xx`
-//! the inspection commands ([`crate::inspect`]). Each crate takes a range of
-//! its own as it lands.
+//! ([`crate::corpus`]), `RE11xx` and `RW11xx` dialogues (`rakata-dialog`),
+//! `RE12xx` and `RW12xx` saves (`rakata-save`), `RE13xx` the inspection
+//! commands ([`crate::inspect`]). Each crate takes a range of its own as it
+//! lands.
 
 pub use nwscript_diag::codes::Code;
 
@@ -80,6 +81,14 @@ nwscript_diag::codes! {
     RE1003 Error "a corpus manifest that does not read";
     RW1001 Warning "a script whose bytecode the decompiler could not read";
     RW1002 Warning "an include library that does not compile, so its functions are not folded";
+    RE1101 Error "a GFF that is not a dialogue";
+    RE1102 Error "a node key that matches no node of the dialogue";
+    RE1103 Error "a node key that matches more than one node of the dialogue";
+    RE1104 Error "a node key that does not parse";
+    RE1105 Error "a dialogue several modules hold, with no module named";
+    RW1101 Warning "a link to a node the dialogue does not have";
+    RW1102 Warning "a script or condition no layer of the install holds";
+    RW1103 Warning "a script whose bytecode the decompiler could not read back";
     RE1201 Error "a directory that is not a saved game";
     RE1202 Error "a module the save holds no state for";
     RE1203 Error "a save member lacking a field the game writes";

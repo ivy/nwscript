@@ -15,7 +15,7 @@ A Rust workspace: a toolset for the data of BioWare's Aurora-family games, KotOR
 | `rakata-lip` | lip-sync files: the duration and the keyframes, read, written bit for bit, made from cues | present |
 | `rakata-game` | the install: search order, `which`, the `Resolver` for nwscript | present |
 | `rakata-gff` | the GFF tree, lossless read, BioWare-layout write, paths, diff | present |
-| `rakata-dialog` | DLG model, stable keys, transcript, lints | planned |
+| `rakata-dialog` | DLG model, stable keys, transcript, lints | model, keys and transcript present |
 | `rakata-save` | save games by name | present |
 | `rakata-index` | facts, references and full text in SQLite | planned |
 | `rakata-patch` | `changes.ini` reader, plan, executor, report read back from the tree | reader and plan present |
@@ -57,7 +57,7 @@ The layout is `nss/`, `ncs/`, `nwscript.nss` as shipped, `oracle/` (the include 
 - Fuzzing: targets live in `crates/<crate>/fuzz/`, outside the workspace, and need a nightly toolchain: from that directory, `mise x cargo:cargo-fuzz -- cargo +nightly fuzz run decode -- -max_total_time=600`.
 - Tools come from mise (`mise.toml`); do not install with brew, apt or npx.
 - Diagnostics are data (`nwscript-diag`): every error has a registered code with an explanation; never build one from rendered text.
-- Rakata codes come in blocks of a hundred, one per crate or command family, so parallel branches never collide: `rakata-res` RE01xx, `rakata-archive` RE02xx, `rakata-patch` RE03xx/RW03xx, `rakata-game` RE04xx/RW04xx, conformance RE05xx/RW05xx, `rakata-gff` RE06xx/RW06xx, `rakata-2da` RE07xx/RW07xx, `rakata-tlk` RE08xx/RW08xx, `rakata-lip` RE09xx/RW09xx, `rakata corpus` RE10xx/RW10xx, `rakata-save` RE12xx/RW12xx, the inspection commands (`rakata cat`, `gff`, `2da`, `tlk`, `lip`) RE13xx/RW13xx; the next crate takes the next free block and records it here.
+- Rakata codes come in blocks of a hundred, one per crate or command family, so parallel branches never collide: `rakata-res` RE01xx, `rakata-archive` RE02xx, `rakata-patch` RE03xx/RW03xx, `rakata-game` RE04xx/RW04xx, conformance RE05xx/RW05xx, `rakata-gff` RE06xx/RW06xx, `rakata-2da` RE07xx/RW07xx, `rakata-tlk` RE08xx/RW08xx, `rakata-lip` RE09xx/RW09xx, `rakata corpus` RE10xx/RW10xx, `rakata-dialog` RE11xx/RW11xx, `rakata-save` RE12xx/RW12xx, the inspection commands (`rakata cat`, `gff`, `2da`, `tlk`, `lip`) RE13xx/RW13xx; the next crate takes the next free block and records it here.
 - Markdown: one paragraph per line, no hard wrapping. Documents state current facts, not their history.
 - Commits: small and coherent, conventional-commit subjects, no AI attribution.
 - Prior work is described with respect: what it achieved and the constraints it was built under.

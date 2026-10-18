@@ -1049,6 +1049,7 @@ dependencies = [
  "nwscript-diag",
  "rakata-2da",
  "rakata-archive",
+ "rakata-dialog",
  "rakata-game",
  "rakata-gff",
  "rakata-lip",
@@ -1093,6 +1094,19 @@ dependencies = [
  "rakata-res",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "rakata-dialog"
+version = "0.0.0"
+dependencies = [
+ "rakata-archive",
+ "rakata-game",
+ "rakata-gff",
+ "rakata-res",
+ "rakata-tlk",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,0 +1,22 @@
+[package]
+name = "rakata-dialog"
+description = "KotOR's conversations (DLG): a model over the GFF that writes back byte for byte, nodes addressed by stable keys, and the transcript of a conversation."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rakata-gff = { workspace = true }
+rakata-res = { workspace = true }
+rakata-tlk = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+rakata-archive = { workspace = true }
+rakata-game = { workspace = true }
+serde_json = "1"
+
+[lints]
+workspace = true

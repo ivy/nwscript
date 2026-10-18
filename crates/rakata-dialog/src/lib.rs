@@ -1,0 +1,40 @@
+//! KotOR's conversations: the DLG model over `rakata-gff`, stable node
+//! keys, and the transcript.
+//!
+//! A [`Dialog`] keeps the GFF it was read from and reads through it:
+//! entries and replies as [`Node`]s (speaker, listener, text, voice, sound,
+//! script, delay, animations with their participants, camera angle and id,
+//! quest, comment), the starting [`Link`]s into the entries and each node's
+//! links onward with their condition scripts and `IsChild`. Every field the
+//! model does not name stays in the tree, so a dialogue written back is the
+//! bytes it was read from.
+//!
+//! A [`NodeKey`] addresses a node by its voice resref, its strref or its
+//! text, and fails with a diagnostic naming the key and the dialogue when
+//! no node matches or several do; an index key exists for what content
+//! cannot name and is marked fragile wherever it is shown.
+//!
+//! A [`Transcript`] renders the conversation for reading, as text or as
+//! structured nodes, with what lies outside the dialogue (the talk table,
+//! the voice files, the decompiled scripts) supplied by a [`Lookup`]. The
+//! crate does no I/O; `rakata::dialog` supplies the install.
+//!
+//! The field names and types are those of BioWare's Conversation document
+//! as xoreos publishes it, checked against the vanilla files; this crate
+//! was written without sight of any other implementation.
+
+#![forbid(unsafe_code)]
+
+pub mod audio;
+mod error;
+mod key;
+mod model;
+mod transcript;
+
+pub use error::{Error, Result, codes};
+pub use key::NodeKey;
+pub use model::{Animation, Dialog, Info, Kind, Link, Node, NodeRef, localized};
+pub use transcript::{
+    AnimationView, Embedded, LinkView, Lookup, NodeView, Options, Row, Script, ScriptStatus,
+    Transcript, Voice, VoiceView, Warning,
+};
