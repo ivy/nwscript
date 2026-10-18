@@ -1100,6 +1100,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rakata-gff"
+version = "0.0.0"
+dependencies = [
+ "rakata-archive",
+ "rakata-res",
+]
+
+[[package]]
 name = "rakata-lip"
 version = "0.0.0"
 dependencies = [

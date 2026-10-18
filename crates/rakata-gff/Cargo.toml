@@ -1,0 +1,17 @@
+[package]
+name = "rakata-gff"
+description = "BioWare's Generic File Format (GFF V3.2), the container of blueprints, areas, dialogues and saves: read without loss, written back in BioWare's layout, addressed by field paths, compared by diff."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rakata-res = { workspace = true }
+
+[dev-dependencies]
+rakata-archive = { workspace = true }
+
+[lints]
+workspace = true

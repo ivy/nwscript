@@ -23,6 +23,7 @@ rakata-res = { path = "crates/rakata-res" }
 rakata-lip = { path = "crates/rakata-lip" }
 rakata-archive = { path = "crates/rakata-archive" }
 rakata-2da = { path = "crates/rakata-2da" }
+rakata-gff = { path = "crates/rakata-gff" }
 rakata-patch = { path = "crates/rakata-patch" }
 rakata-tlk = { path = "crates/rakata-tlk" }
 rakata = { path = "crates/rakata" }
