@@ -1,0 +1,18 @@
+[package]
+name = "rakata-2da"
+description = "The 2DA tables of Aurora-family games: read by cell offset whatever the header's size field says, written in BioWare's layout with its string sharing, edited by row label and column name, diffed by cell."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+rakata-archive = { workspace = true }
+rakata-game = { workspace = true }
+rakata-res = { workspace = true }
+
+[lints]
+workspace = true
