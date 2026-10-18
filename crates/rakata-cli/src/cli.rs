@@ -18,6 +18,8 @@ Examples:
   rakata which appearance.2da --game DIR   which copy the engine loads, and every other
   rakata which dan14_juhani.utc --module danm14ac --game DIR
   rakata which --duplicates --game DIR     Override files that differ only in case
+  rakata corpus extract --game DIR         every script of the install, to the corpus
+  rakata corpus decompile --game DIR       every bytecode-only script, recovered to source
 
 Exit codes: 0 success, 1 errors reported, 2 bad invocation,
 3 a comparison found a difference, 101 internal error.";
@@ -119,4 +121,6 @@ pub enum Command {
     },
     /// Read, write and compare every file of an install, per format.
     Conformance(crate::cmd::ConformanceArgs),
+    /// The script corpus: extract every script of an install, decompile every bytecode-only script, verify against the manifest.
+    Corpus(crate::cmd::CorpusArgs),
 }

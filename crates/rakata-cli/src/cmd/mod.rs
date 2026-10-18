@@ -2,6 +2,8 @@
 
 mod conformance;
 pub use conformance::ConformanceArgs;
+mod corpus;
+pub use corpus::CorpusArgs;
 mod explain;
 mod install;
 mod which;
@@ -70,6 +72,7 @@ pub fn run(cli: Cli) -> Exit {
             dry_run,
         } => install::run(&ctx, &tslpatchdata, option, dry_run),
         Command::Conformance(args) => conformance::run(&ctx, &args),
+        Command::Corpus(args) => corpus::run(&ctx, &args),
         Command::Which {
             name,
             module,

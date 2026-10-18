@@ -134,10 +134,10 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
     commands.sort_unstable();
     assert_eq!(
         commands,
-        ["conformance", "explain", "install", "which"],
+        ["conformance", "corpus", "explain", "install", "which"],
         "--help lists commands not yet built"
     );
-    for cmd in ["conformance", "explain", "install", "which"] {
+    for cmd in ["conformance", "corpus", "explain", "install", "which"] {
         let out = rakata().args([cmd, "--help"]).output().unwrap();
         assert!(
             String::from_utf8_lossy(&out.stdout).contains("Example"),
@@ -157,6 +157,51 @@ fn install(name: &str) -> std::path::PathBuf {
     )
     .unwrap();
     dir
+}
+
+#[test]
+fn corpus_extract_and_decompile_without_a_game_are_usage_errors_naming_the_flag() {
+    for action in ["extract", "decompile"] {
+        rakata()
+            .args(["corpus", action])
+            .assert()
+            .code(2)
+            .stderr(predicate::str::contains("--game"));
+    }
+}
+
+#[test]
+fn corpus_verify_without_a_manifest_reports_re1003() {
+    let dir = install("corpus-verify");
+    rakata()
+        .args([
+            "corpus",
+            "verify",
+            "--out",
+            dir.to_str().unwrap(),
+            "--manifest",
+            dir.join("absent.toml").to_str().unwrap(),
+        ])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("RE1003"));
+}
+
+#[test]
+fn corpus_decompile_over_an_install_without_nwscript_reports_re1002() {
+    let dir = install("corpus-nonwscript");
+    rakata()
+        .args([
+            "--game",
+            dir.to_str().unwrap(),
+            "corpus",
+            "decompile",
+            "--out",
+            dir.join("corpus").to_str().unwrap(),
+        ])
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("RE1002"));
 }
 
 #[test]
