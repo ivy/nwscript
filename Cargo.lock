@@ -1123,6 +1123,7 @@ dependencies = [
  "rakata-save",
  "rakata-texture",
  "rakata-tlk",
+ "rakata-walkmesh",
  "serde",
  "serde_json",
  "sha2",
@@ -1297,6 +1298,16 @@ dependencies = [
 name = "rakata-tlk"
 version = "0.0.0"
 dependencies = [
+ "rakata-res",
+]
+
+[[package]]
+name = "rakata-walkmesh"
+version = "0.0.0"
+dependencies = [
+ "rakata-2da",
+ "rakata-game",
+ "rakata-lyt",
  "rakata-res",
 ]
 

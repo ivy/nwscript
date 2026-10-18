@@ -195,6 +195,11 @@ nwscript_diag::codes! {
     RE2307 Error "a layout or visibility value the text form cannot hold";
     RE2311 Error "a visibility file's indented room before any room line";
     RE2312 Error "a visibility line that is neither ROOM COUNT nor an indented room";
+    RE2501 Error "not a walkmesh: no BWM V1.0 signature";
+    RE2502 Error "a walkmesh truncated before its header or one of its arrays ends";
+    RE2503 Error "a walkmesh type that is neither an object's nor an area room's";
+    RE2504 Error "a walkmesh index naming no element of the array it points into";
+    RE2505 Error "a surface material table without a walk column, or with a walk cell not a number";
 }
 
 /// The rakata code with this id, if registered; case does not matter.

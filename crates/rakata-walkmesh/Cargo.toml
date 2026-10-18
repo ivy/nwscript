@@ -1,0 +1,19 @@
+[package]
+name = "rakata-walkmesh"
+description = "The walkmeshes of Aurora-family games: an area room's WOK and a placeable's PWK or a door's DWK, read to vertices, faces with their surface material, adjacency, perimeter edges with their room transitions, and the AABB tree; walkability through surfacemat.2da."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rakata-2da = { workspace = true }
+
+[dev-dependencies]
+rakata-game = { workspace = true }
+rakata-lyt = { workspace = true }
+rakata-res = { workspace = true }
+
+[lints]
+workspace = true

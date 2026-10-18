@@ -24,6 +24,7 @@ rakata-res = { path = "crates/rakata-res" }
 rakata-lip = { path = "crates/rakata-lip" }
 rakata-texture = { path = "crates/rakata-texture" }
 rakata-lyt = { path = "crates/rakata-lyt" }
+rakata-walkmesh = { path = "crates/rakata-walkmesh" }
 rakata-archive = { path = "crates/rakata-archive" }
 rakata-2da = { path = "crates/rakata-2da" }
 rakata-gff = { path = "crates/rakata-gff" }

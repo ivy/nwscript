@@ -106,6 +106,11 @@ fn every_code_a_data_crate_reports_is_registered() {
         rakata::texture::codes::TGA_TRUNCATED,
         rakata::texture::codes::TGA_UNSUPPORTED,
         rakata::texture::codes::TGA_RLE_OVERRUN,
+        rakata::walkmesh::codes::NOT_A_WALKMESH,
+        rakata::walkmesh::codes::TRUNCATED,
+        rakata::walkmesh::codes::UNKNOWN_KIND,
+        rakata::walkmesh::codes::BAD_INDEX,
+        rakata::walkmesh::codes::BAD_SURFACE_TABLE,
     ] {
         assert!(codes::lookup(id).is_some(), "{id} is not registered");
     }

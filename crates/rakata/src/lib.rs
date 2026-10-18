@@ -31,6 +31,7 @@ pub use rakata_lip as lip;
 pub use rakata_res as res;
 pub use rakata_texture as texture;
 pub use rakata_tlk as tlk;
+pub use rakata_walkmesh as walkmesh;
 
 use std::path::PathBuf;
 
