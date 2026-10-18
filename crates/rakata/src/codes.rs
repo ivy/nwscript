@@ -121,6 +121,10 @@ nwscript_diag::codes! {
     RE1304 Error "a strref the talk table does not hold";
     RE1305 Error "an install without a dialog.tlk";
     RE1306 Error "an output file could not be written";
+    RE1307 Error "a resource of a type the inspection command does not read";
+    RW1301 Warning "a walkmesh's materials unlabelled: the install has no surfacemat.2da that reads";
+    RW1302 Warning "a model read without its MDX";
+    RW1303 Warning "a supermodel that is not found, ending the chain";
     RE1601 Error "a diff of a directory against a file";
     RW1601 Warning "a resource that does not read as its format, compared by hash";
     RW1602 Warning "a file of a tree the diff could not read";

@@ -32,6 +32,14 @@ pub use gff::GffArgs;
 mod inspect;
 mod lip;
 pub use lip::LipArgs;
+mod lyt;
+pub use lyt::LytArgs;
+mod mdl;
+pub use mdl::MdlArgs;
+mod texture;
+pub use texture::TextureArgs;
+mod walkmesh;
+pub use walkmesh::WalkmeshArgs;
 mod lua;
 pub use lua::LuaArgs;
 mod tlk;
@@ -182,6 +190,10 @@ pub fn run(cli: Cli) -> Exit {
         Command::TwoDa(args) => twoda::run(&ctx, &args),
         Command::Tlk(args) => tlk::run(&ctx, &args),
         Command::Lip(args) => lip::run(&ctx, &args),
+        Command::Texture(args) => texture::run(&ctx, &args),
+        Command::Lyt(args) => lyt::run(&ctx, &args),
+        Command::Walkmesh(args) => walkmesh::run(&ctx, &args),
+        Command::Mdl(args) => mdl::run(&ctx, &args),
         Command::Lua(args) => lua::run(&ctx, &args),
         Command::Save(args) => save::run(&ctx, &args),
         Command::Dialog(args) => dialog::run(&ctx, &args),

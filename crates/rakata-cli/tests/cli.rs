@@ -176,11 +176,15 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
             "lint",
             "lip",
             "lua",
+            "lyt",
+            "mdl",
             "quest",
             "refs",
             "save",
             "show",
+            "texture",
             "tlk",
+            "walkmesh",
             "which"
         ],
         "--help lists commands not yet built"
@@ -201,11 +205,15 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
         "lint",
         "lip",
         "lua",
+        "lyt",
+        "mdl",
         "quest",
         "refs",
         "save",
         "show",
+        "texture",
         "tlk",
+        "walkmesh",
         "which",
     ] {
         let out = rakata().args([cmd, "--help"]).output().unwrap();

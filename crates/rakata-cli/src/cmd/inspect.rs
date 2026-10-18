@@ -1,7 +1,8 @@
-//! What the inspection commands (`cat`, `gff`, `2da`, `tlk`, `lip`) share:
-//! the flags that say where a `NAME.EXT` is looked up, reading one named
-//! resource through [`rakata::inspect::load`] into the envelope's inputs,
-//! and writing a file into its outputs.
+//! What the inspection commands (`cat`, `gff`, `2da`, `tlk`, `lip`,
+//! `texture`, `lyt`, `walkmesh`, `mdl`) share: the flags that say where a
+//! `NAME.EXT` is looked up, reading one named resource through
+//! [`rakata::inspect::load`] into the envelope's inputs, finding a
+//! resource beside another by name, and writing a file into its outputs.
 
 use std::path::{Path, PathBuf};
 
@@ -167,4 +168,94 @@ impl DiffArgs {
         let a = out.pop().expect("two sides");
         Ok((a, b))
     }
+}
+
+/// Read the resource `name` names when it exists, recorded under `role`;
+/// `None` when nothing answers to the name (no file, no member, no copy in
+/// the install), an error for anything else.
+pub fn load_if_found(
+    env: &mut Envelope,
+    role: &str,
+    name: &str,
+    lookup: &Lookup<'_>,
+) -> Result<Option<Loaded>, Diagnostic> {
+    match load(env, role, name, lookup) {
+        Ok(l) => Ok(Some(l)),
+        Err(d) if ["RE0001", "RE0404", "RE1301"].contains(&d.code.id) => Ok(None),
+        Err(d) => Err(d),
+    }
+}
+
+/// `name` with its last extension replaced by `ext`, in the case of the
+/// extension it had: `models/a.MDL` to `models/a.MDX`.
+pub fn with_extension(name: &str, ext: &str) -> Option<String> {
+    let (stem, old) = name.rsplit_once('.')?;
+    if old.is_empty() || old.contains(['/', '\\', '!']) {
+        return None;
+    }
+    let ext = if old.chars().all(|c| c.is_ascii_uppercase()) {
+        ext.to_ascii_uppercase()
+    } else {
+        ext.to_owned()
+    };
+    Some(format!("{stem}.{ext}"))
+}
+
+/// The name of the resource `file` beside the one `name` names: in the same
+/// folder for a path, the same archive for a member, and `file` itself for
+/// a name the install resolves.
+pub fn beside(name: &str, file: &str) -> String {
+    match name.rfind(['/', '\\', '!']) {
+        Some(at) => format!("{}{file}", &name[..=at]),
+        None => file.to_owned(),
+    }
+}
+
+/// The diagnostic for a resource `command` does not read, by its extension.
+pub fn unread_type(loaded: &Loaded, command: &str, reads: &str) -> Diagnostic {
+    let ext = loaded.extension().unwrap_or_default();
+    Diagnostic::new(
+        &rakata::codes::RE1307,
+        format!(
+            "`{}` is a .{ext}, which `rakata {command}` does not read",
+            loaded.source
+        ),
+    )
+    .help(match reader(&ext) {
+        Some(r) => format!("`rakata {command}` reads {reads}; a .{ext} is read by `rakata {r}`"),
+        None => format!("`rakata {command}` reads {reads}"),
+    })
+}
+
+/// The inspection command that reads a resource of extension `ext`, for
+/// the formats that are not GFF.
+fn reader(ext: &str) -> Option<&'static str> {
+    Some(match ext {
+        "tpc" | "txi" | "tga" => "texture show",
+        "lyt" | "vis" => "lyt show",
+        "wok" | "pwk" | "dwk" => "walkmesh show",
+        "mdl" | "mdx" => "mdl show",
+        "lip" => "lip show",
+        "2da" => "2da show",
+        _ => return None,
+    })
+}
+
+/// Three floats as `(x, y, z)`.
+pub fn point(v: [f32; 3]) -> String {
+    format!("({}, {}, {})", v[0], v[1], v[2])
+}
+
+/// `N WORD`, the word taking an `s` (or `es` after an `s` or `h`) for
+/// any count but one; `vertex` becomes `vertices`.
+pub fn count(n: usize, word: &str) -> String {
+    if n == 1 {
+        return format!("1 {word}");
+    }
+    let plural = match word.strip_suffix("ex") {
+        Some(stem) => format!("{stem}ices"),
+        None if word.ends_with(['s', 'h']) => format!("{word}es"),
+        None => format!("{word}s"),
+    };
+    format!("{n} {plural}")
 }

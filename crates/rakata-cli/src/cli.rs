@@ -27,6 +27,12 @@ Examples:
   rakata 2da diff globalcat.2da globalcat.2da --game-a VANILLA --game-b BUILD
   rakata tlk show 42724 --game DIR         the string a strref names
   rakata lip show ./n_juhani_01.lip        a lip-sync file's keyframes
+  rakata texture show lhr_flr01.tpc --game DIR
+                                           a texture's format, mip levels and TXI
+  rakata lyt show m01aa.lyt --game DIR     an area's rooms and door hooks
+  rakata walkmesh show m01aa_01a.wok --game DIR
+                                           a walkmesh's materials and room transitions
+  rakata mdl show m01aa_01a.mdl --game DIR a model's nodes, meshes, animations, supermodels
   rakata save show SAVEDIR --module danm14ac --creature carth
                                            a creature as the save has it
   rakata dialog show banter.dlg --game DIR a conversation's transcript, conditions decompiled
@@ -197,6 +203,14 @@ pub enum Command {
     Tlk(crate::cmd::TlkArgs),
     /// Show a lip-sync file's keyframes.
     Lip(crate::cmd::LipArgs),
+    /// Show a texture: a TPC's header, pixel format, images, mip levels and TXI; a TXI's instructions; a TGA's header.
+    Texture(crate::cmd::TextureArgs),
+    /// Show an area's room layout (.lyt: rooms, tracks, obstacles, door hooks) or room visibility (.vis).
+    Lyt(crate::cmd::LytArgs),
+    /// Show a walkmesh (.wok, .pwk, .dwk): counts, surface materials, room transitions, bounds.
+    Walkmesh(crate::cmd::WalkmeshArgs),
+    /// Show a model with its MDX: node tree, meshes with their textures, animations, supermodel chain.
+    Mdl(crate::cmd::MdlArgs),
     /// Run a Lua script with the façade loaded, hermetically: its inputs are its arguments and --game.
     Lua(crate::cmd::LuaArgs),
     /// A saved game by name: globals, the party, each module's creatures with their flags, effects and action queues, and the pending events.
