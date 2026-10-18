@@ -5,9 +5,8 @@ use std::fmt;
 /// Diagnostic codes for resource identity: the `RE01xx` range of the
 /// `rakata` registry. Each is a stable string a caller may match on and a
 /// user may look up.
-// TODO(rakata): register these, with their explanations, in
-// `crates/rakata/src/codes.rs` so `rakata explain RE0101` prints them. This
-// crate depends on nothing, so it carries only the strings.
+// Registered, with explanations, in `crates/rakata/src/codes.rs`; this crate
+// depends on nothing, so it carries only the strings.
 pub mod codes {
     /// A resource name longer than the sixteen bytes a resref holds.
     pub const RESREF_TOO_LONG: &str = "RE0101";
