@@ -8,11 +8,11 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+rakata-res = { workspace = true }
 
 [dev-dependencies]
 rakata-game = { workspace = true }
 rakata-gff = { workspace = true }
-rakata-res = { workspace = true }
 
 [lints]
 workspace = true

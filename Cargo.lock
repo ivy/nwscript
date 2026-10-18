@@ -1207,6 +1207,8 @@ dependencies = [
  "rakata-archive",
  "rakata-dialog",
  "rakata-gff",
+ "rakata-lyt",
+ "rakata-mdl",
  "rakata-res",
  "rakata-tlk",
  "rusqlite",

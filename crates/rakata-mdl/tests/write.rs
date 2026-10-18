@@ -385,6 +385,25 @@ fn a_model_of_every_kind_writes_and_reads_back_equal() {
     assert!(blade.vertex_buffer.is_empty());
     assert_eq!(blade.positions.get(2), Some([0.0, 1.0, 0.0]));
     assert_eq!(m.node("dangly").unwrap().position, [1.0, 0.0, 0.0]);
+    // What it names, from the MDL alone: no supermodel (`NULL`), each
+    // mesh's texture but the `NULL`s, the light's flares, the reference's
+    // model.
+    let refs: Vec<(String, String)> = rakata_mdl::facts::refs(&mdl)
+        .unwrap()
+        .into_iter()
+        .map(|r| (r.site, r.value))
+        .collect();
+    let want = [
+        ("trimesh.texture", "tex_a"),
+        ("skin.texture", "tex_b"),
+        ("dangly.texture", "tex_c"),
+        ("blade.texture", "fx_blade"),
+        ("lamp.flare[0]", "fx_flare01"),
+        ("lamp.flare[1]", "fx_ring"),
+        ("hook.model", "dor_lhr01"),
+    ]
+    .map(|(s, v)| (s.to_string(), v.to_string()));
+    assert_eq!(refs, want);
     let wave = m.animation("wave").unwrap();
     assert_eq!(wave.length, 1.5);
     assert_eq!(wave.events[0].name, "snd_footstep");

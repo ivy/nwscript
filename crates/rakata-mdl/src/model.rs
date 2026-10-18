@@ -26,15 +26,15 @@ const MODEL_ANIMS: usize = 0x58;
 const MODEL_BBOX: usize = 0x68;
 const MODEL_RADIUS: usize = 0x80;
 const MODEL_ANIM_SCALE: usize = 0x84;
-const MODEL_SUPER: usize = 0x88;
+pub(crate) const MODEL_SUPER: usize = 0x88;
 const NAMES: usize = 0xB8;
 const HEADER_END: usize = 0xC4;
 
 // A node, from its start.
-const NODE_NUMBER: usize = 4;
+pub(crate) const NODE_NUMBER: usize = 4;
 const NODE_POSITION: usize = 16;
 const NODE_ORIENTATION: usize = 28;
-const NODE_CHILDREN: usize = 44;
+pub(crate) const NODE_CHILDREN: usize = 44;
 
 // A mesh header, from its start (the node's start plus 80).
 const MESH_FACES: usize = 8;
@@ -44,8 +44,8 @@ const MESH_AVERAGE: usize = 48;
 const MESH_DIFFUSE: usize = 60;
 const MESH_AMBIENT: usize = 72;
 const MESH_TRANSPARENCY: usize = 84;
-const MESH_TEXTURE: usize = 88;
-const MESH_LIGHTMAP: usize = 120;
+pub(crate) const MESH_TEXTURE: usize = 88;
+pub(crate) const MESH_LIGHTMAP: usize = 120;
 const MESH_INDEX_COUNTS: usize = 176;
 const MESH_INDEX_OFFSETS: usize = 188;
 const MESH_STRIDE: usize = 252;
@@ -447,25 +447,8 @@ impl<'a> Model<'a> {
 
 /// Read a binary model from its MDL and MDX; see [`Model::parse`].
 pub fn parse<'a>(mdl: &'a [u8], mdx: &'a [u8]) -> Result<Model<'a>> {
-    if mdl.len() < FILE_HEADER_LEN {
-        return Err(Error::Truncated {
-            what: "file header",
-            offset: 0,
-            needed: FILE_HEADER_LEN,
-            available: mdl.len(),
-        });
-    }
-    let word = |i: usize| u32::from_le_bytes([mdl[i], mdl[i + 1], mdl[i + 2], mdl[i + 3]]);
-    if word(0) != 0 {
-        return Err(Error::NotBinary { first: word(0) });
-    }
-    let size = word(4) as usize;
-    let data = &mdl[FILE_HEADER_LEN..];
-    // The size field is the model data's length; trust the bytes when it
-    // claims more than there is, so a short file fails on what it lacks.
-    let data = &data[..size.min(data.len())];
-    let d = Data { b: data };
-    d.slice(0, HEADER_END, "model header")?;
+    let d = model_data(mdl)?;
+    let data = d.b;
 
     let names = read_names(&d)?;
     let name = d.fixed_str(GEOM_NAME, "model name")?;
@@ -495,8 +478,34 @@ pub fn parse<'a>(mdl: &'a [u8], mdx: &'a [u8]) -> Result<Model<'a>> {
     })
 }
 
+/// The model data of a binary MDL, past its file header, with the model
+/// header's extent checked.
+pub(crate) fn model_data(mdl: &[u8]) -> Result<Data<'_>> {
+    if mdl.len() < FILE_HEADER_LEN {
+        return Err(Error::Truncated {
+            what: "file header",
+            offset: 0,
+            needed: FILE_HEADER_LEN,
+            available: mdl.len(),
+        });
+    }
+    let word = |i: usize| u32::from_le_bytes([mdl[i], mdl[i + 1], mdl[i + 2], mdl[i + 3]]);
+    if word(0) != 0 {
+        return Err(Error::NotBinary { first: word(0) });
+    }
+    let size = word(4) as usize;
+    let data = &mdl[FILE_HEADER_LEN..];
+    // The size field is the model data's length; trust the bytes when it
+    // claims more than there is, so a short file fails on what it lacks.
+    let d = Data {
+        b: &data[..size.min(data.len())],
+    };
+    d.slice(0, HEADER_END, "model header")?;
+    Ok(d)
+}
+
 /// The name array: pointers to NUL-ended names, in node-number order.
-fn read_names<'a>(d: &Data<'a>) -> Result<Vec<&'a str>> {
+pub(crate) fn read_names<'a>(d: &Data<'a>) -> Result<Vec<&'a str>> {
     let (off, count) = d.array(NAMES, "name array")?;
     d.slice(off, count * 4, "name array")?;
     (0..count)
@@ -704,7 +713,7 @@ fn read_mesh<'a>(d: &Data<'a>, mdx: &'a [u8], h: usize, node: &str) -> Result<Me
     })
 }
 
-fn texture_name(s: &str) -> Option<&str> {
+pub(crate) fn texture_name(s: &str) -> Option<&str> {
     (!s.is_empty() && !s.eq_ignore_ascii_case("NULL")).then_some(s)
 }
 

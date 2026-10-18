@@ -152,7 +152,7 @@ The mesh header is 332 bytes, following the node header. That length is confirme
 | 324 | 4 | Offset of the mesh's block in the MDX. |
 | 328 | 4 | Offset in the model data of the positions again, three floats per vertex. |
 
-What the flag bytes 308, 311 and 313 are rests on their correlations above and on the position of the kotor_mdl document's shadow and render flags (u16s of 256 at 310 and 312, so the 1 in their high bytes); the render flag reads as the torlack document says NWN's defaults (off for AABB meshes, on otherwise). The engine does not draw an AABB node even when its render flag is 1: such a node names no texture, and the walkmesh it holds is invisible in the game.
+What the flag bytes 308, 311 and 313 are rests on their correlations above and on the position of the kotor_mdl document's shadow and render flags (u16s of 256 at 310 and 312, so the 1 in their high bytes); the render flag reads as the torlack document says NWN's defaults (off for AABB meshes, on otherwise). The walkmesh an AABB node holds is invisible in the game even when its render flag is 1, though 92 of the 280 such nodes name a texture (and one of the 822 with the flag 0); whether the engine loads that texture is not established.
 
 ### Faces
 
@@ -281,6 +281,20 @@ An animation's position keys do not read as the node's position: of the 92,996 p
 ## Supermodels
 
 A model names its supermodel at 0x88 of the model header; 413 do. The chains, followed through the install's resolution of each name, pass up to seven supermodels (`s_female02` names `S_Female01`, which names `S_Male02`, which names `S_Male01`, which names none). Three models name a supermodel the game does not ship: `h_m_hi01` (`CSpar2`), `n_djedi_h` and `p_carthbbh` (both `S_Male02H`). A supermodel holds animations its descendants play: `s_male02` holds 166, `walk` among them, and a body such as `pmbam`, whose chain is `S_Female02`, `S_Female01`, `S_Male02`, `S_Male01`, has none of its own. An animation's nodes act on the playing model's nodes of the same names; a body model lacks the head's bones, which its head model has.
+
+## What a model names
+
+A model names other resources in five places, all in the geometry's tree or the model header (an animation's nodes are dummies in every vanilla model): the supermodel; each mesh's texture and second texture (the lightmap); each light's flare textures (the light header's array at 52); and a reference node's model (the first 32 bytes of its header, a NUL-ended name). Emitters name textures and chunk models too, in a header not decoded here. Counted over the 2,833 distinct vanilla MDL contents, one naming per node and site, each name matched against every layer of the install without regard to case:
+
+| Site | Namings | Names | Held |
+| --- | --- | --- | --- |
+| texture | 58,257 | 1,665 | 58,033 as TPC, 5 as TGA only; 193 by nothing (35 names) |
+| lightmap | 41,538 | 8,170 | 309 as TPC, 38,873 as TGA only (the BIFs' lightmaps); 2,356 by nothing |
+| light flare | 80 | 10 | 63 as TPC; 17 by nothing (5 names) |
+| reference node | 1,952 | 42 | all as models (`fx_ref`, `OR_Tatshrub01`, `C_Brith`) |
+| supermodel | 375 | 45 | 372 as models; the three above by nothing |
+
+The 2,356 lightmaps held by nothing are each named once, by 51 models: 2,001 named `MODEL_aNNNNN` with a base-36 counter (611 in `m31ad_00a`, 528 in `m31ab_00a`, 420 in `m31aa_00a`; `M01aa_04a_a0002t` in the Endar Spire's `m01aa_04a`, `DOR_LHR02_a00004` in `dor_lhr02`), 354 named `MODEL_lmNNN` in seven models nothing the index reads names (`crossgob`, `hal01gob` to `hal04gob`, `hcrates`, `v_ehawk`), and `plc_knrthvin01_a`. The textures held by nothing are mostly on character and cutscene models (`pmbf`, `pmbmv_01` and `pmblv` on the body models `n_commkidm` and `pmbc`, whose `appearance.2da` rows name a texture of their own in `texa` and `texb`; `h_f_lo01headtest` and `p_bastillah01` on cutscene characters), and on toolset markers (`toolcolors` on `gi_waypoint` and `gi_sound_*`). One name held by nothing has a longer name held beside it, `pmbf` with `pmbf01` and `pmbf02`; whether the engine completes a mesh's texture name as it completes `appearance.2da`'s texture prefixes is not established, so a name is matched as written.
 
 ## Layout
 

@@ -15,6 +15,7 @@
 #![forbid(unsafe_code)]
 
 mod error;
+pub mod facts;
 mod lyt;
 mod text;
 mod vis;

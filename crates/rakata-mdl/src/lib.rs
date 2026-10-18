@@ -44,6 +44,7 @@
 mod animation;
 mod controller;
 mod error;
+pub mod facts;
 mod file;
 mod layout;
 mod lineage;

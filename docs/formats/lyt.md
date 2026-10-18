@@ -46,6 +46,8 @@ Every vanilla layout has this shape (**measured**, 124 of 124):
 
 The tracks and obstacles are in the minigame areas only: `m03mg`, `m17mg`, `m26mg` and `m45mg` (30 or 31 track pieces, 22 obstacles), `m12ab` to `m12ah` (7 and 1, all at the origin) and `mgf_ebonhawk` (1 track piece, no rooms) (**measured**).
 
+Eleven cutscene layouts (`stunt_ebobridge`, `stunt_ebocom`, `stunt_ebocrash`, `stunt_ebodant`, `stunt_ebolev`, `stunt_eboqrts`, `stunt_ebosf`, `stunt_endbridge`, `stunt_levbridge`, `stunt_starforge`, `stunt_unkhall`) hold 134 rooms named `****`, a name no file can have; every other room, track piece and obstacle names a model the install holds (**measured**). Four of `stunt_endbridge`'s door hooks name rooms no layer holds, `M01aa_09a`, `M01aa_11a` and `M01aa_12a` (**measured**).
+
 Coordinates are the game's own: metres, Z up, in the area's frame (**measured**: a door hook stands within a millimetre of the position the area's GIT gives the door built on it, below).
 
 ### Door hooks
