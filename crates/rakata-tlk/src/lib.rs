@@ -20,6 +20,7 @@
 
 pub mod codepage;
 mod error;
+pub mod facts;
 mod tlk;
 
 pub use error::{Error, Result, codes};
