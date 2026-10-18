@@ -11,6 +11,7 @@ pub mod codes;
 pub mod conformance;
 pub mod corpus;
 pub mod dialog;
+pub mod diff;
 pub mod formats;
 pub mod inspect;
 pub mod patch;
