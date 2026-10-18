@@ -1,0 +1,14 @@
+[package]
+name = "rakata-tlk"
+description = "The talk table of Aurora-family games: dialog.tlk read, LocalizedString resolution, append with the returned strref, written back in BioWare's layout."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rakata-res = { workspace = true }
+
+[lints]
+workspace = true

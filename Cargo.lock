@@ -1101,6 +1101,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rakata-tlk"
+version = "0.0.0"
+dependencies = [
+ "rakata-res",
+]
+
+[[package]]
 name = "rand"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
