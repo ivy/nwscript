@@ -6,6 +6,20 @@ use rakata_texture::{
     ImageType, Layout, Origin, PixelFormat, Tga, TgaLayout, Tpc, Txi, TxiEntry, codes,
 };
 
+/// `bytes`, kept as a seed for the fuzz targets in the directory
+/// `$RAKATA_FUZZ_SEEDS` names, when it is set.
+fn seed(bytes: &[u8]) -> &[u8] {
+    if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        bytes.hash(&mut h);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+    }
+    bytes
+}
+
 /// A TPC header: data size, the float, width, height, encoding, mip count,
 /// and 114 bytes of `reserved`.
 fn tpc_header(data_size: u32, float: f32, w: u16, h: u16, encoding: u8, mips: u8) -> Vec<u8> {
@@ -35,7 +49,7 @@ fn tga_header(ty: u8, w: u16, h: u16, bits: u8, desc: u8) -> Vec<u8> {
 
 #[track_caller]
 fn tpc_round_trip(b: &[u8]) -> Tpc<'_> {
-    let t = Tpc::parse(b).unwrap();
+    let t = Tpc::parse(seed(b)).unwrap();
     let written = t.to_bytes().unwrap();
     assert_eq!(written, b);
     let back = Tpc::parse(&written).unwrap();
@@ -48,7 +62,7 @@ fn tpc_round_trip(b: &[u8]) -> Tpc<'_> {
 
 #[track_caller]
 fn tga_round_trip(b: &[u8]) -> Tga {
-    let t = Tga::parse(b).unwrap();
+    let t = Tga::parse(seed(b)).unwrap();
     let written = t.to_bytes().unwrap();
     assert_eq!(written, b);
     let back = Tga::parse(&written).unwrap();
@@ -136,7 +150,7 @@ fn txi_round_trips_and_is_made_from_nothing() {
         b"numchars 2\r\nupperleftcoords 2\r\n0.0 1.0 0\r\n0.5 1.0 0\r\n\r\n\r\n",
         b"Bumpyshinytexture   CM_Bright \t\r\n\0",
     ] {
-        let t = Txi::parse(text);
+        let t = Txi::parse(seed(text));
         let written = t.to_bytes().unwrap();
         assert_eq!(written, text);
         assert_eq!(Txi::parse(&written), t);

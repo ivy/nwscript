@@ -3,6 +3,20 @@
 
 use rakata_texture::{Error, ImageType, Layout, Origin, PixelFormat, Tga, Tpc, codes};
 
+/// `bytes`, kept as a seed for the fuzz targets in the directory
+/// `$RAKATA_FUZZ_SEEDS` names, when it is set.
+fn seed(bytes: &[u8]) -> &[u8] {
+    if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        bytes.hash(&mut h);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+    }
+    bytes
+}
+
 /// A TPC header: data size, the float, width, height, encoding, mip count,
 /// and 114 zero bytes.
 fn tpc_header(data_size: u32, float: f32, w: u16, h: u16, encoding: u8, mips: u8) -> Vec<u8> {
@@ -31,7 +45,7 @@ fn dxt1_with_a_full_chain_and_txi() {
         b.extend(filler(*len, i as u8 * 40));
     }
     b.extend_from_slice(b"mipmap 0\r\nblending additive\r\n");
-    let t = Tpc::parse(&b).unwrap();
+    let t = Tpc::parse(seed(&b)).unwrap();
     assert_eq!(t.format, PixelFormat::Dxt1);
     assert!(!t.has_alpha());
     assert_eq!(t.layout, Layout::Single);
@@ -63,7 +77,7 @@ fn a_tiny_dxt1_states_sixteen_bytes_and_stores_one_block_per_level() {
     // level 0 of one 8-byte block, and that is no animation sheet.
     let mut b = tpc_header(16, 1.0, 4, 4, 2, 3);
     b.extend(filler(24, 1));
-    let t = Tpc::parse(&b).unwrap();
+    let t = Tpc::parse(seed(&b)).unwrap();
     assert_eq!(t.layout, Layout::Single);
     assert_eq!(t.level_count(), 3);
     assert!(t.txi.is_none());
@@ -74,7 +88,7 @@ fn a_tiny_dxt1_states_sixteen_bytes_and_stores_one_block_per_level() {
 fn dxt5_has_alpha_and_the_header_float() {
     let mut b = tpc_header(64, 0.25, 8, 8, 4, 2);
     b.extend(filler(64 + 16, 3));
-    let t = Tpc::parse(&b).unwrap();
+    let t = Tpc::parse(seed(&b)).unwrap();
     assert_eq!(t.format, PixelFormat::Dxt5);
     assert!(t.has_alpha());
     assert_eq!(t.alpha_mean, 0.25);
@@ -91,7 +105,7 @@ fn uncompressed_grey_rgb_and_rgba() {
         // 4×2 with two levels: 4×2 then 2×1.
         let mut b = tpc_header(0, 1.0, 4, 2, enc, 2);
         b.extend(filler(8 * bpp + 2 * bpp, enc));
-        let t = Tpc::parse(&b).unwrap();
+        let t = Tpc::parse(seed(&b)).unwrap();
         assert_eq!(t.format, format);
         assert!(!t.format.is_compressed());
         let l = &t.images[0].levels;
@@ -110,7 +124,7 @@ fn a_cube_map_has_six_faces_each_with_its_chain() {
         b.extend(filler(per_face, face * 10));
     }
     b.extend_from_slice(b"cube 1\r\n");
-    let t = Tpc::parse(&b).unwrap();
+    let t = Tpc::parse(seed(&b)).unwrap();
     assert_eq!(t.layout, Layout::Cube);
     assert_eq!(t.images.len(), 6);
     assert_eq!(t.image_size(), (8, 8));
@@ -132,7 +146,7 @@ fn an_animation_sheet_is_frames_each_with_a_full_chain() {
         b.extend(filler(per_frame, frame * 50));
     }
     b.extend_from_slice(b"proceduretype cycle\r\nnumx 2\r\nnumy 2\r\nfps 8\r\n");
-    let t = Tpc::parse(&b).unwrap();
+    let t = Tpc::parse(seed(&b)).unwrap();
     assert_eq!(t.layout, Layout::Flipbook { numx: 2, numy: 2 });
     assert_eq!(t.mip_count, 1);
     assert_eq!(t.images.len(), 4);
@@ -212,7 +226,7 @@ fn tga_32_bit_bottom_left_comes_out_top_first_with_its_alpha() {
         b.extend_from_slice(&px);
     }
     b.extend_from_slice(b"\0\0\0\0\0\0\0\0TRUEVISION-XFILE.\0");
-    let t = Tga::parse(&b).unwrap();
+    let t = Tga::parse(seed(&b)).unwrap();
     assert_eq!((t.width, t.height, t.bits, t.alpha_bits), (2, 2, 32, 0));
     assert_eq!(t.image_type, ImageType::TrueColor);
     assert_eq!(t.origin, Origin::BottomLeft);
@@ -223,19 +237,19 @@ fn tga_32_bit_bottom_left_comes_out_top_first_with_its_alpha() {
 fn tga_24_bit_top_left_and_right_origins() {
     let mut b = tga_header(2, 2, 1, 24, 0x20);
     b.extend_from_slice(&[0, 0, 255, 0, 255, 0]);
-    let t = Tga::parse(&b).unwrap();
+    let t = Tga::parse(seed(&b)).unwrap();
     assert_eq!(t.origin, Origin::TopLeft);
     assert_eq!(pixels(&t), [RED, GREEN]);
 
     let mut b = tga_header(2, 2, 1, 24, 0x30);
     b.extend_from_slice(&[0, 0, 255, 0, 255, 0]);
-    let t = Tga::parse(&b).unwrap();
+    let t = Tga::parse(seed(&b)).unwrap();
     assert_eq!(t.origin, Origin::TopRight);
     assert_eq!(pixels(&t), [GREEN, RED]);
 
     let mut b = tga_header(2, 1, 2, 24, 0x10);
     b.extend_from_slice(&[0, 0, 255, 0, 255, 0]);
-    let t = Tga::parse(&b).unwrap();
+    let t = Tga::parse(seed(&b)).unwrap();
     assert_eq!(t.origin, Origin::BottomRight);
     assert_eq!(pixels(&t), [GREEN, RED]);
 }
@@ -250,7 +264,7 @@ fn tga_with_an_image_id_and_a_colour_map_skips_both() {
     b.extend_from_slice(b"abc");
     b.extend_from_slice(&[9; 6]);
     b.extend_from_slice(&[255, 0, 0]);
-    assert_eq!(pixels(&Tga::parse(&b).unwrap()), [BLUE]);
+    assert_eq!(pixels(&Tga::parse(seed(&b)).unwrap()), [BLUE]);
 }
 
 #[test]
@@ -259,23 +273,23 @@ fn tga_16_bit() {
     // pixel is transparent; without one it is opaque.
     let mut b = tga_header(2, 1, 1, 16, 0x21);
     b.extend_from_slice(&0x7c00u16.to_le_bytes());
-    assert_eq!(pixels(&Tga::parse(&b).unwrap()), [[255, 0, 0, 0]]);
+    assert_eq!(pixels(&Tga::parse(seed(&b)).unwrap()), [[255, 0, 0, 0]]);
     let mut b = tga_header(2, 1, 1, 16, 0x20);
     b.extend_from_slice(&0x03e0u16.to_le_bytes());
-    assert_eq!(pixels(&Tga::parse(&b).unwrap()), [GREEN]);
+    assert_eq!(pixels(&Tga::parse(seed(&b)).unwrap()), [GREEN]);
 }
 
 #[test]
 fn tga_grey_raw_and_with_alpha() {
     let mut b = tga_header(3, 2, 1, 8, 0x28);
     b.extend_from_slice(&[0, 200]);
-    let t = Tga::parse(&b).unwrap();
+    let t = Tga::parse(seed(&b)).unwrap();
     assert_eq!(t.image_type, ImageType::Grey);
     assert_eq!(pixels(&t), [[0, 0, 0, 255], [200, 200, 200, 255]]);
 
     let mut b = tga_header(3, 1, 1, 16, 0x28);
     b.extend_from_slice(&[90, 30]);
-    assert_eq!(pixels(&Tga::parse(&b).unwrap()), [[90, 90, 90, 30]]);
+    assert_eq!(pixels(&Tga::parse(seed(&b)).unwrap()), [[90, 90, 90, 30]]);
 }
 
 #[test]
@@ -283,14 +297,14 @@ fn tga_rle_runs_and_raw_packets() {
     // 4×1 true colour, 24-bit: a run of three red, then one raw white.
     let mut b = tga_header(10, 4, 1, 24, 0x20);
     b.extend_from_slice(&[0x82, 0, 0, 255, 0x00, 255, 255, 255]);
-    let t = Tga::parse(&b).unwrap();
+    let t = Tga::parse(seed(&b)).unwrap();
     assert_eq!(t.image_type, ImageType::TrueColorRle);
     assert_eq!(pixels(&t), [RED, RED, RED, WHITE]);
 
     // 32-bit, bottom-left, 2×2: one raw packet of two, then a run of two.
     let mut b = tga_header(10, 2, 2, 32, 8);
     b.extend_from_slice(&[0x01, 255, 0, 0, 255, 0, 255, 0, 255, 0x81, 0, 0, 255, 128]);
-    let t = Tga::parse(&b).unwrap();
+    let t = Tga::parse(seed(&b)).unwrap();
     assert_eq!(
         pixels(&t),
         [[255, 0, 0, 128], [255, 0, 0, 128], BLUE, GREEN]
@@ -299,7 +313,7 @@ fn tga_rle_runs_and_raw_packets() {
     // Grey RLE: a run of two.
     let mut b = tga_header(11, 2, 1, 8, 0x20);
     b.extend_from_slice(&[0x81, 77]);
-    let t = Tga::parse(&b).unwrap();
+    let t = Tga::parse(seed(&b)).unwrap();
     assert_eq!(t.image_type, ImageType::GreyRle);
     assert_eq!(pixels(&t), [[77, 77, 77, 255], [77, 77, 77, 255]]);
 }
@@ -313,7 +327,7 @@ fn tga_errors_carry_their_codes() {
 
     let mut b = tga_header(2, 2, 2, 24, 0);
     b.extend_from_slice(&[0; 11]);
-    assert_eq!(Tga::parse(&b).unwrap_err().code(), "RE2204");
+    assert_eq!(Tga::parse(seed(&b)).unwrap_err().code(), "RE2204");
 
     let mapped = Tga::parse(&tga_header(1, 1, 1, 8, 0)).unwrap_err();
     assert_eq!(
@@ -339,4 +353,19 @@ fn tga_errors_carry_their_codes() {
     let mut cut = tga_header(10, 2, 1, 24, 0);
     cut.extend_from_slice(&[0x01, 0, 0]);
     assert_eq!(Tga::parse(&cut).unwrap_err().code(), "RE2204");
+}
+
+#[test]
+fn tga_rle_too_short_for_its_size_is_refused_before_it_allocates() {
+    // 65534 × 65533 pixels from 13 bytes of packets: found by fuzzing,
+    // this once reserved 17 GB for the pixels before reading a packet.
+    let mut b = tga_header(10, 0xfffe, 0xfffd, 32, 8);
+    b.extend_from_slice(&[0x81, 0, 0, 0xff, 0, 0xff, 0, 0xff, 0x81, 0, 0, 0xff, 0x80]);
+    let e = Tga::parse(seed(&b)).unwrap_err();
+    assert_eq!(e.code(), codes::TGA_TRUNCATED);
+    let Error::TgaTruncated { needed, .. } = e else {
+        unreachable!()
+    };
+    // At the least a head and a pixel for each 128 pixels.
+    assert_eq!(needed, 18 + (0xfffe * 0xfffd_usize).div_ceil(128) * 5);
 }
