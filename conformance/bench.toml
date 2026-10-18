@@ -1,0 +1,103 @@
+# The comparators `cargo xtask bench run` measures, as argv templates.
+#
+# Placeholders everywhere: {repo} this repository, {corpus} the scripts corpus, {env:VAR} an
+# environment variable (a row whose variable is unset is reported as skipped, naming it).
+# `identity` lists files whose hashes identify the tool in the report, beside its first argv element.
+
+# Readers. A batch driver takes {mode} {format} {list} {out}: `start` loads the tool and exits (3,
+# with the reason on stderr, for a format it does not read), `read` reads every file of the list,
+# `write` reads and writes each again in memory, `check` does both and saves a written file that
+# differs from the original as OUT.d/I.EXT; OUT gets one JSON line per file. A tool with
+# `per_file = true` runs once per file ({file}), success being its exit status, and `start` is a
+# command that starts it and does nothing.
+
+# Rakata's readers and writers, through the adapters `rakata conformance` registers. Build it first:
+# `cargo build --release -p xtask`.
+[reader.rakata]
+description = "Rakata, this repository's readers and writers, one thread (xtask bench driver)"
+command = ["{repo}/target/release/xtask", "bench", "driver", "{mode}", "{format}", "{list}", "{out}"]
+
+# pykotor's readers and writers from modshop's environment (`uv sync` there first), through the
+# entry points docs/proposals/rakata.md names. Formats without one there are reported as skipped.
+[reader.pykotor]
+description = "pykotor's read_X(bytes) and bytes_X(model), from modshop's environment"
+command = ["{env:MODSHOP}/.venv/bin/python", "-I", "{repo}/conformance/drivers/pykotor_formats.py", "{mode}", "{format}", "{list}", "{out}"]
+identity = ["{env:MODSHOP}/uv.lock"]
+
+# nwnrs (github.com/urothis/nwnrs), a Neverwinter Nights toolchain in Rust: `nwnrs inspect FILE`
+# reads one file by its extension and prints it. NWN shares GFF, TLK, KEY, ERF and TGA with KotOR;
+# its 2DA is text where KotOR's is binary, and its BIF, RIM, MDL and the KotOR-only formats are not
+# among what `inspect` opens. `NWNRS=$(mise x cargo:nwnrs@0.0.1 -- which nwnrs)`.
+[reader.nwnrs]
+description = "nwnrs 0.0.1, nwnrs inspect FILE, one process per file"
+per_file = true
+command = ["{env:NWNRS}", "inspect", "{file}"]
+start = ["{env:NWNRS}", "--help"]
+formats = ["gff", "2da", "tlk", "key", "erf", "tga"]
+
+# Compilers, by their names in conformance/compilers.toml, over the corpus scripts that ship as both
+# source and bytecode. `start` is a command that starts the compiler and compiles nothing.
+[compile]
+compilers = ["nws", "nwnnsscomp-v100", "nwnnsscomp", "pykotor", "nwnrs-o0"]
+
+[compile.start]
+nws = ["{repo}/target/release/nws", "--version"]
+nwnnsscomp-v100 = ["{env:NWNNSSCOMP}"]
+nwnnsscomp = ["{env:NWNNSSCOMP}"]
+pykotor = ["{env:MODSHOP}/.venv/bin/python", "-I", "-c", "pass"]
+nwnrs-o0 = ["{env:NWNRS}", "--help"]
+
+# Installers. {data} the mod's tslpatchdata directory (a fresh copy of the unpacked mod each run),
+# {game} the tree to patch (a fresh reflink copy), {option} the 0-based option, {log} a directory for
+# logs; an argument `{option_args}` becomes `option_args` for a mod with namespaces.ini, where
+# {option_number} is the option's `Namespace#` number, and is dropped otherwise.
+[installer.rakata]
+description = "rakata install, this repository's installer (cargo build --release -p rakata-cli)"
+command = ["{repo}/target/release/rakata", "--game", "{game}", "install", "{data}", "{option_args}"]
+option_args = ["--option", "{option_number}"]
+
+[installer.tslpatcher]
+description = "the mod's own TSLPatcher under Wine in a container, through conformance/drivers/tslpatcher.sh; its peak memory is the podman client's, not the container's"
+command = ["{repo}/conformance/drivers/tslpatcher.sh", "{data}", "{game}", "{option}", "{log}"]
+
+[installer.holopatcher]
+description = "HoloPatcher's command line from modshop's environment (`uv sync` there first)"
+command = ["{env:MODSHOP}/.venv/bin/holopatcher", "--game-dir", "{game}", "--tslpatchdata", "{data}", "--install", "--console", "{option_args}"]
+option_args = ["--namespace-option-index", "{option}"]
+identity = ["{env:MODSHOP}/uv.lock"]
+
+# Install cases: the entries docs/research/tslpatcher-oracle.md drove TSLPatcher through, each onto
+# its parent checkpoint in modshop's KotOR build (the newest checkpoint built for the entry), with
+# the option the build installs.
+[install.130-saber-throw-knockdown]
+description = "TSLPatcher 1.2.10b1 (second build), no namespaces"
+archive = "{env:MODSHOP}/games/kotor/data/archives/130-saber-throw-knockdown/saberthrow_kd.zip"
+data = "tslpatchdata"
+tree = "{env:MODSHOP}/games/kotor/data/game/ckpt/456d12407b7fac05/tree"
+
+[install.141-bastila-has-tsl-battle-meditation]
+description = "TSLPatcher 1.2.10b1, every list but SSFList, a CompileList"
+archive = "{env:MODSHOP}/games/kotor/data/archives/141-bastila-has-tsl-battle-meditation/Bastila Has Battle Meditation v1.2.zip"
+data = "Bastila Has Battle Meditation v1.2/tslpatchdata"
+tree = "{env:MODSHOP}/games/kotor/data/game/ckpt/138b071ec8985755/tree"
+
+[install.168-jc-s-mandalorian-armor]
+description = "TSLPatcher 1.2.9b, namespaces by DataPath, GFF edits inside a .mod"
+archive = "{env:MODSHOP}/games/kotor/data/archives/168-jc-s-mandalorian-armor/KOTOR1-Mandalorian-Armor_v2.0.0.zip"
+data = "tslpatchdata"
+option = 0
+tree = "{env:MODSHOP}/games/kotor/data/game/ckpt/3085a203240ac59a/tree"
+
+[install.170-blaster-adjustment]
+description = "TSLPatcher 1.2.9b, one 2DA, two ChangeRow sections the option's file lacks"
+archive = "{env:MODSHOP}/games/kotor/data/archives/170-blaster-adjustment/KOTOR1-Blaster-Adjustment_v1.0.0.zip"
+data = "tslpatchdata"
+option = 1
+tree = "{env:MODSHOP}/games/kotor/data/game/ckpt/ddd20399247aab92/tree"
+
+[install.180-galaxy-map-fix]
+description = "TSLPatcher 1.2.10b1, with namespaces"
+archive = "{env:MODSHOP}/games/kotor/data/archives/180-galaxy-map-fix/K1 Galaxy Map Fix Pack.zip"
+data = "tslpatchdata"
+option = 0
+tree = "{env:MODSHOP}/games/kotor/data/game/ckpt/e6c2b0d1766b1a21/tree"
