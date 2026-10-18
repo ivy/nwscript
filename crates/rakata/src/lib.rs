@@ -19,6 +19,7 @@ pub mod inspect;
 pub mod lint;
 pub mod patch;
 pub mod save;
+pub mod show;
 
 pub use nwscript_diag as diag;
 pub use nwscript_diag::{Exit, InputRecord, OutputRecord};

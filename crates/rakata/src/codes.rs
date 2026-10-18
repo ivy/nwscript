@@ -165,6 +165,13 @@ nwscript_diag::codes! {
     RW1903 Warning "Override files whose names differ only in case";
     RW1904 Warning "a lint rule skipped: the install has no dialog.tlk or no nwscript.nss";
     RW1905 Warning "resources the lint could not read, so what they name is unchecked";
+    RE2001 Error "a name `rakata decompile` takes that is not a script's NAME.ncs";
+    RE2002 Error "a script several modules hold, with no module named";
+    RE2003 Error "a script the decompiler could not recover";
+    RE2004 Error "an index database holding no tree built from the install `rakata show` reads";
+    RW2001 Warning "a decompiled script some of whose functions did not verify";
+    RW2002 Warning "a 2DA a shown value names that the install lacks or that does not read";
+    RW2003 Warning "a blueprint an instance or inventory names that no layer holds";
 }
 
 /// The rakata code with this id, if registered; case does not matter.
