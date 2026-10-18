@@ -937,7 +937,7 @@ fn lip(a: &Lip, b: &Lip) -> Vec<Site> {
         });
     }
     header(&mut sites, "keyframes", a.keys.len(), b.keys.len());
-    let key = |k: &rakata_lip::Key| format!("{}s {}", k.time, k.shape.label());
+    let key = |k: &rakata_lip::Key| format!("{} s, shape {}", k.time, k.shape.label());
     for i in 0..a.keys.len().max(b.keys.len()) {
         let (x, y) = (a.keys.get(i), b.keys.get(i));
         let same = matches!((x, y), (Some(x), Some(y)) if x.bits_eq(y));
