@@ -13,6 +13,8 @@ mod explain;
 mod index;
 pub use index::IndexArgs;
 mod install;
+mod refs;
+pub use refs::RefsArgs;
 mod save;
 pub use save::SaveArgs;
 mod which;
@@ -105,6 +107,7 @@ pub fn run(cli: Cli) -> Exit {
         Command::Dialog(args) => dialog::run(&ctx, &args),
         Command::Diff(args) => diff::run(&ctx, &args),
         Command::Index(args) => index::run(&ctx, &args),
+        Command::Refs(args) => refs::run(&ctx, &args),
         Command::Which {
             name,
             module,

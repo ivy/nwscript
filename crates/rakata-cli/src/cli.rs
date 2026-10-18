@@ -35,6 +35,7 @@ Examples:
                                            index a tree: facts, references and full text
   rakata index query \"SELECT * FROM refs WHERE value = 'k_pman_aioff'\"
   rakata lua build.lua OUT --game DIR     a Lua script over the façade, writing below OUT
+  rakata refs 42724 --kind strref          what refers to a strref, and where each lies
 
 Exit codes: 0 success, 1 errors reported, 2 bad invocation,
 3 a comparison found a difference, 101 internal error.";
@@ -168,4 +169,6 @@ pub enum Command {
     Diff(crate::cmd::DiffArgs),
     /// The index of a tree: facts, references and full text in SQLite; build, query, digest, coverage.
     Index(crate::cmd::IndexArgs),
+    /// Every reference to a strref, resref, tag or global, or every reference a resource makes, from the index.
+    Refs(crate::cmd::RefsArgs),
 }

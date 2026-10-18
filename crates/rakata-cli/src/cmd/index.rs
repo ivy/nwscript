@@ -123,7 +123,7 @@ Examples:
     },
 }
 
-fn db_path(db: &DbArg) -> Result<PathBuf, Exit> {
+pub(super) fn db_path(db: &DbArg) -> Result<PathBuf, Exit> {
     match db.db.clone().or_else(index::default_db) {
         Some(p) => Ok(p),
         None => {
