@@ -7,6 +7,7 @@
 //! one `nws` uses, shared through `nwscript-diag`; only the `game` field
 //! differs, an install directory here where `nws` records a profile.
 
+pub mod author;
 pub mod codes;
 pub mod conformance;
 pub mod corpus;

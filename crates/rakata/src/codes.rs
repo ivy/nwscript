@@ -13,8 +13,8 @@
 //! files (`rakata-lip`), `RE10xx` and `RW10xx` the corpus
 //! ([`crate::corpus`]), `RE11xx` and `RW11xx` dialogues (`rakata-dialog`),
 //! `RE12xx` and `RW12xx` saves (`rakata-save`), `RE13xx` the inspection
-//! commands ([`crate::inspect`]). Each crate takes a range of its own as it
-//! lands.
+//! commands ([`crate::inspect`]), `RE14xx` the authoring API
+//! ([`crate::author`]). Each crate takes a range of its own as it lands.
 
 pub use nwscript_diag::codes::Code;
 
@@ -125,6 +125,20 @@ nwscript_diag::codes! {
     RE1601 Error "a diff of a directory against a file";
     RW1601 Warning "a resource that does not read as its format, compared by hash";
     RW1602 Warning "a file of a tree the diff could not read";
+    RE1401 Error "a module copy of a replaced resource that differs from the hash the mod was written against";
+    RE1402 Error "Override already holds a copy of a resource the mod replaces";
+    RE1403 Error "the module holds no copy of a resource the mod replaces";
+    RE1404 Error "a global globalcat.2da already declares";
+    RE1405 Error "a 2DA row label matching several rows, or a new row's label the table already carries";
+    RE1406 Error "a blueprint field set to a value of another type";
+    RE1407 Error "a dialogue write refused: a node or link it adds or changes refers to what the install lacks";
+    RE1408 Error "a mod's script that does not compile";
+    RE1409 Error "a file the mod writes could not be written";
+    RE1410 Error "a voice line whose span its take's transcript does not hold";
+    RE1411 Error "two voice lines with one resref";
+    RE1412 Error "a transcript or a set of mouth cues that does not read";
+    RE1413 Error "a voice-over for streamwaves/ that is not a RIFF WAVE file";
+    RE1414 Error "bytes written as NCS that do not decode";
 }
 
 /// The rakata code with this id, if registered; case does not matter.
