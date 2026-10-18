@@ -152,11 +152,11 @@ The mesh header is 332 bytes, following the node header. That length is confirme
 | 324 | 4 | Offset of the mesh's block in the MDX. |
 | 328 | 4 | Offset in the model data of the positions again, three floats per vertex. |
 
-What the flag bytes 308, 311 and 313 are rests on their correlations above and on the position of the kotor_mdl document's shadow and render flags (u16s of 256 at 310 and 312, so the 1 in their high bytes); the render flag reads as the torlack document says NWN's defaults (off for AABB meshes, on otherwise).
+What the flag bytes 308, 311 and 313 are rests on their correlations above and on the position of the kotor_mdl document's shadow and render flags (u16s of 256 at 310 and 312, so the 1 in their high bytes); the render flag reads as the torlack document says NWN's defaults (off for AABB meshes, on otherwise). The engine does not draw an AABB node even when its render flag is 1: such a node names no texture, and the walkmesh it holds is invisible in the game.
 
 ### Faces
 
-A face is 32 bytes: the plane normal (three floats; a unit vector in all but 816 of 5,779,369 faces), the plane distance (a float), a u32 surface id, three i16 adjacent face indices (-1 for none), and three u16 vertex indices. Every vertex index of every vanilla face is less than the mesh's vertex count.
+A face is 32 bytes: the plane normal (three floats; a unit vector in all but 816 of 5,779,369 faces), the plane distance (a float), a u32 surface id, three i16 adjacent face indices (-1 for none), and three u16 vertex indices. Every vertex index of every vanilla face is less than the mesh's vertex count. The stored winding is front-facing in a left-handed frame once Y is negated (KotOR's right-handed Z-up to Unreal's left-handed Z-up), so a renderer that negates Y keeps the order as stored and does not reverse it.
 
 ### Triangle list
 
@@ -312,6 +312,8 @@ Public documents read: xoreos-docs `specs/kotor_mdl.html` (KotOR's binary MDL), 
 Reference projects read: none.
 
 Measured: on 2026-10-18, every count above comes from the vanilla KotOR 1 install under `$RAKATA_GAME_K1`, first with short Python scripts reading the headers, nodes, mesh headers, faces, index lists, controllers, skin headers, animation headers and MDX blocks of every model the KEY's BIFs, `rims/`, `modules/` and `patch.erf` hold, then with `crates/rakata-mdl/tests/vanilla.rs`, which parses every one of them, prints the node kinds, classifications, MDX layouts, flag counts, controllers by type, compressed keys, skins and their bind transforms, resolves every supermodel chain, and reads every model `end_m01aa` uses (`RAKATA_GAME_K1=… cargo test -p rakata-mdl --test vanilla -- --nocapture`). The compressed orientation's partition, its agreement with uncompressed copies and its scale were measured by the Python scripts over the 2,832 models of distinct names (one copy of each name the BIFs and RIMs hold).
+
+Observed in a renderer: the winding and the undrawn AABB nodes, from the OdysseyUE runtime drawing the Endar Spire (`end_m01aa`) from these structures and comparing with the game.
 
 Date: 2026-10-18.
 

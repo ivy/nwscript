@@ -32,7 +32,7 @@ The encoding byte and whether the data size is zero name the format. These five 
 
 A DXT level smaller than 4×4 (2×2, 1×1) still takes one whole block. The DXT block encodings are the published S3TC/BCn ones. Of the 5,311 DXT1 files, 77 have a block among the first ⌈w/4⌉ × ⌈h/4⌉ of their pixel data in DXT1's three-colour mode that uses the transparent index, so they carry one-bit alpha although the format is the one without an alpha channel.
 
-The channel order of the uncompressed formats, and whether the first row stored is the top or the bottom of the image, are not established: no vanilla texture exists both as an uncompressed TPC and in another format under the same name to compare against. `rakata-texture` passes the bytes as stored.
+The first row stored is the top of the image: a renderer that uploads the rows as stored and flips V draws the Endar Spire's wall and ceiling labels the right way up. The channel order of the uncompressed formats is not established: no vanilla texture exists both as an uncompressed TPC and in another format under the same name to compare against. `rakata-texture` passes the bytes as stored.
 
 The dimensions are powers of two in every file except the 189 cube maps, whose height is six times a power of two. 52 files are not square (and not cube maps), such as 32×512.
 
@@ -64,7 +64,7 @@ What each keyword makes the engine do is not established by this document.
 
 ## What could not be established
 
-The meaning of the float at 0x04 to the engine; the channel order and row order of uncompressed pixels; the direction of each cube face; the frame order of an animation sheet within the image; which of a repeated TXI keyword wins. Each needs the engine or a texture known by other means, not the files alone.
+The meaning of the float at 0x04 to the engine; the channel order of uncompressed pixels; the direction of each cube face; the frame order of an animation sheet within the image; which of a repeated TXI keyword wins. Each needs the engine or a texture known by other means, not the files alone.
 
 ## Provenance
 
@@ -73,6 +73,8 @@ Public documents read: xoreos-docs `specs/torlack/basics.html`, for the resource
 Reference projects read: none.
 
 Measured: on 2026-10-18, every count above comes from the vanilla KotOR 1 install under `$RAKATA_GAME_K1`, first with short Python scripts reading the header, the pixel data lengths, the bytes after the pixels, the TXI lines, and the block colours of the animation sheets of every TPC and TXI the KEY's BIFs, `TexturePacks/*.erf`, `patch.erf`, `modules/` and `rims/` hold, then with `crates/rakata-texture/tests/vanilla.rs`, which parses every one of them and prints the counts (`RAKATA_GAME_K1=… cargo test -p rakata-texture --test vanilla -- --nocapture`).
+
+Observed in a renderer: the row order, from the OdysseyUE runtime drawing the Endar Spire (`end_m01aa`) from these structures.
 
 Date: 2026-10-18.
 
