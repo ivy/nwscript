@@ -2,6 +2,7 @@
 //!
 //! [`run`] loads a script into a state holding the `rakata` table: the
 //! install (`Install`, `Mod`), the formats (`twoda`, `gff`, `lip`, `tlk`),
+//! the assets (`tpc`, `txi`, `tga`, `lyt`, `vis`, `walkmesh`, `mdl`),
 //! dialogues with stable node keys (`dialog`), the authoring operations
 //! (`author`), and the diagnostics as error values carrying their codes
 //! (`Error`). The names are the façade's, so a script reads as the Rust
@@ -17,6 +18,7 @@
 /// The reference for scripts: every table and function.
 pub const REFERENCE: &str = include_str!("../api.md");
 
+mod assets;
 mod author;
 mod dialog;
 pub mod error;
@@ -87,6 +89,7 @@ pub fn new_state(opts: &Options) -> mlua::Result<Lua> {
     sandbox::install(&lua, &rakata, opts.print)?;
     install::install(&lua, &rakata)?;
     formats::install(&lua, &rakata)?;
+    assets::install(&lua, &rakata)?;
     dialog::install(&lua, &rakata)?;
     author::install(&lua, &rakata)?;
     explain(&lua, &rakata)?;

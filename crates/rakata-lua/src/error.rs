@@ -101,6 +101,10 @@ lift_via_author!(
     rakata::twoda::Error,
     rakata::lip::Error,
     rakata::tlk::Error,
+    rakata::texture::Error,
+    rakata::lyt::Error,
+    rakata::walkmesh::Error,
+    rakata::mdl::Error,
 );
 
 const ERROR_META: &str = "rakata.Error";

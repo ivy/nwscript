@@ -162,6 +162,106 @@ A talk table.
 - `tlk:append(text)`: add an entry and return its strref.
 - `tlk:to_bytes()`: the table in BioWare's layout.
 
+## The assets
+
+Textures, layouts, walkmeshes and models. Each table has `parse(bytes)` and `load(install, name, [module])`, which reads the copy the install loads; `name` without an extension takes the format's own (`m01aa` is `m01aa.lyt` to `rakata.lyt.load`), and no copy is `RE0404`. A vector is a sequence `{x, y, z}` in metres, Z up, and a rotation `{w, x, y, z}`. Bulk data is a sequence of vectors, and where the file stores it as one array, also the bytes as stored, a Lua string: a level's pixels, a walkmesh's vertices, a mesh's MDX block. A file read and written back with `to_bytes()` unchanged is the bytes it was read from.
+
+### rakata.txi
+
+A texture's instructions, from a `.txi` or a TPC: keywords, their values, and the numeric rows that follow some.
+
+- `rakata.txi.parse(bytes)`: read the text; any bytes read, as Latin-1. `rakata.txi.new()`: an empty one.
+- `txi:entries()`: `{key, value, rows}` each, in file order.
+- `txi:preamble()`: the numeric lines before any keyword.
+- `txi:get(key)`, `txi:int(key)`: the first value of `key`, in any case, and its first word as an integer; nil without one.
+- `txi:set(key, value)`: set the first instruction with `key`, or append one; returns the value it had, or nil.
+- `txi:len()`, `#txi`: the number of instructions.
+- `txi:to_bytes()`: the text. One that would not read back as itself (a key with a space, a line break in a value) is `RE2208`.
+
+### rakata.tpc
+
+A TPC texture, its pixel format kept as stored: DXT1 and DXT5 levels are the blocks, the others the pixels in the file's channel order. `load` searches the texture pack the install selects.
+
+- `tpc.width`, `tpc.height`: the header's size; a cube map's height is six faces'.
+- `tpc.format`: `grey`, `rgb`, `rgba`, `dxt1` or `dxt5`. `tpc.has_alpha`.
+- `tpc.mip_count`, `tpc.data_size`, `tpc.alpha_mean`: the header's fields.
+- `tpc.layout`: `single`, `cube` or `flipbook`; `tpc.frames`, a flipbook's `{numx, numy}`, else nil.
+- `tpc:images()`: each image (one, six faces, or the frames in row order) as a sequence of its levels, largest first, each `{width, height, offset, data}`, `offset` where it begins in the file.
+- `tpc:pixels()`: every level of every image, back to back.
+- `tpc:txi()`: a copy of the TXI, or nil. `tpc:set_txi(txi)`: replace it, nil for none.
+- `tpc:to_bytes()`: the header and pixels as read, then the TXI.
+
+A file shorter than its header is `RE2201`, an encoding that names no format `RE2202`, pixel data that does not divide into its levels `RE2203`.
+
+### rakata.tga
+
+A TARGA image (the game's lightmaps), decoded to RGBA8, rows top first.
+
+- `tga.width`, `tga.height`, `tga.bits`, `tga.alpha_bits`: as stored.
+- `tga.image_type`: `truecolor`, `grey`, `truecolor_rle` or `grey_rle`; `tga.origin`: `bottom_left`, `bottom_right`, `top_left` or `top_right`.
+- `tga:rgba()`: the pixels, four bytes each. `tga:set_rgba(bytes)`: replace them, `width * height * 4` bytes (`RE1805` otherwise).
+- `tga:to_bytes()`: the image in its stored depth, order and packing.
+
+A truncated file is `RE2204`, an image type or pixel depth it does not decode `RE2205`.
+
+### rakata.lyt
+
+An area's room layout, named as the area is (`m01aa`).
+
+- `lyt.file_dependency`: the `filedependancy` line's value, or nil.
+- `lyt:rooms()`, `lyt:tracks()`, `lyt:obstacles()`: `{model, position}` each.
+- `lyt:door_hooks()`: `{room, name, unknown, position, orientation}` each.
+- `lyt:room(model)`: the room whose model is `model`, in any case, or nil.
+- `lyt:semantic_eq(other)`: whether the two hold the same rooms, tracks, obstacles and hooks, floats by their bits.
+- `lyt:to_bytes()`: the text.
+
+Text without `beginlayout` is `RE2301`; a line out of place `RE2302`, a number that does not read `RE2303`.
+
+### rakata.vis
+
+An area's room visibility: for each room, the rooms drawn while the camera is in it.
+
+- `vis:rooms()`: `{room, visible}` each, `visible` a sequence of room names.
+- `vis:visible(room)`: the rooms seen from `room`, in any case, or nil.
+- `vis:len()`, `#vis`, `vis:semantic_eq(other)`, `vis:to_bytes()`.
+
+### rakata.walkmesh
+
+A room's WOK, a placeable's PWK or a door's DWK. `load` takes a bare name as the room's `.wok`; name the others with their extension (`plc_footlker.pwk`). Face, vertex and edge indices are the file's, from 0.
+
+- `w.kind`: `area` (a WOK) or `object` (a PWK or DWK).
+- `w.position`, `w.relative_points`, `w.absolute_points`, `w.unknown`: the header's fields, the points a sequence of two vectors.
+- `w:vertices()`: every vertex. `w:vertex_bytes()`: the same as stored, twelve bytes each.
+- `w:faces()`: `{vertices, material, normal, distance}` each, `material` the face's row of `surfacemat.2da`.
+- `w:adjacency()`: for each walkable face, a table whose keys 1 to 3 are the `{face, edge}` across its edges, nil where no walkable face is.
+- `w:perimeter_edges()`: `{face, edge, transition}` each, `transition` the index in the area's LYT room list of the room the edge leads into, or nil. `w:perimeters()`: where each loop of them ends.
+- `w:aabb()`: the AABB tree, root first: `{min, max, face, unknown, plane, left, right}` each, `face` nil at an inner node and `left` and `right` nil at a leaf.
+- `w:walkable_faces(surfacemat)`: the faces whose material `surfacemat.2da`'s table (a `rakata.twoda`) says is walkable; a table without a `walk` column is `RE2505`.
+- `w:set_material(face, material)`: change a face's material; returns the one it had. A face past the last is `RE1805`.
+- `w:semantic_eq(other)`, `w:to_bytes()`.
+
+Bytes that do not begin `BWM V1.0` are `RE2501`; a truncated file `RE2502`.
+
+### rakata.mdl
+
+A binary model and its MDX. Nodes are named from 0 by their place in the sequence they are in, as `parent` and `children` give them.
+
+- `rakata.mdl.parse(mdl, [mdx])`: read a model; the MDX may be left out for one whose meshes have none. `rakata.mdl.load(install, name, [module])` reads both.
+- `model.name`, `model.supermodel` (nil for none), `model.subclassification`, `model.fog`, `model.radius`, `model.animation_scale`, `model.bounding_box` (`{min, max}`).
+- `model.classification`: `other` (rooms), `effect`, `tile`, `character`, `door`, `lightsaber`, `placeable` or `unknown`.
+- `model:nodes()`: every node of the geometry, the root first. A node is `{name, kind, flags, number, supernode, parent, children, position, orientation, controllers, mesh, skin}`, `kind` one of `dummy`, `light`, `emitter`, `reference`, `trimesh`, `skin`, `animmesh`, `dangly`, `aabb`, `saber`, `other`; `position` and `orientation` relative to the parent; `mesh` and `skin` nil on a node without them.
+- `model:node(name)`: the first node named `name`, in any case, or nil.
+- `model:animations()`, `model:animation(name)`: the model's own animations, `{name, length, transition, root, events, nodes}`, `events` `{time, name}` each and `nodes` as `model:nodes()` gives them.
+- `model:to_bytes()`: two strings, the MDL and the MDX, laid out as BioWare's compiler lays them out.
+
+A mesh is `{texture, lightmap, texture_count, lightmapped, render, shadow, transparency_hint, diffuse, ambient, bounding_box, radius, average, vertex_count, mdx_flags, stride, vertex_buffer, offsets, positions, normals, uv1, uv2, faces, indices}`: `vertex_buffer` the MDX block as stored and `offsets` each attribute read from it (`position`, `normal`, `uv1`, `uv2`) by its offset within `stride`; `positions` and `normals` sequences of vectors and `uv1` and `uv2` of `{u, v}`, the last three nil where the mesh has none; `faces` `{normal, distance, surface, adjacent, vertices}` each (`adjacent` -1 where no face is); `indices` the triangle list, or nil.
+
+A skin is `{bones, weights, bone_indices, bind}`: `bones` the node numbers of the bones by local index; `weights` and `bone_indices` four numbers for each vertex (-1 where a slot names no bone); `bind[number]` the bone's bind transform, `{rotation, translation}`, by node number.
+
+A controller is `{kind, field, columns, is_bezier, is_compressed, keys}`, `kind` the controller type (8 position, 20 orientation, 36 scale) and `keys` `{time, value}` each: an orientation's value its rotation, a compressed one decoded; any other controller's its row of numbers as stored (a bezier key's value, then its two control values).
+
+A file that is not a binary model is `RE2401`, a truncated one `RE2402`, an MDX shorter than its meshes say `RE2403`.
+
 ## rakata.dialog
 
 Dialogues, their nodes by `NodeRef` (list and index) and by `NodeKey` (what the node says, which survives edits). A function taking a key takes a `NodeKey`, a `NodeRef`, or the key's text: `voice:RESREF`, `strref:N`, `text:TEXT`, `E3`, `R0`, `entry:3`, `reply:0`. A key matching no node is `RE1102`, several `RE1103`, one that does not parse `RE1104`.
