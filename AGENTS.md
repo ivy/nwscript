@@ -20,7 +20,8 @@ A Rust workspace: a toolset for the data of BioWare's Aurora-family games, KotOR
 | `rakata-index` | facts, references and full text in SQLite, keyed by content hash; the schema is [`docs/index.md`](docs/index.md) | present |
 | `rakata-patch` | `changes.ini` reader, plan, executor, report read back from the tree | present |
 | `rakata` | the façade and the diagnostic codes | present |
-| `rakata-lua`, `rakata-py` | bindings; the Python module `rakata` carries `rakata.nwscript` | planned |
+| `rakata-lua` | the Lua binding | planned |
+| `rakata-py` | the Python module `rakata`: the façade's classes, `rakata.author`, and `rakata.nwscript` mounted from `nwscript-py` | present |
 | `rakata-cli` | the `rakata` binary | present |
 
 The `nwscript-*` library crates never depend on a `rakata-*` crate; `rakata-game` implements their resolver, and only the `nws` binary may take it.
@@ -55,6 +56,7 @@ The layout is `nss/`, `ncs/`, `nwscript.nss` as shipped, `oracle/` (the include 
 - Corpus-backed tests: `NWSCRIPT_CORPUS=… cargo test --workspace -- --include-ignored`.
 - Round-trip conformance for data: `rakata conformance --game $RAKATA_GAME_K1 --report target/rakata-conformance.json`, then `cargo xtask readme --report target/rakata-conformance.json` refreshes the README's table. Reports describe the user's files and stay out of git; only the vanilla table goes into the README. Every format crate registers in `crates/rakata/src/formats/` and must pass before it ships.
 - Fuzzing: targets live in `crates/<crate>/fuzz/`, outside the workspace, and need a nightly toolchain: from that directory, `mise x cargo:cargo-fuzz -- cargo +nightly fuzz run decode -- -max_total_time=600`.
+- The Python module: `mise run test:py` makes a uv environment under `target/rakata-py/`, builds `crates/rakata-py` into it with `maturin develop`, and runs its pytest suite and pyright over the tests; the game-backed tests read `$RAKATA_GAME_K1`. Its stubs (`crates/rakata-py/python/rakata/*.pyi`) are the Python API and change with it.
 - Tools come from mise (`mise.toml`); do not install with brew, apt or npx.
 - Diagnostics are data (`nwscript-diag`): every error has a registered code with an explanation; never build one from rendered text.
 - Rakata codes come in blocks of a hundred, one per crate or command family, so parallel branches never collide: `rakata-res` RE01xx, `rakata-archive` RE02xx, `rakata-patch` RE03xx/RW03xx, `rakata-game` RE04xx/RW04xx, conformance RE05xx/RW05xx, `rakata-gff` RE06xx/RW06xx, `rakata-2da` RE07xx/RW07xx, `rakata-tlk` RE08xx/RW08xx, `rakata-lip` RE09xx/RW09xx, `rakata corpus` RE10xx/RW10xx, `rakata-dialog` RE11xx/RW11xx, `rakata-save` RE12xx/RW12xx, the inspection commands (`rakata cat`, `gff`, `2da`, `tlk`, `lip`) RE13xx/RW13xx, the authoring API (`rakata::author`) RE14xx/RW14xx, `rakata-index` RE15xx/RW15xx, the semantic diff (`rakata diff`) RE16xx/RW16xx; the next crate takes the next free block and records it here.
