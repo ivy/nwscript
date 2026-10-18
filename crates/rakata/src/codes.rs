@@ -103,6 +103,13 @@ nwscript_diag::codes! {
     RE1203 Error "a save member lacking a field the game writes";
     RE1204 Error "no creature in the save carries the tag";
     RW1201 Warning "local variables shown by index: the scripts that name them were not found";
+    RE1205 Error "a global the install's globalcat.2da does not declare, set without --declare";
+    RE1206 Error "a `save set` assignment that does not parse or does not fit the global's type";
+    RE1207 Error "a party member the save holds no AVAILNPC for";
+    RE1208 Error "a party the game cannot take: a member named twice, or more than two";
+    RE1209 Error "a new save's directory that exists and is not empty, or is the save read";
+    RE1210 Error "a file of the new save could not be written";
+    RW1202 Warning "a global written that the install's globalcat.2da does not declare";
     RE1301 Error "an archive member the archive does not hold";
     RE1302 Error "a `gff set` assignment that does not parse as its field's type";
     RE1303 Error "a `gff set` naming a field that does not exist, without a type to create it";
