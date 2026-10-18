@@ -216,4 +216,24 @@ fn every_script_naming_the_sword_over_the_vanilla_install() {
         "{r}"
     );
     assert!(hits.iter().all(|h| h["unresolved"].is_null()), "{r}");
+
+    // The Terentatek's tag reaches its calls through a function of the
+    // script's own: a weaker match, listed apart.
+    let out = rakata()
+        .args(["refs", "kor34_terenwyrm", "--db", s(&db)])
+        .output()
+        .unwrap();
+    let text = String::from_utf8(out.stdout).unwrap();
+    let weak = text
+        .split("weaker: a string constant, call not resolved:\n")
+        .nth(1)
+        .unwrap_or_else(|| panic!("{text}"));
+    assert!(
+        weak.starts_with("  k_pkor_ud_tarant.ncs  string constant ×3 @3532 @3571 @3610 CONSTS"),
+        "{text}"
+    );
+    assert!(
+        text.contains(", 1 weaker (string constant, call not resolved);"),
+        "{text}"
+    );
 }

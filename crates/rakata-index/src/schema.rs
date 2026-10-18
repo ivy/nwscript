@@ -3,7 +3,7 @@
 //! database of another version is rebuilt, never read.
 
 /// The schema's version, kept in `meta` under `schema`.
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 2;
 
 /// The tables, created empty.
 pub const TABLES: &str = "
@@ -86,7 +86,7 @@ CREATE TABLE cells(
   hash TEXT NOT NULL,
   row INTEGER NOT NULL,
   label TEXT NOT NULL,
-  column TEXT NOT NULL,
+  column TEXT NOT NULL COLLATE NOCASE,
   value TEXT NOT NULL
 );
 CREATE TABLE strings(
@@ -103,6 +103,11 @@ CREATE TABLE calls(
   routine TEXT NOT NULL,
   routine_id INTEGER NOT NULL,
   args TEXT NOT NULL
+);
+CREATE TABLE script_strings(
+  hash TEXT NOT NULL,
+  offset INTEGER NOT NULL,
+  value TEXT NOT NULL COLLATE NOCASE
 );
 CREATE TABLE refs(
   from_hash TEXT NOT NULL,
@@ -135,6 +140,8 @@ CREATE INDEX cells_hash ON cells(hash);
 CREATE INDEX strings_hash ON strings(hash, strref);
 CREATE INDEX calls_hash ON calls(hash);
 CREATE INDEX calls_routine ON calls(routine);
+CREATE INDEX script_strings_hash ON script_strings(hash);
+CREATE INDEX script_strings_value ON script_strings(value);
 CREATE INDEX refs_value ON refs(kind, value);
 CREATE INDEX refs_from ON refs(from_hash);
 CREATE VIEW tree_resources AS
@@ -159,6 +166,7 @@ pub const FACT_TABLES: &[(&str, &str)] = &[
     ("cells", "hash"),
     ("strings", "hash"),
     ("calls", "hash"),
+    ("script_strings", "hash"),
     ("refs", "from_hash"),
     ("search", "hash"),
 ];

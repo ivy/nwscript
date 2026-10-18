@@ -71,6 +71,7 @@ pub(crate) enum Table {
     Cells,
     Strings,
     Calls,
+    ScriptStrings,
     Refs,
     Search,
 }
@@ -87,6 +88,7 @@ impl Table {
             Table::Cells => "INSERT INTO cells VALUES (?1,?2,?3,?4,?5)",
             Table::Strings => "INSERT INTO strings VALUES (?1,?2,?3,?4,?5,?6)",
             Table::Calls => "INSERT INTO calls VALUES (?1,?2,?3,?4,?5)",
+            Table::ScriptStrings => "INSERT INTO script_strings VALUES (?1,?2,?3)",
             Table::Refs => "INSERT INTO refs VALUES (?1,?2,?3,?4)",
             Table::Search => "INSERT INTO search(hash, body, kind, site) VALUES (?1,?2,?3,?4)",
         }
@@ -441,6 +443,15 @@ fn script(bytes: &[u8], routines: &[Routine]) -> Extracted {
     };
     let ret = |r: u16| routines.get(usize::from(r)).map(|f| f.ret);
     let mut out = Extracted::status(Status::Parsed, None);
+    for (offset, s) in nwscript_ncs::facts::strings(&program) {
+        out.push(
+            Table::ScriptStrings,
+            vec![
+                Value::Integer(i64::from(offset)),
+                Value::Text(rakata_tlk::codepage::decode(&s)),
+            ],
+        );
+    }
     let mut refs = Vec::new();
     for c in nwscript_ncs::facts::calls(&program, param, ret) {
         let f = routines.get(usize::from(c.routine));

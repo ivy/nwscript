@@ -102,17 +102,22 @@ content lies:
   dialog_nodes(hash, node, kind, idx, speaker, strref, text, voice, script, ...)
   dialog_links(hash, source, position, target, condition, is_child)
   gff_fields(hash, path, label, type, value, strref)
-  cells(hash, row, label, column, value)
+  cells(hash, row, label, column, value), column in any case
   strings(hash, strref, text, sound, sound_length, flags)
-  calls(hash, offset, routine, routine_id, args)
+  calls(hash, offset, routine, routine_id, args), args a JSON array:
+    each argument's literal, or null where it is computed
+  script_strings(hash, offset, value), every CONSTS of a script
   refs(from_hash, kind, value, site), kind resref, strref, tag or global
   search(body, kind, hash, site), full text: WHERE search MATCH 'word*'
 Views:
   tree_resources(tree, path, member, name, type, hash, status)
   node_text(tree, path, member, hash, node, kind, idx, strref, text)
 
-A node is E3 (EntryList[3]) or R0 (ReplyList[0]). Every column: SELECT name,
-sql FROM sqlite_master. The full reference is docs/index.md in the source.
+A node is E3 (EntryList[3]) or R0 (ReplyList[0]). refs.value,
+script_strings.value and cells.column compare without regard to case.
+Every column: SELECT name, sql FROM sqlite_master. The full reference is
+docs/index.md in the source. A database of another schema version is
+refused (RE1502); there is no migration: build it again into a new file.
 
 Examples:
   rakata index query \"SELECT t.label, l.path FROM calls c JOIN locations l ON l.hash = c.hash JOIN trees t ON t.id = l.tree WHERE json_extract(c.args, '$[0]') = 'k_pman_aioff'\"

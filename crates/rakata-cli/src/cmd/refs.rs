@@ -32,7 +32,10 @@ index holds that resource, marked when an Override/ file of the same name
 with other bytes shadows it. Indirect hits follow, each saying what it goes
 through: a resref naming a blueprint also finds what refers to the
 blueprint's tag, and a script that names THING is followed to the dialogue
-links, nodes and events that run it. --direct leaves them out.
+links, nodes and events that run it. --direct leaves them out. Last come
+the weaker matches: a script that holds THING as a string constant when no
+call the index resolved names it there (the string reaches the call
+through a variable), with how many CONSTS push it and their offsets.
 
 --from lists what the resource THING (name or name.ext) refers to: its
 rows of the refs table, of the kind --kind names or of every kind.
@@ -199,9 +202,22 @@ fn places(h: &Hit, trees: bool) -> String {
 }
 
 fn site(h: &Hit) -> String {
-    match h.operand {
-        Some(op) => format!("{} {op}", h.site),
+    let site = match h.unresolved {
+        Some(n) => format!("string constant \u{d7}{n} {}", h.site),
         None => h.site.clone(),
+    };
+    match h.operand {
+        Some(op) => format!("{site} {op}"),
+        None => site,
+    }
+}
+
+/// The heading a hit is listed under: none for a direct one.
+fn group(h: &Hit) -> Option<String> {
+    match (&h.via, h.unresolved) {
+        (Some(v), _) => Some(format!("through the {v}:")),
+        (None, Some(_)) => Some("weaker: a string constant, call not resolved:".to_string()),
+        (None, None) => None,
     }
 }
 
@@ -209,14 +225,24 @@ fn site(h: &Hit) -> String {
 /// `compact`, the indirect ones under what they go through.
 fn render(a: &Answer, compact: bool) -> String {
     let mut out = String::new();
-    let direct = a.hits.iter().filter(|h| h.via.is_none()).count();
+    let direct = a
+        .hits
+        .iter()
+        .filter(|h| h.via.is_none() && h.unresolved.is_none())
+        .count();
+    let weak = a.hits.iter().filter(|h| h.unresolved.is_some()).count();
     let what = match a.direction {
         Direction::To => format!("references to `{}`", a.thing),
         Direction::From => format!("references from `{}`", a.thing),
     };
     out.push_str(&format!(
-        "{what}: {direct} direct, {} indirect; tried {}; matched {}\n",
-        a.hits.len() - direct,
+        "{what}: {direct} direct, {} indirect{}; tried {}; matched {}\n",
+        a.hits.len() - direct - weak,
+        if weak > 0 {
+            format!(", {weak} weaker (string constant, call not resolved)")
+        } else {
+            String::new()
+        },
         a.tried.join(", "),
         if a.matched.is_empty() {
             "none".to_string()
@@ -234,7 +260,7 @@ fn render(a: &Answer, compact: bool) -> String {
         t.dedup();
         t.len() > 1
     };
-    let rows: Vec<(Option<&str>, [String; 3])> = a
+    let rows: Vec<(Option<String>, [String; 3])> = a
         .hits
         .iter()
         .map(|h| {
@@ -242,7 +268,7 @@ fn render(a: &Answer, compact: bool) -> String {
                 Direction::To => h.resource.clone(),
                 Direction::From => format!("{} {}", h.kind, h.value),
             };
-            (h.via.as_deref(), [first, site(h), places(h, trees)])
+            (group(h), [first, site(h), places(h, trees)])
         })
         .collect();
     let mut width = [0usize; 2];
@@ -251,13 +277,13 @@ fn render(a: &Answer, compact: bool) -> String {
             width[i] = width[i].max(r[i].chars().count());
         }
     }
-    let mut group: Option<&str> = None;
-    for (via, r) in &rows {
-        if *via != group {
-            if let Some(v) = via {
-                out.push_str(&format!("through the {v}:\n"));
+    let mut current: Option<&str> = None;
+    for (heading, r) in &rows {
+        if heading.as_deref() != current {
+            if let Some(g) = heading {
+                out.push_str(&format!("{g}\n"));
             }
-            group = *via;
+            current = heading.as_deref();
         }
         out.push_str(&format!(
             "  {:<w0$}  {:<w1$}  {}\n",

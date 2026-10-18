@@ -31,7 +31,7 @@ Hashes are SHA-256 as sixty-four lowercase hex digits. A resource's name is its 
 
 ### `meta(key, value)`
 
-`schema` holds the schema version (currently 1). A database of another version is refused (RE1502) and built again.
+`schema` holds the schema version (currently 2). There is no migration: a database of another version is refused (RE1502), by `build` as by every reader, and is built again into a new file (or after deleting the old one). The version changes with any table or column, or with what an extractor puts in one.
 
 ### `trees(id, label, parent, root)`
 
@@ -75,7 +75,7 @@ One row per field, at any depth, of every GFF that is not a dialogue. `path` is 
 
 ### `cells(hash, row, label, column, value)`
 
-One row per cell of a 2DA that is not blank: `row` is the row's position, `label` its label, `column` the column's name as written.
+One row per cell of a 2DA that is not blank: `row` is the row's position, `label` its label, `column` the column's name as written. `column` compares without regard to case, so `column = 'Name'` finds a column the file spells `name`.
 
 ### `strings(hash, strref, text, sound, sound_length, flags)`
 
@@ -84,6 +84,10 @@ One row per entry of a talk table that has text or a voice-over: the strref, the
 ### `calls(hash, offset, routine, routine_id, args)`
 
 One row per `ACTION` in a script's bytecode: the instruction's file offset, the routine's name (`routine_N` when the tree has no `nwscript.nss`) and number, and `args`, a JSON array with one element per argument: the literal where a single `CONST*` instruction pushes it (a number, a string, `{"object": "OBJECT_SELF"}` or `{"object": "OBJECT_INVALID"}` or `{"object": N}`, `[x, y, z]` for a vector), and `null` where it is computed. Each argument is read on its own, from the stack slot it occupies when the `ACTION` runs (the stack depths of `nwscript_ncs::cfg`, with each routine's parameter and return sizes from `nwscript.nss`): `GetItemPossessedBy(oPC, "k37_itm_freedont")` with `oPC` copied from a local is `[null,"k37_itm_freedont"]`. A slot is a literal only when one `CONST*` instruction pushes it and nothing pops, changes or overwrites it before the call; a string built by `+`, a negated number or a value passed through a variable is `null`. Where a depth cannot be determined (a tree without `nwscript.nss`, a routine the table does not know), only the literals directly before the `ACTION` are read, up to the first computed argument. The literal conventions are those of the corpus's `calls.jsonl`. Read an argument with `json_extract(args, '$[1]')`.
+
+### `script_strings(hash, offset, value)`
+
+One row per `CONSTS` in a script's bytecode: the instruction's file offset and the string, decoded from Windows-1252. `value` compares without regard to case. It holds every string a script names, whether or not a call the index resolved takes it, so a tag that reaches its call through a variable or a script's own function is still found here; `rakata refs` reads it for its weaker matches.
 
 ### `refs(from_hash, kind, value, site)`
 
@@ -119,7 +123,7 @@ The tokenizer splits on punctuation, `_` included, and matches whole tokens: `ra
 
 The input starts with `rakata-index/v<schema>` and a newline, then `tree` or `all` and a newline, then a fixed list of sections. Each section is the byte `s`, the section's name as an eight-byte big-endian length and its bytes, and its rows, sorted by every column. Each row is the byte `r` and its values; each value is a tag and its bytes: `N` for null, `I` and eight big-endian bytes for an integer, `R` and the eight big-endian bytes of a real's IEEE bits, `T` (text) or `B` (blob), an eight-byte big-endian length and the bytes.
 
-With `--tree LABEL`, the sections are: the tree's `locations` (path, member, name, type, hash) and `coverage` (path, member, status, reason); the `resources` (hash, name, type, size) and `contents` its locations hold; and, for each of `dialog_nodes`, `dialog_links`, `gff_fields`, `cells`, `strings`, `calls`, `refs` and `search`, every row whose hash its locations hold. The tree's label, parent and root and the resources' `first_tree` are left out: they record how the database was built, not what the tree is. Without `--tree`, the sections are every tree (label, parent's label), every location and coverage row with its tree's label, every resource with its first tree's label, every content, and every row of each fact table.
+With `--tree LABEL`, the sections are: the tree's `locations` (path, member, name, type, hash) and `coverage` (path, member, status, reason); the `resources` (hash, name, type, size) and `contents` its locations hold; and, for each of `dialog_nodes`, `dialog_links`, `gff_fields`, `cells`, `strings`, `calls`, `script_strings`, `refs` and `search`, every row whose hash its locations hold. The tree's label, parent and root and the resources' `first_tree` are left out: they record how the database was built, not what the tree is. Without `--tree`, the sections are every tree (label, parent's label), every location and coverage row with its tree's label, every resource with its first tree's label, every content, and every row of each fact table.
 
 ## Queries
 
@@ -167,7 +171,7 @@ WHERE l.tree = (SELECT id FROM trees WHERE label = 'ckpt:ba55d9e0db548e33') AND 
 
 `rakata refs THING` reads the `refs` table. With `--to`, the default, it lists what refers to THING; with `--from`, what the resource THING (`name` or `name.ext`) refers to. `--kind auto`, the default, tries every kind THING can be (a strref only when it is a number) and the answer says which matched. Each hit is the resource holding the reference, the site, and every location of that resource, each marked with the copy the game loads instead when there is one: an `Override/` file of the same name and type holding other bytes, or for a member of `modules/STEM.rim` or `STEM_s.rim`, the `STEM.mod` that replaces both. A script's site carries the instruction that pushes the literal, `CONSTS` for a string and `CONSTI` for a strref.
 
-Toward a symbol, indirect hits follow the direct ones, each naming what it goes through, unless `--direct` is given: a resref that names a blueprint (`utc`, `utd`, `ute`, `uti`, `utm`, `utp`, `uts`, `utt`, `utw`) also finds the references to that blueprint's `Tag`, other than objects' own `Tag` fields, since a script finds an object by its tag; and every script among the hits is followed to the references that run it (a dialogue's `Script` and `Active`, an object's `On…` and `Script…` events, `ExecuteScript`). An empty answer carries RW1505 with the count of resources the index has no reader for or failed to read, since a reference in one of them cannot be found. `--format json` gives the hits as the `result` of the envelope, with `tried`, `matched`, `coverage` (on an empty answer) and `seconds`.
+Toward a symbol, indirect hits follow the direct ones, each naming what it goes through, unless `--direct` is given: a resref that names a blueprint (`utc`, `utd`, `ute`, `uti`, `utm`, `utp`, `uts`, `utt`, `utw`) also finds the references to that blueprint's `Tag`, other than objects' own `Tag` fields, since a script finds an object by its tag; and every script among the hits is followed to the references that run it (a dialogue's `Script` and `Active`, an object's `On…` and `Script…` events, `ExecuteScript`). Last come the weaker matches, kept with `--direct` too: every script that holds THING as a string constant (`script_strings`, without regard to case) and has no `refs` row naming it, as when the tag reaches the call through a variable or a function of the script's own. Each is kind `string`, with the offsets of its `CONSTS` instructions as the site and their count (`unresolved` in JSON), and the text lists them under "weaker: a string constant, call not resolved". An empty answer carries RW1505 with the count of resources the index has no reader for or failed to read, since a reference in one of them cannot be found. `--format json` gives the hits as the `result` of the envelope, with `tried`, `matched`, `coverage` (on an empty answer) and `seconds`.
 
 ## Diagnostics
 

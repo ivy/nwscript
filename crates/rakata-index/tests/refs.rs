@@ -289,3 +289,72 @@ fn the_transition_chain_and_a_global_in_both_directions() {
     let e = refs(&conn, &q("nope.ncs", None, Direction::From)).unwrap_err();
     assert_eq!(e.code(), codes::NO_SUCH_RESOURCE);
 }
+
+#[test]
+fn a_literal_beside_a_computed_argument_and_a_tag_through_a_variable() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("game");
+    // object oPC = GetFirstPC(); GetItemPossessedBy(oPC, "k37_itm_freedont");
+    let has = write(
+        &root,
+        "Override/k35_uth_hassword.ncs",
+        &ncs(
+            "JSR main\nRETN\nmain:\nACTION 2, 0\nCONSTS \"k37_itm_freedont\"\nCPTOPSP -8, 4\nACTION 3, 2\nMOVSP -8\nRETN\n",
+        ),
+    );
+    // string sTag = "k37_itm_freedont"; GetItemPossessedBy(GetFirstPC(), sTag);
+    // and the same string as a value no tag parameter takes.
+    let var = write(
+        &root,
+        "Override/k37_sword_var.ncs",
+        &ncs(
+            "JSR main\nRETN\nmain:\nCONSTS \"k37_itm_freedont\"\nCPTOPSP -4, 4\nACTION 2, 0\nACTION 3, 2\nMOVSP -4\nCONSTS \"k37_itm_freedont\"\nCONSTS \"x\"\nCONSTO 0\nACTION 4, 3\nMOVSP -4\nRETN\n",
+        ),
+    );
+    let files = vec![has, var];
+    let db = dir.path().join("idx.sqlite");
+    let routines = routines();
+    build(&BuildOptions {
+        root: &root,
+        files: &files,
+        db: &db,
+        label: "t",
+        parent: None,
+        changed: None,
+        routines: &routines,
+        threads: 1,
+    })
+    .unwrap();
+    let conn = open(&db).unwrap();
+    let a = refs(&conn, &q("K37_ITM_FREEDONT", None, Direction::To)).unwrap();
+    let got: Vec<(&str, &str, &str, Option<usize>)> = a
+        .hits
+        .iter()
+        .map(|h| {
+            (
+                h.resource.as_str(),
+                h.kind.as_str(),
+                h.site.as_str(),
+                h.unresolved,
+            )
+        })
+        .collect();
+    assert_eq!(
+        got,
+        [
+            (
+                "k35_uth_hassword.ncs",
+                "tag",
+                "@54 GetItemPossessedBy.sItemTag",
+                None
+            ),
+            ("k37_sword_var.ncs", "string", "@21 @65", Some(2)),
+        ]
+    );
+    assert_eq!(a.matched, ["tag"]);
+    assert_eq!(a.hits[1].operand, Some("CONSTS"));
+    // --direct keeps the weaker match: it is no indirect hit.
+    let mut direct = q("k37_itm_freedont", None, Direction::To);
+    direct.direct = true;
+    assert_eq!(refs(&conn, &direct).unwrap().hits.len(), 2);
+}

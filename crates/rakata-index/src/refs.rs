@@ -6,7 +6,10 @@
 //! by a resref is referred to by its tag too (a script finds a placeable
 //! with `GetNearestObjectByTag`, never by its resref), and a script that
 //! names a symbol is run by the dialogue links, nodes and events that name
-//! the script.
+//! the script. A weaker match follows them: a script that holds the symbol
+//! as a string constant (`script_strings`) when no `refs` row of that
+//! script names it, as when the string reaches the call through a
+//! variable.
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -76,6 +79,11 @@ pub struct Hit {
     /// RESOURCE` or `script NAME`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub via: Option<String>,
+    /// For a weaker match, a script holding the symbol as a string
+    /// constant that no resolved call names: how many `CONSTS` push it.
+    /// The kind is `string` and the site the instructions' offsets.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unresolved: Option<usize>,
     pub locations: Vec<Location>,
 }
 
@@ -314,9 +322,34 @@ impl Reader<'_> {
                 hash: hash.to_string(),
                 site: site.to_string(),
                 via: via.map(str::to_string),
+                unresolved: None,
                 locations,
             })
             .collect())
+    }
+
+    /// The scripts holding `value` as a string constant, each with the
+    /// offsets of the `CONSTS` instructions that push it.
+    fn constants(&self, value: &str) -> Result<Vec<(String, Vec<i64>)>> {
+        let mut st = self
+            .conn
+            .prepare_cached(
+                "SELECT hash, offset FROM script_strings WHERE value = ?1 ORDER BY hash, offset",
+            )
+            .map_err(Error::db(FAIL))?;
+        let rows: Vec<(String, i64)> = st
+            .query_map(params![value], |r| Ok((r.get(0)?, r.get(1)?)))
+            .map_err(Error::db(FAIL))?
+            .collect::<rusqlite::Result<_>>()
+            .map_err(Error::db(FAIL))?;
+        let mut out: Vec<(String, Vec<i64>)> = Vec::new();
+        for (hash, offset) in rows {
+            match out.last_mut() {
+                Some((h, v)) if *h == hash => v.push(offset),
+                _ => out.push((hash, vec![offset])),
+            }
+        }
+        Ok(out)
     }
 
     /// The tags of the blueprints named `name`, with the blueprint each
@@ -388,11 +421,13 @@ pub fn refs(conn: &Connection, q: &RefsQuery) -> Result<Answer> {
 
 fn to(r: &mut Reader, q: &RefsQuery, kinds: &[RefKind], answer: &mut Answer) -> Result<()> {
     let mut direct = Vec::new();
+    let mut naming = BTreeSet::new();
     for &kind in kinds {
         let value = valid(kind, q.thing).expect("the kinds are valid for the symbol");
         let before = direct.len();
         for (hash, v, site) in r.naming(kind, &value)? {
             direct.extend(r.hits(&hash, kind.name(), &v, &site, None)?);
+            naming.insert(hash);
         }
         if direct.len() > before {
             answer.matched.push(kind.name().to_string());
@@ -440,10 +475,30 @@ fn to(r: &mut Reader, q: &RefsQuery, kinds: &[RefKind], answer: &mut Answer) -> 
             }
         }
     }
+    // A string constant no resolved call names: the weaker match.
+    let mut weak = Vec::new();
+    if kinds.iter().any(|k| *k != RefKind::StrRef) {
+        for (hash, offsets) in r.constants(q.thing)? {
+            if naming.contains(&hash) {
+                continue;
+            }
+            let site = offsets
+                .iter()
+                .map(|o| format!("@{o}"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            for mut h in r.hits(&hash, "string", q.thing, &site, None)? {
+                h.unresolved = Some(offsets.len());
+                weak.push(h);
+            }
+        }
+    }
     sort(&mut direct);
     sort(&mut indirect);
+    sort(&mut weak);
     answer.hits = direct;
     answer.hits.extend(indirect);
+    answer.hits.extend(weak);
     Ok(())
 }
 

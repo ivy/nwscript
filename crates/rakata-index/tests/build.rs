@@ -207,6 +207,12 @@ fn an_incremental_build_equals_a_cold_one_and_parses_only_what_changed() {
         rows.rows,
         [[serde_json::json!("Override/k_pdan_juhani27.ncs")]]
     );
+    // A 2DA's column name matches in any case; a script's string
+    // constants are listed.
+    let rows = query(&chain_db, "SELECT value FROM cells WHERE column = 'NAME'").unwrap();
+    assert_eq!(rows.rows, [[serde_json::json!("K_JUHANI_CLONES")]]);
+    let rows = query(&chain_db, "SELECT DISTINCT value FROM script_strings").unwrap();
+    assert_eq!(rows.rows, [[serde_json::json!("k_pman_aioff")]]);
     let rows = query(
         &chain_db,
         "SELECT DISTINCT l.member, s.site FROM search s JOIN locations l ON l.hash = s.hash WHERE search MATCH 'rakghoul*'",
