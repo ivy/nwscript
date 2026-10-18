@@ -65,3 +65,14 @@ fn the_envelope_names_the_tool_and_the_version() {
     let doc = serde_json::to_value(&env).unwrap();
     assert_eq!(doc["game"], "games/swkotor");
 }
+
+#[test]
+fn every_code_a_data_crate_reports_is_registered() {
+    for id in [
+        rakata_res::codes::RESREF_TOO_LONG,
+        rakata_res::codes::RESID_NO_EXTENSION,
+        rakata_res::codes::UNKNOWN_EXTENSION,
+    ] {
+        assert!(codes::lookup(id).is_some(), "{id} is not registered");
+    }
+}

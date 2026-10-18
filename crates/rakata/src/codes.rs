@@ -4,14 +4,17 @@
 //! lint, each with a long explanation in `explain/CODE.md` beside this
 //! crate, which `rakata explain CODE` prints.
 //!
-//! Ranges: `RE00xx` inputs and invocation. Each format crate takes a range
-//! of its own as it lands.
+//! Ranges: `RE00xx` inputs and invocation, `RE01xx` resource identity
+//! (`rakata-res`). Each format crate takes a range of its own as it lands.
 
 pub use nwscript_diag::codes::Code;
 
 nwscript_diag::codes! {
     dir "explain";
     RE0001 Error "an input file could not be read";
+    RE0101 Error "a resref longer than sixteen bytes";
+    RE0102 Error "a resource id without an extension";
+    RE0103 Error "an extension that names no resource type";
 }
 
 /// The rakata code with this id, if registered; case does not matter.
