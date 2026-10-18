@@ -82,6 +82,7 @@ Measured on TSLPatcher 1.2.10b1 and the build with a blank version resource, wit
 - `[2DAList]`, `[GFFList]` to a folder, `[SSFList]` and `[HACKList]` edit the destination's copy (`Override`) when it has one; otherwise they copy the option's file there and edit that. `!ReplaceFile=1` copies the option's file over the destination's first. A file in neither is a "locate file" dialog, and the install stops: TSLPatcher never reads the BIFs or a module's RIMs.
 - `[GFFList]` into a capsule edits the member when the capsule holds it and adds the option's file otherwise; the module's `.rim` and `_s.rim` are not read. A capsule that does not exist is an error and the file is skipped.
 - `[CompileList]` writes `NAME.ncs` to `override` or `!Destination`, with `File#` skipping an existing one.
+- A file whose resref is longer than the sixteen bytes a capsule's key holds goes into the capsule under its first sixteen and its extension: Sunry Murder Recording Enhancement's `Replace1=smre_closesunrydor.ncs` into `modules\manm26ae.MOD` is the member `smre_closesunryd.ncs` after TSLPatcher 1.2.10b1 and after HoloPatcher (modshop's parity run, `games/kotor/docs/research/patcher-parity.md`). `rakata install` stores it the same way and warns under `RW0306`.
 
 `rakata install` reads and writes the same places in the same order, with the differences the next section names, and after every write reads the file or member back (`crates/rakata-patch`, `exec`).
 

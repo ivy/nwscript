@@ -47,6 +47,8 @@ pub mod codes {
     pub const REQUIRED_MISSING: &str = "RE0312";
     /// A `File#` entry skipped because its destination already holds the file.
     pub const SKIPPED_EXISTS: &str = "RW0305";
+    /// A capsule member whose resref is longer than sixteen bytes, installed under its first sixteen.
+    pub const NAME_CUT: &str = "RW0306";
 }
 
 /// Where an issue is: a file the reader was given, by index, and a line.

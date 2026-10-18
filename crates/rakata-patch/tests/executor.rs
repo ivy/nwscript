@@ -599,3 +599,24 @@ fn a_report_serializes_with_every_operation_target_and_hash() {
     let _ = Struct::new(0);
     let _ = ResType::Utc;
 }
+
+#[test]
+fn a_member_name_longer_than_a_resref_goes_in_under_its_first_sixteen_bytes() {
+    let dir = tempfile::tempdir().unwrap();
+    let game = game(dir.path());
+    let data = tslpatchdata(dir.path(), "long-name");
+    fs::write(data.join("k_test_long_named.ncs"), b"long-named bytecode").unwrap();
+    let report = install(&game, &data);
+    assert!(report.ok(), "{report}");
+
+    let r = &report.records[0];
+    assert_eq!(r.target, "modules/testmod.mod:k_test_long_name.ncs");
+    assert_eq!(r.outcome, Outcome::Written);
+    assert_eq!(r.issues[0].code, codes::NAME_CUT);
+    let m = game.join("modules/testmod.mod");
+    assert_eq!(
+        member(&m, "k_test_long_name.ncs").unwrap(),
+        b"long-named bytecode"
+    );
+    assert_eq!(member(&m, "k_test.ncs").unwrap(), b"old bytecode");
+}

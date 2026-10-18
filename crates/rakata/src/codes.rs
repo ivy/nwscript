@@ -42,6 +42,7 @@ nwscript_diag::codes! {
     RE0311 Error "a memory token read during the install that has no value";
     RE0312 Error "a file [Settings] requires that is not installed";
     RW0305 Warning "a `File#` entry skipped because its destination holds the file";
+    RW0306 Warning "a capsule member name cut to the sixteen bytes a resref holds";
     RE0401 Error "not a game install: no chitin.key";
     RE0402 Error "a BIF the KEY names is missing from the install";
     RE0403 Error "no module capsule carries the name";

@@ -593,6 +593,7 @@ impl<'h> Executor<'h> {
         replace: bool,
     ) {
         let dest = self.files.destination(destination);
+        note_cut(&dest, name, rec);
         let target = match self.files.target(&dest, name) {
             Ok(t) => t,
             Err(f) => {
@@ -717,6 +718,7 @@ impl<'h> Executor<'h> {
         adds: &[crate::changes::AddField],
     ) {
         let dest = self.files.destination(destination);
+        note_cut(&dest, name, rec);
         let r = (|| {
             let target = self.files.target(&dest, name)?;
             rec.target = self.files.shown(&target);
@@ -765,6 +767,7 @@ impl<'h> Executor<'h> {
         writes: &[HackWrite],
     ) {
         let dest = self.files.destination(destination);
+        note_cut(&dest, file, rec);
         let r = (|| {
             let target = self.files.target(&dest, file)?;
             rec.target = self.files.shown(&target);
@@ -820,6 +823,7 @@ impl<'h> Executor<'h> {
         replace: bool,
     ) {
         let dest = self.files.destination(destination);
+        note_cut(&dest, name, rec);
         let target = match self.files.target(&dest, name) {
             Ok(t) => t,
             Err(f) => {
@@ -930,6 +934,17 @@ impl<'h> Executor<'h> {
         }
         rec.detail = Some(format!("{} sounds", entries.len()));
         self.commit(&target, &ssf.to_bytes(), rec);
+    }
+}
+
+/// The warning for a member name longer than a capsule holds, which goes in
+/// under the name [`files::cut_member_name`] gives it.
+fn note_cut(dest: &Dest, name: &str, rec: &mut Record) {
+    if let (Dest::Capsule(_), Some(cut)) = (dest, files::cut_member_name(name)) {
+        rec.fail(Failure::new(
+            codes::NAME_CUT,
+            format!("`{name}`'s resref is longer than a capsule holds; the member is `{cut}`"),
+        ));
     }
 }
 

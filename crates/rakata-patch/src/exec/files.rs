@@ -59,6 +59,22 @@ pub fn is_capsule_name(name: &str) -> bool {
         .any(|e| lower.ends_with(e))
 }
 
+/// The longest resref a capsule's key table holds.
+pub const RESREF_LEN: usize = 16;
+
+/// `name` cut to the member name a capsule can hold, when its resref is
+/// longer than sixteen bytes: the first sixteen bytes of the resref and the
+/// extension, as TSLPatcher and HoloPatcher both store it
+/// (`smre_closesunrydor.ncs` is the member `smre_closesunryd.ncs`). `None`
+/// when the name fits, or has no extension to keep.
+pub fn cut_member_name(name: &str) -> Option<String> {
+    let (stem, ext) = name.rsplit_once('.')?;
+    if stem.len() <= RESREF_LEN || !stem.is_ascii() {
+        return None;
+    }
+    Some(format!("{}.{ext}", &stem[..RESREF_LEN]))
+}
+
 /// The entry of `dir` named `name` ignoring ASCII case: the exact spelling
 /// first, then the first other spelling in directory order.
 pub fn find_ci(dir: &Path, name: &str) -> Option<PathBuf> {
@@ -148,14 +164,16 @@ impl Files {
         }
     }
 
-    /// The target for `name` in `dest`.
+    /// The target for `name` in `dest`. A member whose resref is longer than
+    /// a capsule holds is the member [`cut_member_name`] names.
     pub fn target(&self, dest: &Dest, name: &str) -> Result<Target, Failure> {
         match dest {
             Dest::Folder(dir) => Ok(Target::File(
                 find_ci(dir, name).unwrap_or_else(|| dir.join(name)),
             )),
             Dest::Capsule(capsule) => {
-                let id = ResId::parse(name).map_err(|e| {
+                let cut = cut_member_name(name);
+                let id = ResId::parse(cut.as_deref().unwrap_or(name)).map_err(|e| {
                     Failure::new(
                         codes::CANNOT_APPLY,
                         format!(
