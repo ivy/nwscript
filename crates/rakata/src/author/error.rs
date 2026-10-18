@@ -75,6 +75,15 @@ pub enum Error {
     Lip(rakata_lip::Error),
     /// The talk table did not read; `rakata-tlk`'s code.
     Tlk(rakata_tlk::Error),
+    /// A texture or its TXI did not read or write; `rakata-texture`'s code.
+    Texture(rakata_texture::Error),
+    /// A room layout or visibility file did not read or write;
+    /// `rakata-lyt`'s code.
+    Lyt(rakata_lyt::Error),
+    /// A walkmesh did not read or write; `rakata-walkmesh`'s code.
+    Walkmesh(rakata_walkmesh::Error),
+    /// A model did not read or write; `rakata-mdl`'s code.
+    Mdl(rakata_mdl::Error),
     /// Bytes written as NCS that do not decode.
     Ncs { name: String, message: String },
     /// A copy of the resource in one of the module's capsules is not the
@@ -181,6 +190,10 @@ impl Error {
             Error::TwoDa(e) => e.code(),
             Error::Lip(e) => e.code(),
             Error::Tlk(e) => e.code(),
+            Error::Texture(e) => e.code(),
+            Error::Lyt(e) => e.code(),
+            Error::Walkmesh(e) => e.code(),
+            Error::Mdl(e) => e.code(),
             Error::Ncs { .. } => codes::NOT_NCS,
             Error::ReplacedDiffers { .. } => codes::REPLACED_DIFFERS,
             Error::OverrideHolds { .. } => codes::OVERRIDE_HOLDS,
@@ -213,6 +226,10 @@ impl Error {
             Error::TwoDa(e) => bare(e.code(), e.to_string()),
             Error::Lip(e) => bare(e.code(), e.to_string()),
             Error::Tlk(e) => bare(e.code(), e.to_string()),
+            Error::Texture(e) => bare(e.code(), e.to_string()),
+            Error::Lyt(e) => bare(e.code(), e.to_string()),
+            Error::Walkmesh(e) => bare(e.code(), e.to_string()),
+            Error::Mdl(e) => bare(e.code(), e.to_string()),
             Error::Ncs { name, message } => format!("{name} is not NCS bytecode: {message}"),
             Error::ReplacedDiffers {
                 id,
@@ -340,4 +357,8 @@ from!(
     TwoDa(rakata_2da::Error),
     Lip(rakata_lip::Error),
     Tlk(rakata_tlk::Error),
+    Texture(rakata_texture::Error),
+    Lyt(rakata_lyt::Error),
+    Walkmesh(rakata_walkmesh::Error),
+    Mdl(rakata_mdl::Error),
 );
