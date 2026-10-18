@@ -5,6 +5,7 @@
 //! touches the database or the file system.
 
 use nwscript_ncs::facts::{ArgType, Literal};
+use nwscript_ncs::flow::Value as FlowValue;
 use rakata_res::{Ref, RefKind, ResType};
 use rusqlite::types::Value;
 use serde_json::json;
@@ -71,6 +72,7 @@ pub(crate) enum Table {
     Cells,
     Strings,
     Calls,
+    ResolvedCalls,
     ScriptStrings,
     Refs,
     Search,
@@ -88,6 +90,7 @@ impl Table {
             Table::Cells => "INSERT INTO cells VALUES (?1,?2,?3,?4,?5)",
             Table::Strings => "INSERT INTO strings VALUES (?1,?2,?3,?4,?5,?6)",
             Table::Calls => "INSERT INTO calls VALUES (?1,?2,?3,?4,?5)",
+            Table::ResolvedCalls => "INSERT INTO resolved_calls VALUES (?1,?2,?3,?4,?5,?6,?7)",
             Table::ScriptStrings => "INSERT INTO script_strings VALUES (?1,?2,?3)",
             Table::Refs => "INSERT INTO refs VALUES (?1,?2,?3,?4)",
             Table::Search => "INSERT INTO search(hash, body, kind, site) VALUES (?1,?2,?3,?4)",
@@ -508,8 +511,52 @@ fn script(bytes: &[u8], routines: &[Routine]) -> Extracted {
             ],
         );
     }
+    for r in nwscript_ncs::flow::resolved_calls(&program, param, ret) {
+        let routine_name = |id: u16| {
+            routines
+                .get(usize::from(id))
+                .map_or_else(|| format!("routine_{id}"), |f| f.name.clone())
+        };
+        let args: Vec<serde_json::Value> = r
+            .args
+            .iter()
+            .map(|a| {
+                a.as_ref()
+                    .map_or(serde_json::Value::Null, |v| value_json(v, &routine_name))
+            })
+            .collect();
+        out.push(
+            Table::ResolvedCalls,
+            vec![
+                Value::Integer(i64::from(r.path[0])),
+                Value::Integer(i64::from(
+                    *r.path.last().expect("a path ends at its ACTION"),
+                )),
+                Value::Text(routine_name(r.routine)),
+                Value::Integer(i64::from(r.routine)),
+                Value::Text(serde_json::to_string(&args).expect("JSON serializes")),
+                Value::Text(serde_json::to_string(&r.path).expect("JSON serializes")),
+            ],
+        );
+    }
     out.refs(refs);
     out
+}
+
+/// A resolved argument as `resolved_calls.args` holds it: a literal as
+/// `calls.args` holds one, and a routine's return value as
+/// `{"call": NAME, "args": [...]}`.
+fn value_json(v: &FlowValue, name: &dyn Fn(u16) -> String) -> serde_json::Value {
+    match v {
+        FlowValue::Literal(l) => literal_json(l),
+        FlowValue::Call { routine, args } => json!({
+            "call": name(*routine),
+            "args": args
+                .iter()
+                .map(|a| a.as_ref().map_or(serde_json::Value::Null, |v| value_json(v, name)))
+                .collect::<Vec<_>>(),
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -580,6 +627,64 @@ mod tests {
         assert_eq!(r.1[1], text("k_pman_aioff"));
         assert!(x.rows.iter().any(|(t, row)| *t == Table::Search
             && row[0] == text("ExecuteScript k_pman_aioff")));
+    }
+
+    #[test]
+    fn a_call_through_a_wrapper_is_a_resolved_call() {
+        // void W(object o, int n) { SetLocalBoolean(o, n, TRUE); }
+        // W(GetObjectByTag("k37_inv_statue", 0), 0);
+        let program = nwscript_ncs::asm::parse(
+            nwscript_diag::FileId(0),
+            b"JSR main\nRETN\nmain:\nCONSTI 0\nCONSTI 0\nCONSTS \"k37_inv_statue\"\nACTION 1, 2\nJSR wrap\nRETN\nwrap:\nCONSTI 1\nCPTOPSP -12, 4\nCPTOPSP -12, 4\nACTION 0, 3\nMOVSP -8\nRETN\n",
+        )
+        .unwrap();
+        let bytes = nwscript_ncs::encode(&program);
+        let p = |name: &str, ty| Param {
+            name: name.into(),
+            ty,
+        };
+        let routines = vec![
+            Routine {
+                name: "SetLocalBoolean".into(),
+                params: vec![
+                    p("oObject", ArgType::Object),
+                    p("nIndex", ArgType::Int),
+                    p("nValue", ArgType::Int),
+                ],
+                ret: ArgType::Void,
+            },
+            Routine {
+                name: "GetObjectByTag".into(),
+                params: vec![p("sTag", ArgType::String), p("nNth", ArgType::Int)],
+                ret: ArgType::Object,
+            },
+        ];
+        let x = extract(ResType::Ncs, "k37_frd_rightswo", &bytes, &routines);
+        let rows: Vec<&Vec<Value>> = x
+            .rows
+            .iter()
+            .filter(|(t, _)| *t == Table::ResolvedCalls)
+            .map(|(_, r)| r)
+            .collect();
+        assert_eq!(rows.len(), 1, "{:?}", x.rows);
+        assert_eq!(rows[0][2], text("SetLocalBoolean"));
+        assert_eq!(
+            rows[0][4],
+            text(r#"[{"args":["k37_inv_statue",0],"call":"GetObjectByTag"},0,1]"#)
+        );
+        let Value::Integer(site) = rows[0][0] else {
+            panic!("a site is an offset")
+        };
+        assert_eq!(
+            rows[0][5],
+            text(&format!(
+                "[{site},{}]",
+                match rows[0][1] {
+                    Value::Integer(o) => o,
+                    _ => panic!("an offset"),
+                }
+            ))
+        );
     }
 
     #[test]

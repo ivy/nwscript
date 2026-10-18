@@ -106,6 +106,10 @@ content lies:
   strings(hash, strref, text, sound, sound_length, flags)
   calls(hash, offset, routine, routine_id, args), args a JSON array:
     each argument's literal, or null where it is computed
+  resolved_calls(hash, site, offset, routine, routine_id, args, path),
+    the calls whose arguments the index follows further: through the
+    script's own functions, locals and globals; a routine's return value
+    as {\"call\": NAME, \"args\": [...]}
   script_strings(hash, offset, value), every CONSTS of a script
   refs(from_hash, kind, value, site), kind resref, strref, tag or global
   search(body, kind, hash, site), full text: WHERE search MATCH 'word*'

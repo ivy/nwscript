@@ -3,7 +3,7 @@
 //! database of another version is rebuilt, never read.
 
 /// The schema's version, kept in `meta` under `schema`.
-pub const VERSION: u32 = 2;
+pub const VERSION: u32 = 3;
 
 /// The tables, created empty.
 pub const TABLES: &str = "
@@ -104,6 +104,15 @@ CREATE TABLE calls(
   routine_id INTEGER NOT NULL,
   args TEXT NOT NULL
 );
+CREATE TABLE resolved_calls(
+  hash TEXT NOT NULL,
+  site INTEGER NOT NULL,
+  offset INTEGER NOT NULL,
+  routine TEXT NOT NULL,
+  routine_id INTEGER NOT NULL,
+  args TEXT NOT NULL,
+  path TEXT NOT NULL
+);
 CREATE TABLE script_strings(
   hash TEXT NOT NULL,
   offset INTEGER NOT NULL,
@@ -140,6 +149,8 @@ CREATE INDEX cells_hash ON cells(hash);
 CREATE INDEX strings_hash ON strings(hash, strref);
 CREATE INDEX calls_hash ON calls(hash);
 CREATE INDEX calls_routine ON calls(routine);
+CREATE INDEX resolved_calls_hash ON resolved_calls(hash);
+CREATE INDEX resolved_calls_routine ON resolved_calls(routine);
 CREATE INDEX script_strings_hash ON script_strings(hash);
 CREATE INDEX script_strings_value ON script_strings(value);
 CREATE INDEX refs_value ON refs(kind, value);
@@ -166,6 +177,7 @@ pub const FACT_TABLES: &[(&str, &str)] = &[
     ("cells", "hash"),
     ("strings", "hash"),
     ("calls", "hash"),
+    ("resolved_calls", "hash"),
     ("script_strings", "hash"),
     ("refs", "from_hash"),
     ("search", "hash"),

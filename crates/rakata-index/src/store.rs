@@ -125,6 +125,7 @@ pub const COUNTED: &[&str] = &[
     "cells",
     "strings",
     "calls",
+    "resolved_calls",
     "script_strings",
     "refs",
     "search",
