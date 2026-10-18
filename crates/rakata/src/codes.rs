@@ -11,8 +11,9 @@
 //! ([`crate::conformance`]), `RE06xx` GFF (`rakata-gff`), `RE07xx` tables
 //! (`rakata-2da`), `RE08xx` the talk table (`rakata-tlk`), `RE09xx` lip-sync
 //! files (`rakata-lip`), `RE10xx` and `RW10xx` the corpus
-//! ([`crate::corpus`]), `RE13xx` the inspection commands
-//! ([`crate::inspect`]). Each crate takes a range of its own as it lands.
+//! ([`crate::corpus`]), `RE12xx` and `RW12xx` saves (`rakata-save`), `RE13xx`
+//! the inspection commands ([`crate::inspect`]). Each crate takes a range of
+//! its own as it lands.
 
 pub use nwscript_diag::codes::Code;
 
@@ -79,6 +80,11 @@ nwscript_diag::codes! {
     RE1003 Error "a corpus manifest that does not read";
     RW1001 Warning "a script whose bytecode the decompiler could not read";
     RW1002 Warning "an include library that does not compile, so its functions are not folded";
+    RE1201 Error "a directory that is not a saved game";
+    RE1202 Error "a module the save holds no state for";
+    RE1203 Error "a save member lacking a field the game writes";
+    RE1204 Error "no creature in the save carries the tag";
+    RW1201 Warning "local variables shown by index: the scripts that name them were not found";
     RE1301 Error "an archive member the archive does not hold";
     RE1302 Error "a `gff set` assignment that does not parse as its field's type";
     RE1303 Error "a `gff set` naming a field that does not exist, without a type to create it";

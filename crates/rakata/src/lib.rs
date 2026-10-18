@@ -13,6 +13,7 @@ pub mod corpus;
 pub mod formats;
 pub mod inspect;
 pub mod patch;
+pub mod save;
 
 pub use nwscript_diag as diag;
 pub use nwscript_diag::{Exit, InputRecord, OutputRecord};

@@ -86,6 +86,11 @@ fn every_code_a_data_crate_reports_is_registered() {
         rakata_lip::codes::BAD_SHAPE,
         rakata_lip::codes::TRAILING_BYTES,
         rakata_lip::codes::TOO_MANY_KEYS,
+        rakata::save::codes::NOT_A_SAVE,
+        rakata::save::codes::NO_SUCH_MODULE,
+        rakata::save::codes::BAD_SHAPE,
+        rakata::save::codes::NO_SUCH_CREATURE,
+        rakata::save::codes::NO_LOCAL_NAMES,
     ] {
         assert!(codes::lookup(id).is_some(), "{id} is not registered");
     }
