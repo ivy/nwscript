@@ -152,6 +152,19 @@ impl UserData for LMod {
             },
         );
         m.add_method_mut(
+            "write_module",
+            |lua, this, (name, b): (String, mlua::LuaString)| {
+                let w = this.inner.write_module(&name, &b.as_bytes()).lift()?;
+                written(lua, &w, &name)
+            },
+        );
+        m.add_method_mut("set_module", |_, this, module: Option<String>| {
+            this.inner.set_module(module.as_deref()).lift()
+        });
+        m.add_method("guard_other_modules", |_, this, name: String| {
+            this.inner.guard_other_modules(res_id(&name)?).lift()
+        });
+        m.add_method_mut(
             "write_streamwaves",
             |lua, this, (resref, b): (String, mlua::LuaString)| {
                 let w = this

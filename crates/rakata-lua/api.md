@@ -83,9 +83,12 @@ An install opened for a mod's writes, in one module. Every write is read back as
 - `rakata.Mod.open(install, [module])`: open `install` for a mod working in `module`, or in the global layers alone. A module the install lacks is `RE0403`.
 - `m:install()`: the install.
 - `m:module()`: the module's name, or nil.
+- `m:set_module([module])`: work in `module` from now on, or in the global layers alone with nil, keeping every write made so far. A module the install lacks is `RE0403`, the module unchanged.
+- `m:guard_other_modules(name)`: refuse to go on when another module holds its own copy of `name`, different from the one this module loads, which a write to `Override/` would replace there too (`RE1415`).
 - `m:loaded(name)`: `{bytes, location, written}`, the copy the game loads, the mod's own write first; `written` says whether the mod wrote it. No copy is `RE0404`.
 - `m:guard_replaced(name, sha256)`: refuse to go on unless every copy in the module's capsules has this SHA-256 (`RE1401`), `Override/` holds none (`RE1402`), and the module holds one (`RE1403`).
 - `m:write_override(name, bytes)`: write to `Override/` as `name`; returns `{path, hash, len, warnings}`, `warnings` the findings a dialogue's loaded copy already had. A dialogue whose edit names what the install lacks is refused with the file unchanged (`RE1407`).
+- `m:write_module(name, bytes)`: write into the module's `STEM.mod`, for an edit this module alone loads, another module's own copy left as it is; a `.mod` the module lacks is made from its `.rim` and `_s.rim` first. Checked as `write_override` is, and returns as it does, `path` the `.mod`. A copy in `Override/` that would be loaded over it is `RE1418`, a mod in no module `RE1419`.
 - `m:write_streamwaves(resref, bytes)`: write a voice-over to `streamwaves/RESREF.wav`; bytes that are not RIFF WAVE are `RE1413`. Returns as `write_override`.
 - `m:find(dialog, key)`: the `NodeRef` a key names, text keys compared through the install's talk table.
 - `m:check_dialog(dialog)`: the reference checks `write_override` runs, a sequence of findings `{code, place, key, subject, via, message}`.

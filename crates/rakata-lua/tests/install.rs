@@ -44,14 +44,18 @@ fn id(text: &str) -> rakata::res::ResId {
     rakata::res::ResId::parse(text).unwrap()
 }
 
-/// A mirror of `game`: every entry linked, except `Override/`, whose files
-/// are linked one by one into a folder of the mirror's own, so a write
-/// replaces a link and never touches the install.
+/// A mirror of `game`: every entry linked, except `Override/` and
+/// `modules/`, whose files are linked one by one into folders of the
+/// mirror's own, so a write replaces a link or adds a file and never
+/// touches the install.
 fn mirror(game: &Path, root: &Path) {
     for e in fs::read_dir(game).unwrap() {
         let e = e.unwrap();
         let n = e.file_name();
-        if n.to_string_lossy().eq_ignore_ascii_case("override") {
+        let own = ["override", "modules"]
+            .iter()
+            .any(|d| n.to_string_lossy().eq_ignore_ascii_case(d));
+        if own {
             let dir = root.join(&n);
             fs::create_dir(&dir).unwrap();
             for f in fs::read_dir(e.path()).unwrap() {
@@ -245,4 +249,62 @@ fn a_script_name_over_sixteen_bytes_is_refused_before_anything_compiles() {
         o.output,
         "false\tRE0101\tresource name `k_oaj_seventeen01` is 17 bytes; a resref holds at most 16\nfalse\tRE0101\n"
     );
+}
+
+#[test]
+fn a_dialogue_written_into_one_modules_mod_is_the_bytes_the_rust_api_writes() {
+    let Some(game) = game() else {
+        return;
+    };
+    let lua_tree = tempfile::tempdir().unwrap();
+    let rust_tree = tempfile::tempdir().unwrap();
+    mirror(&game, lua_tree.path());
+    mirror(&game, rust_tree.path());
+    let dir = tempfile::tempdir().unwrap();
+    let o = run_in(
+        dir.path(),
+        r#"
+        local d = rakata.author.dialog
+        local m = rakata.Mod.open(rakata.Install.open(), "tar_m02af")
+        local name = "tar02_carbast.dlg"
+        local ok, e = pcall(m.guard_other_modules, m, name)
+        print(ok, e.code)
+        local carbast = rakata.dialog.parse(name, m:loaded(name).bytes)
+        local r = d.add_reply(carbast, {text = "A reply of the test's own."})
+        d.link(carbast, "voice:nm02aacarb01002_", r, {at = 0})
+        local w = m:write_module(name, carbast:to_bytes())
+        print(m:loaded(name).location, w.len > 0)
+        m:set_module(nil)
+        ok, e = pcall(m.write_module, m, name, carbast:to_bytes())
+        print(ok, e.code)
+    "#,
+        &[],
+        lua_tree.path(),
+    )
+    .unwrap_or_else(|f| panic!("{}: {}", f.code, f.message));
+    assert_eq!(
+        o.output,
+        "false\tRE1415\nmodules/tar_m02af.mod:tar02_carbast.dlg\ttrue\nfalse\tRE1419\n"
+    );
+
+    let install = Install::open(rust_tree.path(), Profile::K1).unwrap();
+    let mut m = Mod::open(install, Some("tar_m02af")).unwrap();
+    let name = "tar02_carbast.dlg";
+    let mut carbast = Dialog::parse(name, &m.loaded(id(name)).unwrap().bytes).unwrap();
+    let r = dlg::add_reply(
+        &mut carbast,
+        &NewNode {
+            text: Text::English("A reply of the test's own.".into()),
+            ..NewNode::default()
+        },
+    )
+    .unwrap();
+    let anchor = NodeKey::Voice(rakata::res::ResRef::new("nm02aacarb01002_").unwrap());
+    dlg::link(&mut carbast, &anchor, &r.into(), None, Some(0)).unwrap();
+    m.write_module(name, &carbast.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        fs::read(lua_tree.path().join("modules/tar_m02af.mod")).unwrap(),
+        fs::read(rust_tree.path().join("modules/tar_m02af.mod")).unwrap()
+    );
+    assert!(!game.join("modules/tar_m02af.mod").exists());
 }

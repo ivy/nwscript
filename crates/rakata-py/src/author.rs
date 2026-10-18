@@ -171,6 +171,16 @@ impl PyMod {
         Ok(self.inner.write_override(name, data).map_err(fail)?.into())
     }
 
+    /// Write `data` as `name` into this module's `.mod`, for an edit this
+    /// module alone loads: another module's own copy stays as it is. A
+    /// `.mod` the module lacks is made from its `.rim` and `_s.rim` first.
+    /// Checked as `write_override` is (`RE1407`); raises `RE1418` when
+    /// Override holds a copy that would be loaded over it and `RE1419` when
+    /// the mod works in no module. `path` is the `.mod`.
+    fn write_module(&mut self, name: &str, data: &[u8]) -> PyResult<PyWritten> {
+        Ok(self.inner.write_module(name, data).map_err(fail)?.into())
+    }
+
     /// Write a voice-over to `streamwaves/` as `resref.wav`. Raises `RE1413`
     /// for bytes that are not RIFF WAVE.
     fn write_streamwaves(&mut self, resref: &str, data: &[u8]) -> PyResult<PyWritten> {

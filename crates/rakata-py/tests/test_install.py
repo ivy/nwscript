@@ -92,3 +92,27 @@ def test_mod_moves_between_modules_and_guards_their_own_copies(scratch_install: 
     with pytest.raises(rakata.RakataError) as e:
         m.set_module("no_such_module")
     assert e.value.code == "RE0403" and m.module == "tar_m03ae"
+
+
+def test_a_dialogue_is_written_into_one_modules_mod(scratch_install: Path, game_k1: Path) -> None:
+    m = rakata.Mod.open(rakata.Install(scratch_install), "tar_m02af")
+    name = "tar02_carbast.dlg"
+    # The two hideout modules carry their own copies, and they differ
+    with pytest.raises(rakata.RakataError) as e:
+        m.guard_other_modules(name)
+    assert e.value.code == "RE1415" and "tar_m02aa" in e.value.message
+    d = rakata.Dialog.parse(name, m.loaded(name).bytes)
+    reply = dialog.add_reply(d, "A reply of the test's own.")
+    dialog.link(d, rakata.NodeKey.voice("nm02aacarb01002_"), reply, at=0)
+    written = m.write_module(name, d.to_bytes())
+    assert Path(written.path) == scratch_install / "modules" / "tar_m02af.mod"
+    assert not (game_k1 / "modules" / "tar_m02af.mod").exists()
+    again = m.loaded(name)
+    assert again.written and again.location == "modules/tar_m02af.mod:tar02_carbast.dlg"
+    fresh, vanilla = rakata.Install(scratch_install), rakata.Install(game_k1)
+    assert fresh.which(name, module="tar_m02af").winner.hash == written.hash
+    assert fresh.which(name, module="tar_m02aa").hash == vanilla.which(name, module="tar_m02aa").hash
+    m.set_module(None)
+    with pytest.raises(rakata.RakataError) as e:
+        m.write_module(name, d.to_bytes())
+    assert e.value.code == "RE1419"

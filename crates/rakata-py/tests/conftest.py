@@ -23,11 +23,17 @@ def game_k1() -> Path:
 @pytest.fixture
 def scratch_install(game_k1: Path, tmp_path: Path) -> Path:
     """An install a test may write to: every entry of the vanilla one linked, except Override/
-    and streamwaves/, which are empty folders of its own."""
+    and streamwaves/, which are empty folders of its own, and modules/, a folder of its own
+    whose files are linked one by one."""
     root = tmp_path / "game"
     root.mkdir()
     for entry in game_k1.iterdir():
         if entry.name.lower() in ("override", "streamwaves"):
+            continue
+        if entry.name.lower() == "modules":
+            (root / entry.name).mkdir()
+            for f in entry.iterdir():
+                (root / entry.name / f.name).symlink_to(f)
             continue
         (root / entry.name).symlink_to(entry)
     (root / "Override").mkdir()

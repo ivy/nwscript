@@ -63,5 +63,9 @@ class Mod:
     def write_override(self, name: str, data: bytes) -> Written:
         """Read back as its type first; a dialogue whose edit names what the install lacks is
         refused with RE1407."""
+    def write_module(self, name: str, data: bytes) -> Written:
+        """Into this module's `.mod` (made from its RIMs when it has none), for an edit this
+        module alone loads; checked as `write_override` is. RE1418 when Override holds a copy
+        that would be loaded over it, RE1419 when the mod works in no module."""
     def write_streamwaves(self, resref: str, data: bytes) -> Written:
         """RE1413 for bytes that are not RIFF WAVE."""
