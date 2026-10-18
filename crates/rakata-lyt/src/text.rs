@@ -29,7 +29,10 @@ impl Line<'_> {
 }
 
 /// The bytes as ASCII text, split into lines that keep their endings, and
-/// the ending of the first line, which the writer uses throughout.
+/// the ending of the first line, which the writer uses throughout. A blank
+/// line is not a line of its own: its bytes join the raw bytes of the line
+/// before it (or, before the first line, of the first), so the line it
+/// follows departs from the written form and writes it back.
 pub(crate) fn lines(bytes: &[u8]) -> Result<(Vec<Line<'_>>, Newline)> {
     if let Some(offset) = bytes.iter().position(|b| !b.is_ascii()) {
         return Err(Error::NotAscii {
@@ -38,21 +41,38 @@ pub(crate) fn lines(bytes: &[u8]) -> Result<(Vec<Line<'_>>, Newline)> {
         });
     }
     let text = std::str::from_utf8(bytes).expect("ASCII is UTF-8");
-    let mut out = Vec::new();
-    for (i, raw) in text.split_inclusive('\n').enumerate() {
-        let body = raw.strip_suffix('\n').unwrap_or(raw);
-        let body = body.strip_suffix('\r').unwrap_or(body);
-        out.push(Line {
-            number: i + 1,
-            text: body,
-            raw,
-        });
-    }
-    let newline = match out.first() {
-        Some(l) if l.raw.ends_with("\r\n") || !l.raw.ends_with('\n') => Newline::CrLf,
+    let newline = match text.split_inclusive('\n').next() {
+        Some(raw) if raw.ends_with("\r\n") || !raw.ends_with('\n') => Newline::CrLf,
         Some(_) => Newline::Lf,
         None => Newline::CrLf,
     };
+    let mut out: Vec<Line<'_>> = Vec::new();
+    // Where the raw bytes of the next line start: past the lines folded
+    // into the one before it, or at the leading blank lines.
+    let mut start = 0;
+    let mut end = 0;
+    for (i, raw) in text.split_inclusive('\n').enumerate() {
+        let body = raw.strip_suffix('\n').unwrap_or(raw);
+        let body = body.strip_suffix('\r').unwrap_or(body);
+        let from = end;
+        end += raw.len();
+        if body.trim_ascii().is_empty() {
+            match out.last_mut() {
+                Some(last) => {
+                    last.raw = &text[start..end];
+                }
+                None => continue,
+            }
+        } else {
+            let line_start = if out.is_empty() { 0 } else { from };
+            start = line_start;
+            out.push(Line {
+                number: i + 1,
+                text: body,
+                raw: &text[line_start..end],
+            });
+        }
+    }
     Ok((out, newline))
 }
 

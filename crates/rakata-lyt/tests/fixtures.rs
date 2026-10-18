@@ -278,6 +278,26 @@ fn a_visibility_files_departures_are_kept_and_its_rooms_follow_the_indentation()
 }
 
 #[test]
+fn a_room_seen_with_a_count_after_it_is_a_room_seen() {
+    // A mod's visibility file writes the last room seen as `  NAME 5`.
+    let bytes = b"test_a 2\r\n  test_b\r\n  test_c 5\r\n";
+    let vis = Vis::parse(bytes).unwrap();
+    assert_eq!(vis.visible("test_a").unwrap(), ["test_b", "test_c"]);
+    assert_eq!(vis.departures(), 1);
+    assert_eq!(vis.to_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn blank_lines_and_mixed_line_endings_write_back() {
+    // A mod's visibility file: LF after some rooms seen, an indented blank
+    // line ended CR LF after each, a blank line before the first.
+    let bytes = b"\r\ntest_a 2\n  \r\n  test_b\n  \r\n  test_c\r\ntest_b 0\r\n";
+    let vis = Vis::parse(bytes).unwrap();
+    assert_eq!(vis.visible("test_a").unwrap(), ["test_b", "test_c"]);
+    assert_eq!(vis.to_bytes().unwrap(), bytes);
+}
+
+#[test]
 fn a_visibility_file_is_refused_with_the_code_for_what_is_wrong() {
     let e = Vis::parse(b"  test_b\r\ntest_a 1\r\n").unwrap_err();
     assert_eq!(e.code(), "RE2311");

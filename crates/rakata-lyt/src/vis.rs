@@ -56,8 +56,12 @@ impl Vis {
         for (index, l) in lines.iter().filter(|l| !l.is_blank()).enumerate() {
             let tokens = l.tokens();
             if l.is_indented() {
-                let [name] = tokens[..] else {
-                    return Err(bad(l));
+                // An indented line is a room seen, with or without a count
+                // after it: the indentation decides, as for a room line.
+                let name = match tokens[..] {
+                    [name] => name,
+                    [name, count] if count.bytes().all(|b| b.is_ascii_digit()) => name,
+                    _ => return Err(bad(l)),
                 };
                 let Some(room) = rooms.last_mut() else {
                     return Err(Error::OrphanVisible {

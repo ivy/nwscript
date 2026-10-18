@@ -102,6 +102,8 @@ Other departures (**measured**):
 - A trailing space after a room seen: `m17aa_15 ` in `m17aa.vis`, `m22aa_02a ` in `m22aa.vis`.
 - Two spaces before the count: `M36aa_03  3`, the first line of `m36aa.vis`.
 
+Files written by other tools depart further. In the modded build (`$RAKATA_BUILD`), a mod's `Override/stunt_starforge.vis` ends with an indented `  StuntRoom45ad 5`: a room seen with a number after it (**measured**). `rakata-lyt` follows the indentation there too, reading the room seen and keeping the line as written; what the engine does with the number is not established. Another mod's `m41ae.vis` (in `modules/unk_m41ae.mod`) ends some lines with LF alone and puts an indented blank line, ended CR LF, after each of them (**measured**); `rakata-lyt` keeps blank lines with the line before them and writes both back.
+
 ## The Endar Spire's first area
 
 Module `end_m01aa`, area `m01aa`: `m01aa.lyt` (1,749 bytes, `filedependancy M01aa.max`) places 15 rooms, `M01aa_01a` to `M01aa_10`, all at Z = 0, and 15 door hooks, `Door_01` to `Door_19` with gaps, on 11 of the rooms; no track or obstacle. Its hooks are turns of 0, π/2 (as `-π/2`) or π about Z, standing at Z = -0.0407561 to -0.0424994 or -1.31576. `m01aa.vis` lists the 15 rooms, each seeing 2 to 9 others, and ends without a final line ending (**measured**).
