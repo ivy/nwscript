@@ -30,6 +30,7 @@ Examples:
   rakata save show SAVEDIR --module danm14ac --creature carth
                                            a creature as the save has it
   rakata dialog show banter.dlg --game DIR a conversation's transcript, conditions decompiled
+  rakata diff PARENT/tree CHILD/tree       what a checkpoint changed, by field, row and node
 
 Exit codes: 0 success, 1 errors reported, 2 bad invocation,
 3 a comparison found a difference, 101 internal error.";
@@ -157,4 +158,6 @@ pub enum Command {
     Save(crate::cmd::SaveArgs),
     /// Conversations: show prints a dialogue's transcript, conditions decompiled.
     Dialog(crate::cmd::DialogArgs),
+    /// Compare two trees or two resources by field, row, strref and dialogue node; exit 3 on a difference.
+    Diff(crate::cmd::DiffArgs),
 }
