@@ -1,0 +1,23 @@
+[package]
+name = "rakata-py"
+description = "Python bindings of the rakata façade: the module `rakata`, with `rakata.nwscript` inside it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "rakata_py"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+nwscript = { workspace = true }
+nwscript-py = { workspace = true }
+pyo3 = { version = "0.30", features = ["extension-module"] }
+rakata = { workspace = true }
+rakata-dialog = { workspace = true }
+
+[lints]
+workspace = true

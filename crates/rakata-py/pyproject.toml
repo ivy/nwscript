@@ -1,0 +1,26 @@
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "rakata"
+description = "The data of BioWare's Aurora games (KotOR 1 and 2) from Rust: the install, GFF, 2DA, TLK, LIP, dialogues, authoring, and rakata.nwscript"
+requires-python = ">=3.10"
+license = "ISC"
+dynamic = ["version"]
+
+[dependency-groups]
+# The tools `mise run test:py` runs: `maturin develop` builds the module into
+# the environment `uv sync --no-install-project` makes, then the tests.
+dev = ["maturin==1.15.0", "pytest==9.1.1", "pyright==1.1.414"]
+
+[tool.maturin]
+module-name = "rakata"
+python-source = "python"
+features = ["pyo3/extension-module"]
+
+[tool.pyright]
+include = ["tests"]
+typeCheckingMode = "strict"
+# rakata.nwscript and rakata.author.* are submodules of the extension, so only their stubs are files.
+reportMissingModuleSource = false

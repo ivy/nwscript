@@ -1234,6 +1234,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rakata-py"
+version = "0.0.0"
+dependencies = [
+ "nwscript",
+ "nwscript-py",
+ "pyo3",
+ "rakata",
+ "rakata-dialog",
+]
+
+[[package]]
 name = "rakata-res"
 version = "0.0.0"
 dependencies = [

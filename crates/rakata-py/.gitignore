@@ -1,0 +1,5 @@
+# What `maturin develop` and the tests leave in the source tree
+/python/rakata/*.so
+/python/rakata/*.pyd
+__pycache__/
+.pytest_cache/
