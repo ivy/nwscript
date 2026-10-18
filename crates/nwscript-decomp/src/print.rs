@@ -15,6 +15,9 @@ pub struct Context<'a> {
     pub notes: &'a [String],
     /// A header comment for the whole file.
     pub header: &'a str,
+    /// The libraries whose functions replaced recovered ones, as
+    /// `#include` lines after the header.
+    pub includes: &'a [String],
 }
 
 /// The text and the lines each function occupies (first, last; 1-based).
@@ -58,10 +61,16 @@ impl Printer<'_> {
             let _ = writeln!(self.out, "// {l}");
         }
         self.out.push('\n');
-        for st in &self.s.structs {
+        for inc in self.cx.includes {
+            let _ = writeln!(self.out, "#include \"{inc}\"");
+        }
+        if !self.cx.includes.is_empty() {
+            self.out.push('\n');
+        }
+        for st in self.s.structs.iter().filter(|st| !st.folded) {
             let _ = writeln!(self.out, "struct {} {{", st.name);
             for (i, f) in st.fields.iter().enumerate() {
-                let _ = writeln!(self.out, "{INDENT}{} f{i};", self.ty(Some(*f)));
+                let _ = writeln!(self.out, "{INDENT}{} {};", self.ty(Some(*f)), st.field(i));
             }
             self.out.push_str("};\n\n");
         }
@@ -85,7 +94,7 @@ impl Printer<'_> {
             self.out.push('\n');
         }
         let users: Vec<usize> = (0..self.s.funcs.len())
-            .filter(|&i| self.s.funcs[i].kind == FuncKind::User)
+            .filter(|&i| self.s.funcs[i].kind == FuncKind::User && !self.s.funcs[i].folded)
             .collect();
         for &i in &users {
             let sig = self.signature(i);
@@ -95,7 +104,7 @@ impl Printer<'_> {
             self.out.push('\n');
         }
         for (i, f) in self.s.funcs.iter().enumerate() {
-            if f.kind == FuncKind::Globals {
+            if f.kind == FuncKind::Globals || f.folded {
                 continue;
             }
             let first = self.line();
@@ -172,21 +181,7 @@ impl Printer<'_> {
     }
 
     fn ty(&self, t: Option<Ty>) -> String {
-        match t {
-            None | Some(Ty::Int) => "int".into(),
-            Some(Ty::Float) => "float".into(),
-            Some(Ty::String) => "string".into(),
-            Some(Ty::Object) => "object".into(),
-            Some(Ty::Vector) => "vector".into(),
-            Some(Ty::Engine(n)) => self
-                .cx
-                .table
-                .structures
-                .get(usize::from(n))
-                .cloned()
-                .unwrap_or_else(|| format!("engine{n}")),
-            Some(Ty::Struct(i)) => format!("struct {}", self.s.structs[i].name),
-        }
+        type_text(self.s, self.cx.table, t)
     }
 
     fn place(&self, p: &Place) -> String {
@@ -197,6 +192,7 @@ impl Printer<'_> {
             None => var.name.clone(),
             Some(n) => match var.ty {
                 Some(Ty::Vector) => format!("{}.{}", var.name, ["x", "y", "z"][n.min(2)]),
+                Some(Ty::Struct(i)) => format!("{}.{}", var.name, self.s.structs[i].field(n)),
                 _ => format!("{}.f{n}", var.name),
             },
         }
@@ -451,6 +447,24 @@ impl Printer<'_> {
                 }
             }
         }
+    }
+}
+
+/// A type as the source spells it; an unknown type prints as `int`, the
+/// type an unused slot defaults to.
+pub(crate) fn type_text(s: &Script, table: &EngineTable, t: Option<Ty>) -> String {
+    match t {
+        None | Some(Ty::Int) => "int".into(),
+        Some(Ty::Float) => "float".into(),
+        Some(Ty::String) => "string".into(),
+        Some(Ty::Object) => "object".into(),
+        Some(Ty::Vector) => "vector".into(),
+        Some(Ty::Engine(n)) => table
+            .structures
+            .get(usize::from(n))
+            .cloned()
+            .unwrap_or_else(|| format!("engine{n}")),
+        Some(Ty::Struct(i)) => format!("struct {}", s.structs[i].name),
     }
 }
 

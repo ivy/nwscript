@@ -8,7 +8,9 @@ use nwscript_diag::{Diagnostic, SourceMap, Span, codes};
 use nwscript_ncs::decode;
 use nwscript_sema::EngineTable;
 
-pub use nwscript_decomp::{CompileError, Compiler, Decompiled, Function, Status};
+pub use nwscript_decomp::{
+    CompileError, Compiler, Decompiled, Fold, FoldStruct, Function, Global, Kind, Status,
+};
 
 /// Decode NCS bytes and recover their source; with a compiler, verify each
 /// function. Errors point into the bytes, registered in `map` under `name`.

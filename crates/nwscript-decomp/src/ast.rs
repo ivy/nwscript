@@ -82,6 +82,20 @@ pub struct Var {
 pub struct StructDef {
     pub name: String,
     pub fields: Vec<Ty>,
+    /// The fields' names where a fold supplied them; `f0`, `f1`, ... otherwise.
+    pub field_names: Vec<String>,
+    /// Declared by an included library: the declaration is not printed.
+    pub folded: bool,
+}
+
+impl StructDef {
+    /// Field `n`'s name as the source spells it.
+    pub fn field(&self, n: usize) -> String {
+        self.field_names
+            .get(n)
+            .cloned()
+            .unwrap_or_else(|| format!("f{n}"))
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -238,6 +252,9 @@ pub struct Func {
     pub defaults: Vec<Option<Expr>>,
     pub ret: Option<Ty>,
     pub body: Result<Vec<Stmt>, String>,
+    /// Replaced by a function of an included library: neither its prototype
+    /// nor its definition is printed, and calls use its library name.
+    pub folded: bool,
 }
 
 /// The whole recovered program.

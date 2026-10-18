@@ -36,7 +36,7 @@ impl<F: FnMut(&[u8]) -> Result<Vec<u8>, CompileError>> Compiler for F {
 /// The functions of a program as contiguous instruction ranges: one starts
 /// at the entry stub's target and at every `JSR` target; the first range
 /// takes in the entry stub.
-pub(crate) fn function_ranges(p: &Program) -> Vec<(usize, usize)> {
+pub fn function_ranges(p: &Program) -> Vec<(usize, usize)> {
     let ins = p.instructions();
     let mut starts: Vec<usize> = ins
         .iter()
@@ -52,6 +52,49 @@ pub(crate) fn function_ranges(p: &Program) -> Vec<(usize, usize)> {
         out.push((if k == 0 { 0 } else { s }, end));
     }
     out
+}
+
+/// The instructions' bytes with everything that depends on where the
+/// function sits in a program normalised: `JSR` targets are zero, and the
+/// `BP`-relative offsets, which count down from the top of the globals, are
+/// rebased to count up from their bottom by adding `globals_bytes`
+/// ([`globals_bytes`]), so a global keeps its offset however many globals a
+/// script declares after the library's; `STORE_STATE`'s count of global
+/// bytes is zero. Two functions with the same shape are the same source
+/// compiled in two programs, give or take which functions they call; a fold
+/// then settles the question by recompiling ([`crate::Decompiled::fold`]).
+pub fn shape(ins: &[Instruction], globals_bytes: i32) -> Vec<u8> {
+    use nwscript_ncs::Operands;
+    let mut out = Vec::new();
+    for x in ins {
+        let mut x = x.clone();
+        match (x.opcode, &mut x.operands) {
+            (Op::Jsr, Operands::Jump(rel)) => *rel = 0,
+            (Op::CpTopBp | Op::CpDownBp, Operands::Stack { offset, .. }) => {
+                *offset += globals_bytes;
+            }
+            (Op::DecIBp | Op::IncIBp, Operands::Offset(off)) => *off += globals_bytes,
+            (Op::StoreState, Operands::StoreState { globals, .. }) => *globals = 0,
+            _ => {}
+        }
+        x.encode_into(&mut out);
+    }
+    out
+}
+
+/// How many bytes of globals a program declares: what the `MOVSP` after
+/// `RESTOREBP` pops once `main` returns, or 0 for a program without the
+/// globals trailer.
+pub fn globals_bytes(p: &Program) -> i32 {
+    let ins = p.instructions();
+    ins.iter()
+        .position(|x| x.opcode == Op::RestoreBp)
+        .and_then(|i| ins.get(i + 1))
+        .and_then(|x| match x.operands {
+            nwscript_ncs::Operands::Offset(n) if x.opcode == Op::MovSp => Some(-n),
+            _ => None,
+        })
+        .unwrap_or(0)
 }
 
 fn calls(p: &Program, ranges: &[(usize, usize)], r: (usize, usize)) -> Vec<Option<usize>> {

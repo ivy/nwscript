@@ -130,6 +130,7 @@ pub fn recover(prog: &Program, table: &EngineTable) -> Res<Script> {
             defaults: Vec::new(),
             ret: (l.kind == FuncKind::Entry && entry_is_sc).then_some(Ty::Int),
             body: Err("not reached".into()),
+            folded: false,
         });
     }
     for i in 0..n {
@@ -586,6 +587,8 @@ impl Fp<'_, '_> {
                     self.sh.script.structs.push(StructDef {
                         name: format!("Struct{}", n + 1),
                         fields,
+                        field_names: Vec::new(),
+                        folded: false,
                     });
                     n
                 }
