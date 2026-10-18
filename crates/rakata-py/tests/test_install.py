@@ -4,6 +4,7 @@ and the authoring API writing into a scratch install over it."""
 import json
 import subprocess
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -26,6 +27,45 @@ def test_which_matches_the_binary(game_k1: Path, rakata_bin: Path) -> None:
     assert ours.hash == theirs["winner"]["sha256"]
     assert [c.hash for c in ours.candidates] == [c["sha256"] for c in theirs["candidates"]]
     assert ours.winner.layer == theirs["winner"]["layer"]
+
+
+@pytest.mark.parametrize(
+    ("name", "pack"),
+    [
+        ("fnt_d16x16.tpc", None),
+        ("lbl_menudarr.txi", None),
+        ("lhr_flr01.tpc", None),
+        ("lhr_flr01.tpc", "tpc"),
+    ],
+)
+def test_a_texture_resolves_as_the_binary_resolves_it(
+    game_k1: Path, rakata_bin: Path, name: str, pack: Literal["tpa", "tpb", "tpc"] | None
+) -> None:
+    install = rakata.Install(game_k1, texture_pack=pack)
+    assert install.texture_pack == (pack or "tpa")
+    ours = install.which(name)
+    args = ["--texture-pack", pack] if pack else []
+    out = subprocess.run(
+        [rakata_bin, "--format", "json", "which", name, "--game", game_k1, *args],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    theirs = json.loads(out)["result"]
+    assert ours.winner.layer == theirs["winner"]["layer"] == "texturepack"
+    assert ours.winner.path == theirs["winner"]["location"]["path"]
+    assert ours.hash == theirs["winner"]["sha256"]
+
+
+def test_the_gui_pack_follows_the_quality_pack(game_k1: Path) -> None:
+    font = rakata.Install(game_k1).which("fnt_d16x16.tpc").winner
+    assert Path(font.path).name == "swpc_tex_gui.erf"
+    assert font.member == "fnt_d16x16.tpc"
+    room = rakata.Install(game_k1, texture_pack="tpb").which("lhr_flr01.tpc").winner
+    assert Path(room.path).name == "swpc_tex_tpb.erf"
+    with pytest.raises(rakata.RakataError) as e:
+        rakata.Install(game_k1, texture_pack="tpd")  # pyright: ignore[reportArgumentType]
+    assert e.value.code == "RE0405"
 
 
 def test_which_names_what_no_layer_holds(game_k1: Path) -> None:

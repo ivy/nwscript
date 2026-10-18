@@ -67,14 +67,15 @@ A script's inputs are its arguments and `--game`. The state has the `string`, `t
 
 ## rakata.Install
 
-The install `--game` names, read in the engine's order: `Override/`, the module's capsules, `patch.erf`, the BIFs.
+The install `--game` names, read in the engine's order: `Override/`, the module's capsules, `patch.erf`, the texture packs (the selected quality pack, then `swpc_tex_gui.erf`), the BIFs.
 
-- `rakata.Install.open([{profile = "k1"}])`: open it, the profile `k1` or `k2` (default: `rakata lua --profile`, itself `k1` by default). Without `--game`, `RE1803`.
+- `rakata.Install.open([{profile = "k1", texture_pack = "tpa"}])`: open it, the profile `k1` or `k2` (default: `rakata lua --profile`, itself `k1` by default), and the quality pack the texture layer searches, `tpa`, `tpb` or `tpc` (default `tpa`: which pack the game's `Texture Quality` selects is not established); another pack name is `RE0405`. Without `--game`, `RE1803`.
 - `install:root()`: the install's directory.
 - `install:profile()`: `k1` or `k2`.
+- `install:texture_pack()`: `tpa`, `tpb` or `tpc`.
 - `install:modules()`: every module's name (`danm14ac`), a sequence.
-- `install:resolve(name, [module])`: which copy the engine loads, `{id, module, ambiguous, candidates}`, each candidate `{layer, location, len, hash, verdict}` with `layer` one of `override`, `module`, `patch`, `chitin`, and `verdict` `wins`, `ambiguous` or `shadowed` (then also `by`, the winner's index from 0, and `reason`). The first candidate wins.
-- `install:read(name, [module])`: `{bytes, location}` of the copy the engine loads, or nil when no layer holds it. `location` is relative to the install: `Override/x.2da`, `modules/danm14ac_s.rim:k_pdan_juhani31.ncs`, `data/2da.bif[12]`.
+- `install:resolve(name, [module])`: which copy the engine loads, `{id, module, ambiguous, candidates}`, each candidate `{layer, location, len, hash, verdict}` with `layer` one of `override`, `module`, `patch`, `texturepack`, `chitin`, and `verdict` `wins`, `ambiguous` or `shadowed` (then also `by`, the winner's index from 0, and `reason`). The first candidate wins.
+- `install:read(name, [module])`: `{bytes, location}` of the copy the engine loads, or nil when no layer holds it. `location` is relative to the install: `Override/x.2da`, `modules/danm14ac_s.rim:k_pdan_juhani31.ncs`, `TexturePacks/swpc_tex_gui.erf:fnt_d16x16.tpc`, `data/2da.bif[12]`.
 
 ## rakata.Mod
 

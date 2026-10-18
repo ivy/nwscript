@@ -16,6 +16,7 @@ checkout with uncommitted changes."""
 VERSION: str
 
 Profile: TypeAlias = Literal["k1", "k2"]
+TexturePack: TypeAlias = Literal["tpa", "tpb", "tpc"]
 Kind: TypeAlias = Literal["entry", "reply"]
 GffValue: TypeAlias = (
     int | float | str | bytes | tuple[float, ...] | dict[str, object] | list[dict[str, object]]
@@ -37,11 +38,18 @@ class RakataError(Exception):
 class Install:
     """A game install: the folder holding `chitin.key`, opened once."""
 
-    def __init__(self, path: StrPath, profile: Profile = "k1") -> None: ...
+    def __init__(
+        self, path: StrPath, profile: Profile = "k1", texture_pack: TexturePack | None = None
+    ) -> None:
+        """`texture_pack` is the quality pack the texture layer searches over `swpc_tex_gui.erf`;
+        `"tpa"` when none is named, since which pack the game's `Texture Quality` selects is not
+        established. Raises RE0405 for any other name."""
     @property
     def root(self) -> str: ...
     @property
     def profile(self) -> Profile: ...
+    @property
+    def texture_pack(self) -> TexturePack: ...
     def modules(self) -> list[str]: ...
     def which(self, name: str, ext: str | None = None, module: str | None = None) -> Resolution:
         """`which("globalcat", "2da")` or `which("globalcat.2da")`; raises RE0404 when no layer
@@ -51,7 +59,7 @@ class Candidate:
     """One copy of a resource the install holds."""
 
     @property
-    def layer(self) -> Literal["override", "module", "patch", "chitin"]: ...
+    def layer(self) -> Literal["override", "module", "patch", "texturepack", "chitin"]: ...
     @property
     def location(self) -> str: ...
     @property

@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use rakata::game::{Candidate, Install, Location, ModuleName, Profile, Resolution, Verdict};
+use rakata::game::{
+    Candidate, Install, Location, ModuleName, Profile, Resolution, TexturePack, Verdict,
+};
 use rakata::res::ResId;
 
 use crate::fail;
@@ -44,12 +46,22 @@ pub struct PyInstall {
 
 #[pymethods]
 impl PyInstall {
-    /// Open the install at `path`. Raises `RE0401` without a `chitin.key`
-    /// and `RE0402` when a BIF it names is missing.
+    /// Open the install at `path`, its texture layer searching the quality
+    /// pack `texture_pack` names (`"tpa"`, `"tpb"` or `"tpc"`; `"tpa"` when
+    /// none is named) over `swpc_tex_gui.erf`. Raises `RE0401` without a
+    /// `chitin.key`, `RE0402` when a BIF it names is missing, and `RE0405`
+    /// for a pack that is none of the three.
     #[new]
-    #[pyo3(signature = (path, profile = "k1"))]
-    fn new(path: PathBuf, profile: &str) -> PyResult<Self> {
-        let install = Install::open(&path, self::profile(profile)?).map_err(fail)?;
+    #[pyo3(signature = (path, profile = "k1", texture_pack = None))]
+    fn new(path: PathBuf, profile: &str, texture_pack: Option<&str>) -> PyResult<Self> {
+        let profile = self::profile(profile)?;
+        let pack = match texture_pack {
+            Some(name) => name.parse::<TexturePack>().map_err(fail)?,
+            None => profile.default_texture_pack(),
+        };
+        let install = Install::open(&path, profile)
+            .map_err(fail)?
+            .with_texture_pack(pack);
         Ok(PyInstall {
             inner: Arc::new(install),
         })
@@ -65,6 +77,13 @@ impl PyInstall {
     #[getter]
     fn profile(&self) -> &'static str {
         profile_name(self.inner.profile())
+    }
+
+    /// The quality pack the texture layer searches: `"tpa"`, `"tpb"` or
+    /// `"tpc"`.
+    #[getter]
+    fn texture_pack(&self) -> &'static str {
+        self.inner.texture_pack().name()
     }
 
     /// The modules under `modules/`, by capsule stem.
@@ -100,7 +119,7 @@ impl PyInstall {
 #[pyclass(name = "Candidate", module = "rakata", frozen, get_all)]
 #[derive(Clone)]
 pub struct PyCandidate {
-    /// `"override"`, `"module"`, `"patch"` or `"chitin"`.
+    /// `"override"`, `"module"`, `"patch"`, `"texturepack"` or `"chitin"`.
     layer: &'static str,
     /// The file, with `:member` for a capsule's or `[index]` for a BIF's.
     location: String,

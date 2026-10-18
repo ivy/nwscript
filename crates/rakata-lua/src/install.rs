@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use mlua::{Lua, Table, UserData, UserDataMethods, UserDataRef, Value};
 use rakata::author::{Mod, Written};
-use rakata::game::{Install, ModuleName, Verdict};
+use rakata::game::{Install, ModuleName, TexturePack, Verdict};
 use rakata::res::ContentHash;
 
 use crate::dialog::{LDialog, LNodeRef, node_key};
@@ -27,6 +27,9 @@ impl UserData for LInstall {
             Ok(this.0.root().display().to_string())
         });
         m.add_method("profile", |_, this, ()| Ok(profile_name(this.0.profile())));
+        m.add_method("texture_pack", |_, this, ()| {
+            Ok(this.0.texture_pack().name())
+        });
         m.add_method("modules", |lua, this, ()| {
             lua.create_sequence_from(this.0.modules().iter().map(ToString::to_string))
         });
@@ -82,9 +85,10 @@ impl UserData for LInstall {
     }
 }
 
-/// `Install.open([{profile = "k1"}])`: the install `--game` names.
+/// `Install.open([{profile = "k1", texture_pack = "tpa"}])`: the install
+/// `--game` names.
 pub fn open_install(lua: &Lua, opts: Option<Table>) -> mlua::Result<LInstall> {
-    let o = Opts::new(opts, "Install.open", &["profile"])?;
+    let o = Opts::new(opts, "Install.open", &["profile", "texture_pack"])?;
     let p = match o.get::<String>("profile")? {
         Some(p) => profile(&p)?,
         None => lua
@@ -99,7 +103,13 @@ pub fn open_install(lua: &Lua, opts: Option<Table>) -> mlua::Result<LInstall> {
             "the script opened the install, and no install was named: pass --game DIR, the folder holding chitin.key",
         ));
     };
-    Ok(LInstall(Arc::new(Install::open(&game, p).lift()?)))
+    let pack = match o.get::<String>("texture_pack")? {
+        Some(name) => name.parse::<TexturePack>().lift()?,
+        None => p.default_texture_pack(),
+    };
+    Ok(LInstall(Arc::new(
+        Install::open(&game, p).lift()?.with_texture_pack(pack),
+    )))
 }
 
 /// An install opened for a mod's writes.

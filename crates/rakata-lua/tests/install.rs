@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use rakata::author::dialog::{self as dlg, Text};
 use rakata::author::twoda::{self, RowKey};
 use rakata::author::{Mod, codes};
-use rakata::game::{Install, Profile};
+use rakata::game::{Install, Profile, TexturePack};
 use rakata::twoda::TwoDa;
 use rakata_dialog::{Dialog, Kind, NewNode, NodeKey};
 use rakata_lua::{Failure, Options, Outcome, Print, run};
@@ -196,6 +196,59 @@ fn the_dialogue_operations_write_what_the_rust_api_writes_and_refuse_what_it_ref
     assert_eq!(
         fs::read(lua_tree.path().join("Override").join(name)).unwrap(),
         fs::read(rust_tree.path().join("Override").join(name)).unwrap()
+    );
+}
+
+#[test]
+fn the_texture_layer_answers_as_the_rust_api_answers() {
+    let Some(game) = game() else {
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let o = run_in(
+        dir.path(),
+        r#"
+        for _, pack in ipairs({"tpa", "tpb"}) do
+            local install = rakata.Install.open{texture_pack = pack}
+            for _, name in ipairs({"fnt_d16x16.tpc", "lbl_menudarr.txi", "lhr_flr01.tpc"}) do
+                local w = install:resolve(name).candidates[1]
+                print(install:texture_pack(), name, w.layer, w.location, w.hash)
+            end
+        end
+        print(rakata.Install.open():texture_pack())
+        local ok, e = pcall(rakata.Install.open, {texture_pack = "tpd"})
+        print(ok, e.code)
+    "#,
+        &[],
+        &game,
+    )
+    .unwrap_or_else(|f| panic!("{}: {}", f.code, f.message));
+
+    let mut want = String::new();
+    for pack in [TexturePack::Tpa, TexturePack::Tpb] {
+        let install = Install::open(&game, Profile::K1)
+            .unwrap()
+            .with_texture_pack(pack);
+        for name in ["fnt_d16x16.tpc", "lbl_menudarr.txi", "lhr_flr01.tpc"] {
+            let r = install.resolve(id(name), None).unwrap();
+            let w = r.winner().unwrap();
+            let rel = w.location.path().strip_prefix(&game).unwrap();
+            want.push_str(&format!(
+                "{pack}\t{name}\ttexturepack\t{}:{name}\t{}\n",
+                rel.display(),
+                w.hash.to_hex()
+            ));
+        }
+    }
+    want.push_str("tpa\nfalse\tRE0405\n");
+    assert_eq!(o.output, want);
+    assert!(
+        o.output
+            .contains("TexturePacks/swpc_tex_gui.erf:fnt_d16x16.tpc")
+    );
+    assert!(
+        o.output
+            .contains("tpb\tlhr_flr01.tpc\ttexturepack\tTexturePacks/swpc_tex_tpb.erf")
     );
 }
 
