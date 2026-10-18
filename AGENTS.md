@@ -52,6 +52,7 @@ The layout is `nss/`, `ncs/`, `nwscript.nss` as shipped, `oracle/` (the include 
 
 - Build and check: `cargo build --workspace`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --check`. A change is done when all four pass.
 - Corpus-backed tests: `NWSCRIPT_CORPUS=… cargo test --workspace -- --include-ignored`.
+- Round-trip conformance for data: `rakata conformance --game $RAKATA_GAME_K1 --report target/rakata-conformance.json`, then `cargo xtask readme --report target/rakata-conformance.json` refreshes the README's table. Reports describe the user's files and stay out of git; only the vanilla table goes into the README. Every format crate registers in `crates/rakata/src/formats/` and must pass before it ships.
 - Fuzzing: targets live in `crates/<crate>/fuzz/`, outside the workspace, and need a nightly toolchain: from that directory, `mise x cargo:cargo-fuzz -- cargo +nightly fuzz run decode -- -max_total_time=600`.
 - Tools come from mise (`mise.toml`); do not install with brew, apt or npx.
 - Diagnostics are data (`nwscript-diag`): every error has a registered code with an explanation; never build one from rendered text.

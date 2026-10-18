@@ -29,6 +29,19 @@ The other 89 are not compiler failures. No compiler can reproduce them from the 
 
 Getting there meant reconstructing BioWare's build environment from its output. The engine's declarations changed while the game was written, and the bytecode carries each era: of the 55 scripts that call `ActionStartConversation`, 51 were compiled when it took eleven arguments, three against the twelve-argument declaration that shipped, and one against five; ten call the party-member routines at numbers and with arguments the shipped table no longer has. `--declarations bioware` restores the eleven-argument era, and [`conformance/overlays/`](conformance/overlays/) holds the earlier declarations inferred from the bytecode, each file citing the bytes it rests on. The findings are written up in [`docs/research/bytecode-quirks.md`](docs/research/bytecode-quirks.md); the full report, with every differing script, is [`conformance/report.md`](conformance/report.md).
 
+### Every archive of KotOR 1 reads and writes back byte for byte
+
+`rakata conformance` is the suite for the game's data: over an install it reads every file a format crate handles, writes it again with that crate's writer, and classifies the result per file. Over a vanilla KotOR 1 install, into every archive's members:
+
+<!-- rakata-conformance:begin -->
+| Format | Files | Identical | Equal after re-read | Different | No reader |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `archive` | 401 | 401 | 0 | 0 | |
+| no format | 78104 | | | | 78104 |
+<!-- rakata-conformance:end -->
+
+A file is **identical** when the writer reproduces its bytes; **equal after re-read** when the bytes differ but read back to the same data, a layout another tool chose and [`conformance/rakata-known.toml`](conformance/rakata-known.toml) names; **different** when they do not, which is a defect and exits 3. Files with no reader are the formats still to come; each format crate joins the table as it lands. The table is generated from the report by `cargo xtask readme`.
+
 ### It builds a real modded game identically
 
 modshop, a companion project, builds a modded KotOR 1 by script from a pristine game and the community's mod archives; four of its mods compile scripts at install time. Built with `nws`'s nwnnsscomp shim natively instead of nwnnsscomp under Wine, the game is identical: the same tree hash over 21,300 files, and none of its 24,277 compiled scripts differs.

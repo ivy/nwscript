@@ -8,9 +8,9 @@
 //! differs, an install directory here where `nws` records a profile.
 
 pub mod codes;
-pub mod patch;
 pub mod conformance;
 pub mod formats;
+pub mod patch;
 
 pub use nwscript_diag as diag;
 pub use nwscript_diag::{Exit, InputRecord, OutputRecord};
