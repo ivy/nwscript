@@ -88,11 +88,11 @@ One row per `ACTION` in a script's bytecode: the instruction's file offset, the 
 One row per naming of a symbol by a content. The kinds:
 
 - `resref`: a resource, by lowercase resref. From every non-empty `CResRef` field of a GFF (a dialogue's `Script`, `Active`, `VO_ResRef`, `Sound`; a blueprint's `Conversation`, `TemplateResRef`, event scripts); from a talk-table entry's voice-over; and from a script's string literal passed to a parameter whose name speaks of a script, template, resref, dialogue, sound, movie or module (`ExecuteScript`'s `sScript`, `CreateObject`'s `sTemplate`).
-- `strref`: a line of the talk table, in decimal. From every `CExoLocString` with a strref and every `StrRef` field, and from a script's integer literal passed to a parameter named for a strref (`nStrRef`).
+- `strref`: a line of the talk table, in decimal. From every `CExoLocString` with a strref and every `StrRef` field, from each 2DA cell holding a decimal number in a column of strrefs (`name`, `description`, `spelldesc`, `gameplayhint`, `storyhint`, `trapname`, and any column whose name contains `strref` or `stringref`), and from a script's integer literal passed to a parameter named for a strref (`nStrRef`).
 - `tag`: an object's tag, as written. From a `CExoString` field labelled `Tag`, `LinkedTo`, `KeyName`, `Speaker`, `Listener`, `Participant` or `Quest`, and from a script's string literal passed to a parameter whose name contains `Tag`.
 - `global`: a global variable, as written. From each row of `globalcat.2da` (its `name` cell), and from a script's string literal passed to `GetGlobal*` or `SetGlobal*`.
 
-`value` compares without regard to case. `site` says where in the content: a GFF field path for a GFF or dialogue (`EntryList[3].RepliesList[0].Active`), `@OFFSET Routine.param` for a script (`@4793 ExecuteScript.sScript`), `row N` for `globalcat.2da`, `strref N` for a talk table.
+`value` compares without regard to case. `site` says where in the content: a GFF field path for a GFF or dialogue (`EntryList[3].RepliesList[0].Active`), `@OFFSET Routine.param` for a script (`@4793 ExecuteScript.sScript`), `row N` for `globalcat.2da` and `row N COLUMN` for a 2DA's strref cell, `strref N` for a talk table.
 
 ### `search(body, kind, hash, site)`
 
