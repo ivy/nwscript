@@ -33,7 +33,8 @@ PATTERN = re.compile(NAMES, re.IGNORECASE)
 # a module run. A command that merely mentions the word (editing a document that says "PyKotor", `grep -v pykotor`)
 # reads nothing.
 COMMAND_PATTERN = re.compile(
-    rf"[/\\][^\s/\\]*(?:{NAMES})|(?:{NAMES})[^\s/\\]*[/\\]|(?:import|from|-m)\s+(?:{NAMES})",
+    rf"[/\\][^\s/\\]*(?:{NAMES})|(?:{NAMES})[^\s/\\]*[/\\]"
+    rf"|(?:\bimport|(?<![\w-])-m)\s+(?:{NAMES})|\bfrom\s+(?:{NAMES})[\w.]*\s+import\b",
     re.IGNORECASE,
 )
 
