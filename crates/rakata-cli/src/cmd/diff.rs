@@ -29,9 +29,18 @@ shows as ARCHIVE!MEMBER. Each pair whose bytes differ is compared by format:
   2DA        by row label and column
   TLK        by strref
   LIP        by length and keyframe
+  TPC, TGA   by header, each level's pixels as changed or not, and the
+             TPC's TXI by instruction; a TXI by instruction
+  LYT        by room, track, obstacle and door hook, by name
+  VIS        by room and by each room it sees
+  WOK, PWK,  by counts, the faces of each surface material, the edges
+  DWK        leading into each room, and the arrays that differ
+  MDL, MDX   as one model: header, nodes by name (added, removed, moved,
+             a mesh's textures, flags and counts), animations by name;
+             when both halves differ, the MDL's entry is the model's
   KEY        by resource: which BIF and index holds it
-  others     by hash, with the header fields known (a TPC's size and
-             encoding, a WAV's duration), marked contents not compared
+  others     by hash, with the header fields known (a WAV's duration),
+             marked contents not compared
 A pair whose bytes differ while its data is equal (another tool's layout) is
 counted, not listed.
 

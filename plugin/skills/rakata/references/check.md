@@ -28,7 +28,7 @@ rakata diff VANILLA SCRATCH
 rakata diff VANILLA SCRATCH --only Override/
 ```
 
-A tree diff pairs files by path; an Override file the original lacks is compared with the copy it replaces, so a changed dialogue shows its nodes, not a new file. `+` is added, `-` removed, `~` changed, with the sites (fields, rows, nodes and links by stable key) beneath each path. Exit 3 when the trees differ, 0 when they hold the same data.
+A tree diff pairs files by path; an Override file the original lacks is compared with the copy it replaces, so a changed dialogue shows its nodes, not a new file. `+` is added, `-` removed, `~` changed, with the sites (fields, rows, nodes and links by stable key; a texture's levels and TXI instructions, a layout's rooms, a walkmesh's materials and transitions, a model's nodes, textures and animations) beneath each path. A model's MDL and MDX are read as one: when both changed, the MDL's entry describes the model. A file whose bytes differ while its data is the same (another tool's layout) is marked `the same data, laid out differently`. Exit 3 when the trees differ, 0 when they hold the same data.
 
 Read it as the statement of the change: every line should be something the task asked for. For a new reply under a condition, expect the dialogue with one added reply and one added link carrying the condition, the condition's `.ncs` added (bytecode is compared by hash), and one added row in `globalcat.2da`. Anything else is a side effect to explain or undo.
 

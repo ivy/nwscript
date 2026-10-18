@@ -10,9 +10,13 @@ use rakata_archive::{Bif, Erf, Key, Rim};
 use rakata_dialog::Dialog;
 use rakata_gff::{Gff, LocString, Struct, Value};
 use rakata_lip::Lip;
+use rakata_lyt::{Lyt, Vis};
 use rakata_res::ResId;
+use rakata_texture::{Tga, Tpc, Txi};
 use rakata_tlk::{Tlk, codepage};
+use rakata_walkmesh::Walkmesh;
 
+use super::asset::{self, ModelPair};
 use super::{
     Cell, Change, Diff, Entry, FieldChange, Header, Kind, Options, Shown, Site, Walked, Warning,
     copies_elsewhere, extension, facts, matches,
@@ -65,6 +69,61 @@ struct Found {
     format: Option<String>,
     compared: bool,
     sites: Vec<Site>,
+    /// The pair is the second half of a two-file resource whose first
+    /// half differs too: the first half's entry describes both, and this
+    /// one is not listed.
+    folded: bool,
+}
+
+impl Found {
+    fn new(format: Option<String>, compared: bool, sites: Vec<Site>) -> Self {
+        Found {
+            format,
+            compared,
+            sites,
+            folded: false,
+        }
+    }
+}
+
+/// The other half of a two-file resource on each side, where it is found:
+/// the MDX beside a model's MDL, or the MDL beside its MDX.
+#[derive(Debug, Clone, Default)]
+pub(super) struct Partners(pub [Option<Vec<u8>>; 2]);
+
+/// The two extensions of the pair format `ext` belongs to, its own first.
+fn pair_exts(registry: &Registry, ext: Option<&str>) -> Option<(String, String)> {
+    let ext = ext?;
+    let d = registry.by_extension(ext)?;
+    d.pair()?;
+    let other = d
+        .extensions()
+        .iter()
+        .find(|e| !e.eq_ignore_ascii_case(ext))?;
+    Some((ext.to_ascii_lowercase(), (*other).to_owned()))
+}
+
+/// `name` with the other extension of its pair format, in the case its
+/// own extension is written in: `x.MDL` names `x.MDX`.
+pub(super) fn partner_name(name: &str) -> Option<String> {
+    let (stem, ext) = name.rsplit_once('.')?;
+    if ext.contains(['/', '!']) {
+        return None;
+    }
+    let (_, other) = pair_exts(&Registry::builtin(), Some(&ext.to_ascii_lowercase()))?;
+    let other = if ext.chars().all(|c| c.is_ascii_uppercase()) {
+        other.to_ascii_uppercase()
+    } else {
+        other
+    };
+    Some(format!("{stem}.{other}"))
+}
+
+/// The member of `members` named `name` with the other extension of its
+/// pair format, in any case.
+fn partner_member<'m>(members: &'m [Member], name: &str) -> Option<&'m Member> {
+    let want = partner_name(name)?;
+    members.iter().find(|m| m.name.eq_ignore_ascii_case(&want))
 }
 
 impl Cx {
@@ -188,7 +247,9 @@ impl Cx {
                     }
                     return;
                 }
-                self.pair(&b.rel, ext.as_deref(), &xa, &xb, change, from);
+                let partners =
+                    Partners([self.tree_partner(0, &a.rel), self.tree_partner(1, &b.rel)]);
+                self.pair(&b.rel, ext.as_deref(), &xa, &xb, &partners, change, from);
             }
             (Kind::Link { target: ta }, Kind::Link { target: tb }) => {
                 if ta != tb || renamed {
@@ -345,21 +406,29 @@ impl Cx {
             });
             return;
         }
-        for (location, theirs) in copies {
+        for (location, theirs, module) in copies {
             let (xa, xb) = if change == Change::Added {
                 (&theirs, &bytes)
             } else {
                 (&bytes, &theirs)
             };
             let found = if xa == xb {
-                Found {
-                    format: self.format_of(ext.as_deref()).format,
-                    compared: true,
-                    sites: Vec::new(),
-                }
+                Found::new(self.format_of(ext.as_deref()).format, true, Vec::new())
             } else {
-                self.contents(&w.rel, ext.as_deref(), xa, xb)
+                // A model's other half, as each install resolves it for
+                // the copy's module: from Override first, as the engine.
+                let partners = match (id, pair_exts(&self.registry, ext.as_deref())) {
+                    (Some(id), Some(_)) => Partners([
+                        self.install_partner(0, id, module.as_ref()),
+                        self.install_partner(1, id, module.as_ref()),
+                    ]),
+                    _ => Partners::default(),
+                };
+                self.contents(&w.rel, ext.as_deref(), xa, xb, &partners)
             };
+            if found.folded {
+                continue;
+            }
             self.entries.push(Entry {
                 path: w.rel.clone(),
                 change,
@@ -486,7 +555,23 @@ impl Cx {
             } else {
                 (data, rim)
             };
-            let found = self.contents(&here, ext.as_deref(), xa, xb);
+            let pid = partner_name(&id.to_string()).and_then(|n| ResId::parse(&n).ok());
+            let mine = pid.and_then(|p| ours.iter().find(|(o, _)| *o == p).map(|(_, d)| d.clone()));
+            let yours = pid.and_then(|p| {
+                theirs
+                    .iter()
+                    .find(|(t, _, _)| *t == p)
+                    .map(|(_, _, d)| d.clone())
+            });
+            let partners = if change == Change::Added {
+                Partners([yours, mine])
+            } else {
+                Partners([mine, yours])
+            };
+            let found = self.contents(&here, ext.as_deref(), xa, xb, &partners);
+            if found.folded {
+                continue;
+            }
             if found.compared && found.sites.is_empty() {
                 self.same_data += 1;
                 continue;
@@ -515,33 +600,93 @@ impl Cx {
         }
     }
 
-    /// The copies of `id` the side's install loads outside Override.
-    fn copies(&mut self, side: usize, id: ResId) -> Vec<(String, Vec<u8>)> {
+    /// The side's install, opened on first use.
+    fn install(&mut self, side: usize) -> Option<&Install> {
         let profile = self.profile;
         let s = &mut self.sides[side];
-        let Some(root) = s.root.clone() else {
-            return Vec::new();
-        };
+        let root = s.root.clone()?;
         s.install.get_or_init(|| Install::open(&root, profile).ok());
+        s.install.get().and_then(Option::as_ref)
+    }
+
+    /// The copies of `id` the side's install loads outside Override.
+    fn copies(&mut self, side: usize, id: ResId) -> Vec<(String, Vec<u8>, Option<ModuleName>)> {
+        if self.install(side).is_none() {
+            return Vec::new();
+        }
+        let s = &mut self.sides[side];
         let Some(install) = s.install.get().and_then(Option::as_ref) else {
             return Vec::new();
         };
         copies_elsewhere(install, &mut s.modules, id)
     }
 
+    /// The other half of the two-file resource `id` as the side's install
+    /// loads it for `module`, Override first.
+    fn install_partner(
+        &mut self,
+        side: usize,
+        id: ResId,
+        module: Option<&ModuleName>,
+    ) -> Option<Vec<u8>> {
+        let pid = ResId::parse(&partner_name(&id.to_string())?).ok()?;
+        let install = self.install(side)?;
+        install.read(pid, module).ok().flatten().map(|(_, b)| b)
+    }
+
+    /// The other half of the tree file `rel` on the side, when its format
+    /// is a pair: the file of that name in the same folder, else, for a
+    /// file under Override, the copy the side's install loads.
+    fn tree_partner(&mut self, side: usize, rel: &str) -> Option<Vec<u8>> {
+        let want = partner_name(rel)?;
+        let (dir, file) = want.rsplit_once('/').unwrap_or(("", &want));
+        let mut at = self.sides[side].root.clone()?;
+        let mut found = true;
+        for part in dir.split('/').filter(|p| !p.is_empty()) {
+            match crate::inspect::child_ci(&at, part) {
+                Some(p) => at = p,
+                None => {
+                    found = false;
+                    break;
+                }
+            }
+        }
+        if found
+            && let Some(path) = crate::inspect::child_ci(&at, file)
+            && let Ok(bytes) = fs::read(path)
+        {
+            return Some(bytes);
+        }
+        let in_override = rel
+            .split('/')
+            .next()
+            .is_some_and(|d| d.eq_ignore_ascii_case("override"));
+        let id = ResId::parse(rel.rsplit('/').next()?).ok()?;
+        if in_override {
+            self.install_partner(side, id, None)
+        } else {
+            None
+        }
+    }
+
     /// Two byte strings that differ, under `path`: an entry when their
     /// data differs, members of an archive as entries of their own.
+    #[allow(clippy::too_many_arguments)]
     pub fn pair(
         &mut self,
         path: &str,
         ext: Option<&str>,
         a: &[u8],
         b: &[u8],
+        partners: &Partners,
         change: Change,
         renamed_from: Option<String>,
     ) {
         let before = self.entries.len();
-        let found = self.contents(path, ext, a, b);
+        let found = self.contents(path, ext, a, b, partners);
+        if found.folded {
+            return;
+        }
         if found.compared && found.sites.is_empty() && renamed_from.is_none() {
             // An archive whose members differ is listed by its members.
             if self.entries.len() == before {
@@ -569,15 +714,19 @@ impl Cx {
             Some(e) => self.registry.by_extension(e).map(|d| d.name().to_owned()),
             None => None,
         };
-        Found {
-            format,
-            compared: false,
-            sites: Vec::new(),
-        }
+        Found::new(format, false, Vec::new())
     }
 
-    /// The sites at which two byte strings differ, by format.
-    fn contents(&mut self, path: &str, ext: Option<&str>, a: &[u8], b: &[u8]) -> Found {
+    /// The sites at which two byte strings differ, by format; `partners`
+    /// holds the other halves of a two-file resource.
+    fn contents(
+        &mut self,
+        path: &str,
+        ext: Option<&str>,
+        a: &[u8],
+        b: &[u8],
+        partners: &Partners,
+    ) -> Found {
         let format = self.format_of(ext).format;
         let result = match format.as_deref() {
             Some("dlg") => match (Dialog::parse(path, a), Dialog::parse(path, b)) {
@@ -592,21 +741,53 @@ impl Cx {
             Some("2da") => both(a, b, TwoDa::parse).map(|(x, y)| twoda(&x, &y)),
             Some("tlk") => both(a, b, Tlk::parse).map(|(x, y)| tlk(&x, &y)),
             Some("lip") => both(a, b, Lip::parse).map(|(x, y)| lip(&x, &y)),
-            Some("archive") => self.archive(path, a, b),
-            _ => {
-                return Found {
-                    format,
-                    compared: false,
-                    sites: Vec::new(),
+            Some("tpc") => both(a, b, Tpc::parse).map(|(x, y)| asset::tpc(&x, &y)),
+            Some("txi") => Ok(asset::txi(&Txi::parse(a), &Txi::parse(b))),
+            Some("tga") => both(a, b, Tga::parse).map(|(x, y)| asset::tga(&x, &y)),
+            Some("lyt") => both(a, b, Lyt::parse).map(|(x, y)| asset::lyt(&x, &y)),
+            Some("vis") => both(a, b, Vis::parse).map(|(x, y)| asset::vis(&x, &y)),
+            Some("walkmesh") => both(a, b, Walkmesh::parse).map(|(x, y)| asset::walkmesh(&x, &y)),
+            Some("mdl") => {
+                let second = pair_exts(&self.registry, ext).is_some_and(|(own, _)| own == "mdx");
+                let [pa, pb] = &partners.0;
+                let halves = if second {
+                    // An MDX is read with its MDL. When the MDLs differ
+                    // too, or only one side has one, the MDL's entry
+                    // compares the model whole.
+                    match (pa, pb) {
+                        (Some(x), Some(y)) if x == y => Some((&x[..], a, &y[..], b)),
+                        (None, None) => None,
+                        _ => {
+                            let mut f = Found::new(format, true, Vec::new());
+                            f.folded = true;
+                            return f;
+                        }
+                    }
+                } else {
+                    let empty: &[u8] = &[];
+                    Some((
+                        a,
+                        pa.as_deref().unwrap_or(empty),
+                        b,
+                        pb.as_deref().unwrap_or(empty),
+                    ))
                 };
+                match halves {
+                    None => Err("no MDL of its name lies beside it to read it with".to_owned()),
+                    Some((la, xa, lb, xb)) => {
+                        match (ModelPair::parse(la, xa), ModelPair::parse(lb, xb)) {
+                            (Ok(x), Ok(y)) => Ok(asset::model(&x, &y)),
+                            (Err(e), _) => Err(format!("A: {e}")),
+                            (_, Err(e)) => Err(format!("B: {e}")),
+                        }
+                    }
+                }
             }
+            Some("archive") => self.archive(path, a, b),
+            _ => return Found::new(format, false, Vec::new()),
         };
         match result {
-            Ok(sites) => Found {
-                format,
-                compared: true,
-                sites,
-            },
+            Ok(sites) => Found::new(format, true, sites),
             Err(message) => {
                 self.warn(
                     "RW1601",
@@ -615,11 +796,7 @@ impl Cx {
                         format.as_deref().unwrap_or("its format")
                     ),
                 );
-                Found {
-                    format,
-                    compared: false,
-                    sites: Vec::new(),
-                }
+                Found::new(format, false, Vec::new())
             }
         }
     }
@@ -758,7 +935,19 @@ impl Cx {
                         });
                     } else {
                         let ext = mb.ext.clone();
-                        self.pair(&there, ext.as_deref(), &ma.data, &mb.data, change, from);
+                        let partners = Partners([
+                            partner_member(a, &ma.name).map(|m| m.data.clone()),
+                            partner_member(b, &mb.name).map(|m| m.data.clone()),
+                        ]);
+                        self.pair(
+                            &there,
+                            ext.as_deref(),
+                            &ma.data,
+                            &mb.data,
+                            &partners,
+                            change,
+                            from,
+                        );
                     }
                 }
             }
@@ -1177,7 +1366,8 @@ fn key(a: &Key, b: &Key) -> Vec<Site> {
     sites
 }
 
-/// The header fields known for a format without a crate.
+/// The header fields read from a file's head, shown for a file not
+/// compared by its contents.
 pub(super) fn header_fields(ext: Option<&str>, b: &[u8], len: u64) -> Vec<Header> {
     let h = |field: &str, value: String| Header {
         field: field.to_owned(),

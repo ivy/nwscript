@@ -6,10 +6,18 @@
 //! BIF's by position), and each pair whose bytes differ is compared by its
 //! format: a GFF by field path, a 2DA by row label and column, a talk table
 //! by strref, a dialogue node by node under stable keys ([`dialog`]), a LIP
-//! by keyframe, a KEY by resource. A format without a crate is compared by
+//! by keyframe, a KEY by resource, and a texture, layout, walkmesh or
+//! model by its parts ([`asset`]). A format without a crate is compared by
 //! hash, with the header fields known for it, and marked as not compared.
 //! A pair whose bytes differ while its data is equal (another writer's
 //! layout) is counted in [`Diff::same_data`] and listed nowhere.
+//!
+//! A model is two files of one name, its MDL and its MDX, read as one: the
+//! other half is the file of that name beside it (in its folder, or its
+//! archive), or for an Override file the one its install loads. When both
+//! halves differ the MDL's entry describes the model and the MDX has none;
+//! an MDX that differs beside an MDL that does not is listed by itself,
+//! read with that MDL.
 //!
 //! An `Override/` file one tree has and the other lacks is compared with
 //! the copies the other tree's install loads in its place, from `patch.erf`
@@ -24,6 +32,7 @@
 //! which `rakata diff` renders as text ([`Diff::text`]) and serialises as
 //! JSON.
 
+mod asset;
 mod compare;
 pub mod dialog;
 mod render;
@@ -60,8 +69,9 @@ pub enum Change {
 pub struct Facts {
     pub size: u64,
     pub sha256: String,
-    /// Header fields of a format without a crate, where they are known
-    /// (`width`, `height` and `encoding` for a TPC; a WAV's duration).
+    /// Header fields read from the file's head, where they are known
+    /// (`width`, `height` and `encoding` for a TPC or TGA; a WAV's
+    /// duration).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub header: Vec<Header>,
 }
@@ -142,6 +152,20 @@ pub enum Site {
         before: Option<String>,
         after: Option<String>,
     },
+    /// A named part of a texture, layout, walkmesh or model ([`asset`]):
+    /// a level's pixels, a TXI instruction, a room, a room seen, a surface
+    /// material, a node, an animation, or an array of the file. A part
+    /// changed names its `field` when the change is to one; `before` and
+    /// `after` describe it where there is something to show.
+    Part {
+        change: Change,
+        part: String,
+        name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        field: Option<String>,
+        before: Option<String>,
+        after: Option<String>,
+    },
 }
 
 /// One path that differs: a file of a tree, or a member of an archive as
@@ -155,7 +179,8 @@ pub struct Entry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub renamed_from: Option<String>,
     /// The format the contents were read as: `gff`, `dlg`, `2da`, `tlk`,
-    /// `lip`, `archive`; `None` for a format without a crate.
+    /// `lip`, `tpc`, `txi`, `tga`, `lyt`, `vis`, `walkmesh`, `mdl` (an MDX
+    /// too), `archive`; `None` for a format without a crate.
     pub format: Option<String>,
     /// Whether the contents were compared by format. `false` means
     /// contents not compared: the sides are told apart by hash and header.
@@ -262,7 +287,20 @@ pub fn diff(a: &str, b: &str, options: &Options) -> Result<Diff, Diagnostic> {
             };
             let la = inspect::load(a, &lookup)?;
             let lb = inspect::load(b, &lookup)?;
-            let mut d = diff_resources((&la.name, &la.bytes), (&lb.name, &lb.bytes), options);
+            // The other half of a model, by the same name with the other
+            // extension, where it is found.
+            let partner = |side: &str| {
+                compare::partner_name(side)
+                    .and_then(|n| inspect::load(&n, &lookup).ok())
+                    .map(|l| l.bytes)
+            };
+            let partners = compare::Partners([partner(a), partner(b)]);
+            let mut d = resources(
+                (&la.name, &la.bytes),
+                (&lb.name, &lb.bytes),
+                &partners,
+                options,
+            );
             d.a = la.source;
             d.b = lb.source;
             Ok(d)
@@ -279,8 +317,19 @@ pub fn diff(a: &str, b: &str, options: &Options) -> Result<Diff, Diagnostic> {
 }
 
 /// Compare two resources, each a name (whose extension says its format)
-/// and its bytes. An archive is recursed into its members.
+/// and its bytes. An archive is recursed into its members. A model's MDL
+/// is read without its MDX here, and an MDX alone is not read: [`diff`]
+/// finds the other half by name.
 pub fn diff_resources(a: (&str, &[u8]), b: (&str, &[u8]), options: &Options) -> Diff {
+    resources(a, b, &compare::Partners::default(), options)
+}
+
+fn resources(
+    a: (&str, &[u8]),
+    b: (&str, &[u8]),
+    partners: &compare::Partners,
+    options: &Options,
+) -> Diff {
     let mut cx = compare::Cx::new(None, None, options.profile);
     let path = if a.0.eq_ignore_ascii_case(b.0) {
         b.0.to_owned()
@@ -290,7 +339,15 @@ pub fn diff_resources(a: (&str, &[u8]), b: (&str, &[u8]), options: &Options) -> 
     cx.compared += 1;
     if a.1 != b.1 {
         let ext = extension(b.0).or_else(|| extension(a.0));
-        cx.pair(&path, ext.as_deref(), a.1, b.1, Change::Changed, None);
+        cx.pair(
+            &path,
+            ext.as_deref(),
+            a.1,
+            b.1,
+            partners,
+            Change::Changed,
+            None,
+        );
     }
     cx.finish(a.0.to_owned(), b.0.to_owned(), "resource", options)
 }
@@ -577,12 +634,13 @@ fn same_bytes(a: &Path, b: &Path) -> std::io::Result<bool> {
 /// The copies of an Override file's resource that an install loads in its
 /// place: the one it loads outside any module (`patch.erf`, the BIFs) and
 /// the one each module holding the resource loads, distinct by bytes, each
-/// as a location name [`inspect::load`] takes back.
+/// as a location name [`inspect::load`] takes back, with the module whose
+/// copy it is (`None` for the one outside any module).
 fn copies_elsewhere(
     install: &Install,
     modules: &mut Option<HashMap<ResId, Vec<ModuleName>>>,
     id: ResId,
-) -> Vec<(String, Vec<u8>)> {
+) -> Vec<(String, Vec<u8>, Option<ModuleName>)> {
     let index = modules.get_or_insert_with(|| {
         let mut m: HashMap<ResId, Vec<ModuleName>> = HashMap::new();
         for module in install.modules() {
@@ -592,17 +650,21 @@ fn copies_elsewhere(
         }
         m
     });
-    let mut out: Vec<(String, Vec<u8>)> = Vec::new();
-    let mut add = |found: Option<(crate::game::Location, Vec<u8>)>| {
+    let mut out: Vec<(String, Vec<u8>, Option<ModuleName>)> = Vec::new();
+    let mut add = |found: Option<(crate::game::Location, Vec<u8>)>, module: Option<&ModuleName>| {
         if let Some((location, bytes)) = found
-            && !out.iter().any(|(_, b)| *b == bytes)
+            && !out.iter().any(|(_, b, _)| *b == bytes)
         {
-            out.push((location_name(install.root(), &location, id), bytes));
+            out.push((
+                location_name(install.root(), &location, id),
+                bytes,
+                module.cloned(),
+            ));
         }
     };
-    add(install.read(id, None).ok().flatten());
+    add(install.read(id, None).ok().flatten(), None);
     for module in index.get(&id).into_iter().flatten() {
-        add(install.read(id, Some(module)).ok().flatten());
+        add(install.read(id, Some(module)).ok().flatten(), Some(module));
     }
     out
 }
@@ -619,5 +681,7 @@ fn location_name(root: &Path, l: &crate::game::Location, id: ResId) -> String {
     }
 }
 
+#[cfg(test)]
+mod asset_tests;
 #[cfg(test)]
 mod tests;

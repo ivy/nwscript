@@ -121,6 +121,11 @@ fn entry(out: &mut String, e: &Entry) {
         let _ = write!(out, ", {verb} {}", e.against.join(", "));
         if e.sites.is_empty() && e.compared {
             out.push_str(": the same data");
+            if let (Some(a), Some(b)) = (&e.a, &e.b)
+                && a.sha256 != b.sha256
+            {
+                out.push_str(", laid out differently");
+            }
         }
     }
     out.push('\n');
@@ -215,6 +220,29 @@ fn site(out: &mut String, s: &Site) {
             for f in &n.fields {
                 field(out, "        ", f);
             }
+        }
+        Site::Part {
+            change,
+            part,
+            name,
+            field,
+            before,
+            after,
+        } => {
+            let _ = write!(out, "{IN}{} {part} `{name}`", mark(*change));
+            if let Some(f) = field {
+                let _ = write!(out, " {f}");
+            }
+            match (before, after) {
+                (Some(b), Some(a)) => {
+                    let _ = write!(out, ": {} -> {}", clip(b, 200), clip(a, 200));
+                }
+                (Some(v), None) | (None, Some(v)) => {
+                    let _ = write!(out, ": {}", clip(v, 200));
+                }
+                (None, None) => {}
+            }
+            out.push('\n');
         }
         Site::Resource {
             change,
