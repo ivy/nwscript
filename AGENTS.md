@@ -15,7 +15,7 @@ A Rust workspace: a toolset for the data of BioWare's Aurora-family games, KotOR
 | `rakata-lip` | lip-sync files: the duration and the keyframes, read, written bit for bit, made from cues | present |
 | `rakata-game` | the install: search order, `which`, the `Resolver` for nwscript | present |
 | `rakata-gff` | the GFF tree, lossless read, BioWare-layout write, paths, diff | present |
-| `rakata-dialog` | DLG model, stable keys, transcript, lints | model, keys and transcript present |
+| `rakata-dialog` | DLG model, stable keys, transcript, lints | present |
 | `rakata-save` | save games by name, and a copy with changed globals or party | present |
 | `rakata-index` | facts, references and full text in SQLite, keyed by content hash; the schema is [`docs/index.md`](docs/index.md) | present |
 | `rakata-patch` | `changes.ini` reader, plan, executor, report read back from the tree | present |
