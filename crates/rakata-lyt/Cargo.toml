@@ -1,0 +1,18 @@
+[package]
+name = "rakata-lyt"
+description = "An area's room layout and room visibility in Aurora-family games: the LYT's rooms, swoop tracks, obstacles and door hooks, and the VIS's rooms each room sees; read, and written back byte for byte."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+rakata-game = { workspace = true }
+rakata-gff = { workspace = true }
+rakata-res = { workspace = true }
+
+[lints]
+workspace = true

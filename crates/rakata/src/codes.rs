@@ -186,6 +186,15 @@ nwscript_diag::codes! {
     RE2204 Error "a TGA truncated before its header or pixels end";
     RE2205 Error "a TGA image type or pixel depth that is not decoded";
     RE2206 Error "a TGA run-length packet past the image's last pixel";
+    RE2301 Error "not a room layout: no beginlayout line";
+    RE2302 Error "a room layout line in no form the layout takes where it stands";
+    RE2303 Error "a count or coordinate of a layout or visibility file that is not a number";
+    RE2304 Error "a room layout section whose rows disagree with its count";
+    RE2305 Error "a room layout with no donelayout line";
+    RE2306 Error "a byte outside ASCII in a layout or visibility file";
+    RE2307 Error "a layout or visibility value the text form cannot hold";
+    RE2311 Error "a visibility file's indented room before any room line";
+    RE2312 Error "a visibility line that is neither ROOM COUNT nor an indented room";
 }
 
 /// The rakata code with this id, if registered; case does not matter.

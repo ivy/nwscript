@@ -1117,6 +1117,7 @@ dependencies = [
  "rakata-gff",
  "rakata-index",
  "rakata-lip",
+ "rakata-lyt",
  "rakata-patch",
  "rakata-res",
  "rakata-save",
@@ -1229,6 +1230,15 @@ dependencies = [
  "rakata-dialog",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "rakata-lyt"
+version = "0.0.0"
+dependencies = [
+ "rakata-game",
+ "rakata-gff",
+ "rakata-res",
 ]
 
 [[package]]

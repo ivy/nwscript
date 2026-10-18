@@ -18,6 +18,7 @@ rakata-dialog = { workspace = true }
 rakata-game = { workspace = true }
 rakata-index = { workspace = true }
 rakata-lip = { workspace = true }
+rakata-lyt = { workspace = true }
 rakata-gff = { workspace = true }
 rakata-res = { workspace = true }
 rakata-patch = { workspace = true }
