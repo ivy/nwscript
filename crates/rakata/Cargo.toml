@@ -14,6 +14,7 @@ nwscript-decomp = { workspace = true }
 nwscript-diag = { workspace = true }
 rakata-archive = { workspace = true }
 rakata-2da = { workspace = true }
+rakata-dialog = { workspace = true }
 rakata-game = { workspace = true }
 rakata-lip = { workspace = true }
 rakata-gff = { workspace = true }
