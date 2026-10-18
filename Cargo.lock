@@ -1048,6 +1048,7 @@ dependencies = [
  "rakata-2da",
  "rakata-archive",
  "rakata-game",
+ "rakata-gff",
  "rakata-lip",
  "rakata-patch",
  "rakata-res",
