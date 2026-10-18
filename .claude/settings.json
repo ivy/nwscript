@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Grep|Glob|Edit|Write|Bash|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I \"${CLAUDE_PROJECT_DIR}/scripts/clean-room.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "^mcp__codebase-memory__",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I \"${CLAUDE_PROJECT_DIR}/scripts/clean-room.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
