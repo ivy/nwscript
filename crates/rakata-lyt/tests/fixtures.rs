@@ -164,6 +164,45 @@ fn departures_from_the_written_form_are_kept_and_an_edited_line_is_rewritten() {
         assert_eq!(l.to_bytes().unwrap(), b);
     }
 
+    // A section missing, the others out of order and one given twice: the
+    // writer adds and orders them, and every row read is still written as
+    // it was spelled, so 1.707107 does not become %g's 1.70711 (found by
+    // fuzzing, when a missing section shifted the rows kept as read).
+    let b = crlf(&[
+        "beginlayout",
+        "   doorhookcount 1",
+        "      Test02_a Door_01 0 1.0 2.0 3.0 1.707107 0.0 0.0 -0.707107",
+        "   roomcount 1",
+        "      Test02_a 0.1234567 0.0 0.0",
+        "   obstaclecount 0",
+        "   roomcount 1",
+        "      Test02_b 0.0 0.0 0.0",
+        "donelayout",
+    ]);
+    let l = Lyt::parse(seed(&b)).unwrap();
+    let written = l.to_bytes().unwrap();
+    let back = Lyt::parse(&written).unwrap();
+    assert!(back.semantic_eq(&l));
+    assert_eq!(back.door_hooks[0].orientation.w, 1.707107);
+    assert_eq!(back.to_bytes().unwrap(), written);
+    assert_eq!(
+        String::from_utf8(written).unwrap(),
+        crlf(&[
+            "beginlayout",
+            "   roomcount 2",
+            "      Test02_a 0.1234567 0.0 0.0",
+            "      Test02_b 0.0 0.0 0.0",
+            "   trackcount 0",
+            "   obstaclecount 0",
+            "   doorhookcount 1",
+            "      Test02_a Door_01 0 1.0 2.0 3.0 1.707107 0.0 0.0 -0.707107",
+            "donelayout",
+        ])
+        .into_iter()
+        .map(char::from)
+        .collect::<String>()
+    );
+
     lyt.rooms[0].position[0] = 5.0;
     let written = String::from_utf8(lyt.to_bytes().unwrap()).unwrap();
     assert!(

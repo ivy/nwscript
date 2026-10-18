@@ -272,13 +272,17 @@ impl Lyt {
             .filter(|l| !l.is_blank())
             .peekable();
         let mut done = None;
+        // The section lines as read, each with the line the writer would
+        // produce for it and its row, if it is one. They are placed where
+        // the writer puts them once every section's rows are known, since
+        // the writer orders the sections and writes each once.
+        let mut read: Vec<(Section, Option<usize>, String, &str)> = Vec::new();
         while let Some(l) = rest.next() {
             let tokens = l.tokens();
             if let [w] = tokens[..]
                 && w.eq_ignore_ascii_case(DONE)
             {
-                style.record(index, DONE, l.raw);
-                done = Some(l.number);
+                done = Some((l.number, l.raw));
                 break;
             }
             let Some(section) = tokens.first().and_then(|w| Section::from_keyword(w)) else {
@@ -288,12 +292,12 @@ impl Lyt {
                 return Err(unexpected(l, "`KEYWORD COUNT`"));
             };
             let declared = text::parse_count(count, l.number)?;
-            style.record(
-                index,
-                &format!("{COUNT_INDENT}{} {declared}", section.keyword()),
+            read.push((
+                section,
+                None,
+                format!("{COUNT_INDENT}{} {declared}", section.keyword()),
                 l.raw,
-            );
-            index += 1;
+            ));
             let mut found = 0;
             while let Some(row) =
                 rest.next_if(|r| !r.tokens().first().is_some_and(|w| is_keyword(w)))
@@ -316,8 +320,7 @@ impl Lyt {
                         c
                     }
                 };
-                style.record(index, &canonical, row.raw);
-                index += 1;
+                read.push((section, Some(lyt.rows(section) - 1), canonical, row.raw));
                 found += 1;
             }
             if found != declared {
@@ -329,7 +332,26 @@ impl Lyt {
                 });
             }
         }
-        let done = done.ok_or(Error::Unterminated)?;
+        let (done, done_raw) = done.ok_or(Error::Unterminated)?;
+        let mut start = [0; 4];
+        for (k, section) in Section::ALL.into_iter().enumerate() {
+            start[k] = index;
+            index += 1 + lyt.rows(section);
+        }
+        let mut counted = [false; 4];
+        for (section, row, canonical, raw) in &read {
+            let k = *section as usize;
+            match row {
+                Some(i) => style.record(start[k] + 1 + i, canonical, raw),
+                // A section given twice is written once, counting both.
+                None if !counted[k] => {
+                    counted[k] = true;
+                    style.record(start[k], canonical, raw);
+                }
+                None => {}
+            }
+        }
+        style.record(index, DONE, done_raw);
         // Blank lines fold into the line before them, so a line's number
         // is not its place in `lines`.
         let after = lines.iter().position(|l| l.number == done).expect("read") + 1;
@@ -338,8 +360,19 @@ impl Lyt {
         Ok(lyt)
     }
 
+    fn rows(&self, section: Section) -> usize {
+        match section {
+            Section::Rooms => self.rooms.len(),
+            Section::Tracks => self.tracks.len(),
+            Section::Obstacles => self.obstacles.len(),
+            Section::DoorHooks => self.door_hooks.len(),
+        }
+    }
+
     /// The file's bytes. A layout read writes back as the bytes it came
-    /// from; a layout built or edited is written in the vanilla files' form:
+    /// from (when a section is missing, out of order or given twice, the
+    /// sections are written in order, each once, their lines as read); a
+    /// layout built or edited is written in the vanilla files' form:
     /// CRLF endings, count lines indented three spaces and rows six, the
     /// sections in the order rooms, tracks, obstacles, door hooks, every
     /// count written even when zero, and numbers spelled as
