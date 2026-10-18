@@ -148,7 +148,7 @@ fn opt_int(v: Option<impl Into<i64>>) -> Value {
 }
 
 /// The resource types read as GFF.
-pub(crate) fn is_gff(ty: ResType) -> bool {
+pub fn is_gff(ty: ResType) -> bool {
     use ResType::*;
     matches!(
         ty,
@@ -189,7 +189,7 @@ pub(crate) fn is_gff(ty: ResType) -> bool {
 }
 
 /// The resource types read as archives, whose members the build lists.
-pub(crate) fn is_archive(ty: ResType) -> bool {
+pub fn is_archive(ty: ResType) -> bool {
     matches!(
         ty,
         ResType::Key
@@ -400,7 +400,7 @@ fn literal_json(l: &Literal) -> serde_json::Value {
 /// `sWaypointTag`) names a tag, one that speaks of a script, template,
 /// resref, dialogue, sound, movie or module names a resource; an integer
 /// parameter named for a strref names a line of the talk table.
-pub(crate) fn ref_kind(routine: &str, param: &str, lit: &Literal) -> Option<RefKind> {
+pub fn ref_kind(routine: &str, param: &str, lit: &Literal) -> Option<RefKind> {
     let p = param.to_ascii_lowercase();
     match lit {
         Literal::String(_) => {

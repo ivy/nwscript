@@ -73,23 +73,28 @@ pub fn routines(game: &Path) -> Vec<Routine> {
     };
     let mut map = SourceMap::new();
     match nwscript::engine::load_table(&mut install, &mut map) {
-        Ok(Some((table, _))) => table
-            .functions
-            .iter()
-            .map(|f| Routine {
-                name: f.name.clone(),
-                params: f
-                    .params
-                    .iter()
-                    .map(|p| Param {
-                        name: p.name.clone(),
-                        ty: arg_type(&p.ty),
-                    })
-                    .collect(),
-            })
-            .collect(),
+        Ok(Some((table, _))) => routines_of(&table),
         _ => Vec::new(),
     }
+}
+
+/// The engine's routines as `table` declares them, by number.
+pub fn routines_of(table: &nwscript::sema::EngineTable) -> Vec<Routine> {
+    table
+        .functions
+        .iter()
+        .map(|f| Routine {
+            name: f.name.clone(),
+            params: f
+                .params
+                .iter()
+                .map(|p| Param {
+                    name: p.name.clone(),
+                    ty: arg_type(&p.ty),
+                })
+                .collect(),
+        })
+        .collect()
 }
 
 /// Build the index of the tree at `o.game` into `o.db`.
