@@ -4,17 +4,8 @@
 //! lint, each with a long explanation in `explain/CODE.md` beside this
 //! crate, which `rakata explain CODE` prints.
 //!
-//! Ranges: `RE00xx` inputs and invocation, `RE01xx` resource identity
-//! (`rakata-res`), `RE02xx` archives (`rakata-archive`), `RE03xx` and
-//! `RW03xx` the installer, its change files and its run (`rakata-patch`), `RE04xx` the
-//! install (`rakata-game`), `RE05xx` the round-trip suite
-//! ([`crate::conformance`]), `RE06xx` GFF (`rakata-gff`), `RE07xx` tables
-//! (`rakata-2da`), `RE08xx` the talk table (`rakata-tlk`), `RE09xx` lip-sync
-//! files (`rakata-lip`), `RE10xx` and `RW10xx` the corpus
-//! ([`crate::corpus`]), `RE11xx` and `RW11xx` dialogues (`rakata-dialog`),
-//! `RE12xx` and `RW12xx` saves (`rakata-save`), `RE13xx` the inspection
-//! commands ([`crate::inspect`]), `RE14xx` the authoring API
-//! ([`crate::author`]). Each crate takes a range of its own as it lands.
+//! Each crate or command family holds a block of a hundred codes, so
+//! parallel work never collides; `AGENTS.md` lists the blocks.
 
 pub use nwscript_diag::codes::Code;
 
