@@ -8,6 +8,21 @@ use rakata_mdl::{
     controller_types, decompress_quaternion, mdx_flags,
 };
 
+/// `mdl`, kept with `mdx` after it as a seed for the fuzz targets in the
+/// directory `$RAKATA_FUZZ_SEEDS` names, when it is set.
+fn seed<'a>(mdl: &'a [u8], mdx: &[u8]) -> &'a [u8] {
+    if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let bytes = [mdl, mdx].concat();
+        let mut h = DefaultHasher::new();
+        bytes.hash(&mut h);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+    }
+    mdl
+}
+
 const NONE: u32 = u32::MAX;
 
 /// A model's MDL and MDX under construction. Offsets in the model data
@@ -458,7 +473,7 @@ fn room() -> (Vec<u8>, Vec<u8>) {
 #[test]
 fn a_room_with_meshes_of_two_kinds_and_other_nodes() {
     let (mdl, mdx) = room();
-    let m = Model::parse(&mdl, &mdx).unwrap();
+    let m = Model::parse(seed(&mdl, &mdx), &mdx).unwrap();
     assert_eq!(m.name, "m01aa_01a");
     assert_eq!(m.classification, Classification::Other);
     assert_eq!(m.supermodel, None);
@@ -543,7 +558,7 @@ fn a_door_with_a_supermodel_and_a_mesh_with_its_positions_in_the_mdl() {
     b.mesh(blade, &q);
     b.children(root, &[blade]);
     let (mdl, _) = b.finish();
-    let m = Model::parse(&mdl, &[]).unwrap();
+    let m = Model::parse(seed(&mdl, &[]), &[]).unwrap();
     assert_eq!(m.classification, Classification::Door);
     assert_eq!(m.supermodel, Some("dor_base"));
     assert!(m.animations.is_empty());
@@ -605,7 +620,7 @@ fn a_node_reached_twice_is_refused() {
 fn a_name_not_ascii_is_refused() {
     let (mut mdl, mdx) = room();
     mdl[12 + 0x08] = 0xE9;
-    let e = Model::parse(&mdl, &mdx).unwrap_err();
+    let e = Model::parse(seed(&mdl, &mdx), &mdx).unwrap_err();
     assert_eq!(e.code(), codes::BAD_NAME, "{e}");
 }
 
@@ -619,7 +634,7 @@ fn an_attribute_past_the_stride_is_refused() {
     b.put_u32(mesh + 80 + 272, 28);
     b.children(root, &[mesh]);
     let (mdl, mdx) = b.finish();
-    let e = Model::parse(&mdl, &mdx).unwrap_err();
+    let e = Model::parse(seed(&mdl, &mdx), &mdx).unwrap_err();
     assert_eq!(e.code(), codes::BAD_VERTEX_LAYOUT, "{e}");
 }
 
@@ -634,7 +649,7 @@ fn a_face_naming_a_missing_vertex_is_refused() {
     b.mesh(mesh, &q);
     b.children(root, &[mesh]);
     let (mdl, mdx) = b.finish();
-    let e = Model::parse(&mdl, &mdx).unwrap_err();
+    let e = Model::parse(seed(&mdl, &mdx), &mdx).unwrap_err();
     assert_eq!(
         e,
         Error::BadIndex {
@@ -660,7 +675,7 @@ fn close(a: [f32; 4], b: Quaternion, tol: f32) -> bool {
 #[test]
 fn geometry_controllers_repeat_the_node_header() {
     let (mdl, mdx) = room();
-    let m = Model::parse(&mdl, &mdx).unwrap();
+    let m = Model::parse(seed(&mdl, &mdx), &mdx).unwrap();
     let floor = m.node("floor").unwrap();
     assert_eq!(floor.controllers.len(), 2);
     let p = floor.controller(controller_types::POSITION).unwrap();
@@ -676,7 +691,7 @@ fn geometry_controllers_repeat_the_node_header() {
 #[test]
 fn an_animation_with_events_and_linear_compressed_and_bezier_keys() {
     let (mdl, mdx) = room();
-    let m = Model::parse(&mdl, &mdx).unwrap();
+    let m = Model::parse(seed(&mdl, &mdx), &mdx).unwrap();
     let a = m.animation("ANIMLOOP1").unwrap();
     assert_eq!((a.length, a.transition, a.root), (2.0, 0.25, "m01aa_01a"));
     let events: Vec<_> = a.events.iter().map(|e| (e.time, e.name)).collect();
@@ -810,7 +825,7 @@ fn body(bone_map: [f32; 4]) -> (Vec<u8>, Vec<u8>) {
 #[test]
 fn a_skin_with_its_bones_and_weights() {
     let (mdl, mdx) = body([-1.0, 0.0, 1.0, -1.0]);
-    let m = Model::parse(&mdl, &mdx).unwrap();
+    let m = Model::parse(seed(&mdl, &mdx), &mdx).unwrap();
     let n = m.node("skin").unwrap();
     assert_eq!(n.kind, NodeKind::Skin);
     let mesh = n.mesh.as_ref().unwrap();
@@ -840,10 +855,10 @@ fn a_skin_with_its_bones_and_weights() {
 #[test]
 fn a_skin_naming_a_bone_index_twice_is_refused() {
     let (mdl, mdx) = body([-1.0, 0.0, 0.0, -1.0]);
-    let e = Model::parse(&mdl, &mdx).unwrap_err();
+    let e = Model::parse(seed(&mdl, &mdx), &mdx).unwrap_err();
     assert_eq!(e.code(), codes::BAD_SKIN, "{e}");
     let (mdl, mdx) = body([-1.0, 0.0, 2.0, -1.0]);
-    let e = Model::parse(&mdl, &mdx).unwrap_err();
+    let e = Model::parse(seed(&mdl, &mdx), &mdx).unwrap_err();
     assert_eq!(e.code(), codes::BAD_SKIN, "{e}");
 }
 

@@ -313,7 +313,18 @@ impl ModelFile {
                     w.geometry.len()
                 ),
             })? as u32,
-            NodePointer::Raw(v) => v,
+            // Kept as read, it must still name no node where this layout
+            // puts them, or it would read back as that node.
+            NodePointer::Raw(v) => match w.geometry.iter().position(|&o| o == v as usize) {
+                Some(i) => {
+                    return Err(Error::Inconsistent {
+                        what: format!(
+                            "the header's raw head-node value {v} is where node {i} is written"
+                        ),
+                    });
+                }
+                None => v,
+            },
         };
         w.put(0xA8, head);
 

@@ -7,6 +7,21 @@ use rakata_mdl::{
     NodeFile, NodePointer, SaberFile, SkinFile, codes, controller_types, layout, mdx_flags,
 };
 
+/// `mdl`, kept with `mdx` after it as a seed for the fuzz targets in the
+/// directory `$RAKATA_FUZZ_SEEDS` names, when it is set.
+fn seed<'a>(mdl: &'a [u8], mdx: &[u8]) -> &'a [u8] {
+    if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let bytes = [mdl, mdx].concat();
+        let mut h = DefaultHasher::new();
+        bytes.hash(&mut h);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+    }
+    mdl
+}
+
 fn put_u16(b: &mut [u8], at: usize, v: u16) {
     b[at..at + 2].copy_from_slice(&v.to_le_bytes());
 }
@@ -340,7 +355,7 @@ fn every_kind() -> ModelFile {
 fn a_model_of_every_kind_writes_and_reads_back_equal() {
     let model = every_kind();
     let (mdl, mdx) = model.to_bytes().unwrap();
-    let again = ModelFile::parse(&mdl, &mdx).unwrap();
+    let again = ModelFile::parse(seed(&mdl, &mdx), &mdx).unwrap();
     // The padding after each MDX block is what the writer's layout put
     // there; the rest is the model as built.
     assert!(again.semantic_eq(&model));
@@ -353,7 +368,7 @@ fn a_model_of_every_kind_writes_and_reads_back_equal() {
     assert_eq!(l.mdx_trailing, 0);
 
     // The reader sees what was built.
-    let m = rakata_mdl::parse(&mdl, &mdx).unwrap();
+    let m = rakata_mdl::parse(seed(&mdl, &mdx), &mdx).unwrap();
     assert_eq!(m.name, "every_kind");
     assert_eq!(m.nodes.len(), 10);
     let names: Vec<&str> = m.nodes.iter().map(|n| n.name).collect();
@@ -424,7 +439,7 @@ fn a_model_of_every_kind_writes_and_reads_back_equal() {
 #[test]
 fn the_mdx_holds_skins_last_and_pads_by_the_length_past_sixteen() {
     let (mdl, mdx) = every_kind().to_bytes().unwrap();
-    let m = rakata_mdl::parse(&mdl, &mdx).unwrap();
+    let m = rakata_mdl::parse(seed(&mdl, &mdx), &mdx).unwrap();
     let start = |name: &str| {
         let mesh = m.node(name).unwrap().mesh.as_ref().unwrap();
         mesh.vertex_buffer.as_ptr() as usize - mdx.as_ptr() as usize
@@ -446,7 +461,7 @@ fn a_layout_another_writer_chose_reads_equal_and_is_described() {
     let model = every_kind();
     let (mut mdl, mdx) = model.to_bytes().unwrap();
     // Zero the empty child array of the first leaf node, as some tools do.
-    let m = rakata_mdl::parse(&mdl, &mdx).unwrap();
+    let m = rakata_mdl::parse(seed(&mdl, &mdx), &mdx).unwrap();
     let leaf = m.node("skin").unwrap();
     assert!(leaf.children.is_empty());
     let data = &mdl[12..];
@@ -458,7 +473,7 @@ fn a_layout_another_writer_chose_reads_equal_and_is_described() {
         })
         .unwrap();
     put_u32(&mut mdl, 12 + skin_at + 44, 0);
-    let read = ModelFile::parse(&mdl, &mdx).unwrap();
+    let read = ModelFile::parse(seed(&mdl, &mdx), &mdx).unwrap();
     assert!(read.semantic_eq(&model));
     assert_ne!(read.to_bytes().unwrap().0, mdl);
     let l = layout(&mdl, &mdx).unwrap();
@@ -488,6 +503,18 @@ fn parts_that_disagree_are_refused_by_the_writer() {
     let mut model = every_kind();
     model.head_node = NodePointer::Node(99);
     assert_eq!(model.to_bytes().unwrap_err().code(), codes::INCONSISTENT);
+
+    // A raw head-node value that is where the writer puts a node would read
+    // back as that node (found by fuzzing a model laid out otherwise).
+    let mut model = every_kind();
+    let (mdl, _) = model.to_bytes().unwrap();
+    let at = u32::from_le_bytes(mdl[12 + 0xA8..12 + 0xAC].try_into().unwrap());
+    model.head_node = NodePointer::Raw(at);
+    assert_eq!(model.to_bytes().unwrap_err().code(), codes::INCONSISTENT);
+    model.head_node = NodePointer::Raw(at + 1);
+    let (mdl, mdx) = model.to_bytes().unwrap();
+    let back = ModelFile::parse(&mdl, &mdx).unwrap();
+    assert_eq!(back.head_node, NodePointer::Raw(at + 1));
 }
 
 #[test]
@@ -496,6 +523,6 @@ fn a_node_of_a_kind_the_owned_model_does_not_hold_is_refused() {
     // The NWN animmesh flags on a trimesh: its header's length is unknown.
     put_u16(&mut model.root.children[0].header, 0, 0x0A1);
     let (mdl, mdx) = model.to_bytes().unwrap();
-    let e = ModelFile::parse(&mdl, &mdx).unwrap_err();
+    let e = ModelFile::parse(seed(&mdl, &mdx), &mdx).unwrap_err();
     assert_eq!(e.code(), codes::UNSUPPORTED);
 }
