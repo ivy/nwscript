@@ -19,6 +19,7 @@ nwscript-vm = { path = "crates/nwscript-vm" }
 nwscript-codegen = { path = "crates/nwscript-codegen" }
 nwscript-decomp = { path = "crates/nwscript-decomp" }
 nwscript-lua = { path = "crates/nwscript-lua" }
+nwscript-py = { path = "crates/nwscript-py" }
 rakata-res = { path = "crates/rakata-res" }
 rakata-lip = { path = "crates/rakata-lip" }
 rakata-archive = { path = "crates/rakata-archive" }

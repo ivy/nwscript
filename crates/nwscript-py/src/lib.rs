@@ -297,6 +297,12 @@ fn diff(py: Python<'_>, a: &[u8], b: &[u8], nwscript: Option<PathBuf>) -> PyResu
 
 #[pymodule(name = "nwscript")]
 fn nwscript_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    register(m)
+}
+
+/// Add the functions and `__version__` to `m`: this crate's module
+/// `nwscript`, or the submodule `rakata.nwscript` that `rakata-py` mounts.
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(check, m)?)?;
     m.add_function(wrap_pyfunction!(compile, m)?)?;
     m.add_function(wrap_pyfunction!(disassemble, m)?)?;
