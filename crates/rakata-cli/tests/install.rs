@@ -1,4 +1,5 @@
-//! `rakata install --dry-run` over the reader's fixtures.
+//! `rakata install` over the reader's fixtures (`--dry-run`) and over a
+//! hand-made install (the executor's report, as text and as JSON).
 
 use assert_cmd::Command;
 use predicates::prelude::*;
@@ -130,10 +131,76 @@ fn install_needs_the_game_and_an_option_when_the_installer_offers_them() {
         .assert()
         .code(2)
         .stderr(predicate::str::contains("--option").and(predicate::str::contains("Option B")));
+    // Without --dry-run the install is opened, and a folder that is not one
+    // stops it before any operation.
+    let dir = tempfile::tempdir().unwrap();
     rakata()
-        .args(["install", "--game", "g"])
+        .args(["install", "--game"])
+        .arg(dir.path())
         .arg(fixture("full"))
         .assert()
-        .code(2)
-        .stderr(predicate::str::contains("--dry-run"));
+        .code(1)
+        .stderr(predicate::str::contains("RE0401"));
+}
+
+/// An install with nothing in it but an empty KEY and the folders.
+fn empty_game(dir: &std::path::Path) -> PathBuf {
+    let root = dir.join("game");
+    std::fs::create_dir_all(root.join("Override")).unwrap();
+    std::fs::write(
+        root.join("chitin.key"),
+        rakata_archive::Key::new().to_bytes().unwrap(),
+    )
+    .unwrap();
+    root
+}
+
+#[test]
+fn an_install_reports_every_operation_with_the_hash_found_as_json_and_to_a_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let game = empty_game(dir.path());
+    let data = dir.path().join("tslpatchdata");
+    std::fs::create_dir_all(&data).unwrap();
+    std::fs::copy(
+        fixture("exec/required-lone/changes.ini"),
+        data.join("changes.ini"),
+    )
+    .unwrap();
+    std::fs::write(data.join("k_copy.ncs"), b"copied bytecode").unwrap();
+    let report = dir.path().join("report.json");
+    let out = rakata()
+        .args(["--format", "json", "install", "--game"])
+        .arg(&game)
+        .arg(&data)
+        .arg("--report")
+        .arg(&report)
+        .output()
+        .unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let rec = &doc["result"]["report"]["records"][0];
+    assert_eq!(rec["target"], "Override/k_copy.ncs");
+    assert_eq!(rec["outcome"], "written");
+    let sha = rakata_res::ContentHash::of(b"copied bytecode").to_hex();
+    assert_eq!(rec["found"], sha.as_str());
+    assert_eq!(doc["result"]["ok"], true);
+    let file: serde_json::Value = serde_json::from_slice(&std::fs::read(&report).unwrap()).unwrap();
+    assert_eq!(file["report"]["records"][0]["found"], sha.as_str());
+
+    // Again as text: the summary line and the hash found, abbreviated.
+    let text = rakata()
+        .args(["install", "--game"])
+        .arg(&game)
+        .arg(&data)
+        .output()
+        .unwrap();
+    assert_eq!(text.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&text.stdout);
+    assert!(stdout.contains("1 written and read back"), "{stdout}");
+    assert!(stdout.contains(&sha[..16]), "{stdout}");
 }

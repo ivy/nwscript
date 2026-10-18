@@ -8,6 +8,8 @@ const ABOUT: &str = "A toolset for the data of BioWare's Aurora-family games, Ko
 
 const EXAMPLES: &str = "\
 Examples:
+  rakata install MOD/tslpatchdata --game ~/games/swkotor
+                                           install a TSLPatcher mod, every write read back
   rakata install MOD/tslpatchdata --game ~/games/swkotor --dry-run
                                            print what installing the mod would do
   rakata install MOD/tslpatchdata --game DIR --option 2 --dry-run --format json
@@ -85,11 +87,17 @@ pub enum Command {
     ///
     /// TSLPATCHDATA is the mod's tslpatchdata folder. An installer with a
     /// namespaces.ini offers options; --option picks one by its number in
-    /// [Namespaces]. Today only --dry-run is implemented: the plan is the
-    /// operations in the order TSLPatcher runs them, with the 2DAMEMORY# and
-    /// StrRef# tokens as placeholders.
+    /// [Namespaces]. The lists run in TSLPatcher's order (TLKList,
+    /// InstallList, 2DAList, GFFList, HACKList, CompileList, SSFList) with the
+    /// 2DAMEMORY# and StrRef# tokens filled as they are set; a CompileList
+    /// compiles through nwscript against the install, never through a
+    /// compiler the mod ships. After every write the file or capsule member
+    /// is read back: the report lists each operation, its target and the
+    /// hash found there, and a write that did not land is an error (exit 1).
+    /// --dry-run prints the plan, the tokens as placeholders, and changes
+    /// nothing.
     #[command(
-        after_help = "Examples:\n  rakata install MOD/tslpatchdata --game ~/games/swkotor --dry-run\n  rakata install MOD/tslpatchdata --game ~/games/swkotor --option 1 --dry-run --format json"
+        after_help = "Examples:\n  rakata install MOD/tslpatchdata --game ~/games/swkotor\n  rakata install MOD/tslpatchdata --game ~/games/swkotor --option 1 --report install.json\n  rakata install MOD/tslpatchdata --game ~/games/swkotor --dry-run\n  rakata install MOD/tslpatchdata --game ~/games/swkotor --option 1 --dry-run --format json"
     )]
     Install {
         /// The mod's tslpatchdata folder.
@@ -100,6 +108,9 @@ pub enum Command {
         /// Print the plan and change nothing.
         #[arg(long)]
         dry_run: bool,
+        /// Also write the report, as JSON, to FILE.
+        #[arg(long, value_name = "FILE")]
+        report: Option<PathBuf>,
     },
     /// Which copy of a resource the engine loads: the winner, every other copy the install holds, and why each lost.
     #[command(
