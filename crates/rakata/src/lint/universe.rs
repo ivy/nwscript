@@ -90,11 +90,17 @@ fn add_id(names: &mut Names, id: &ResId) {
     add(names, &String::from_utf8_lossy(id.name.as_bytes()), id.ty);
 }
 
+/// The formats a texture is loaded from: a site that names a `tpc` is
+/// satisfied by any of them, since the game reads a `.tga` or `.dds` in
+/// `Override/` where it has no `.tpc` (and crashes on both, RE1901).
+const TEXTURES: [ResType; 3] = [ResType::Tpc, ResType::Tga, ResType::Dds];
+
 /// The names a scope holds.
 fn holds(names: &Names, name: &str, want: Want, modules: &HashSet<String>) -> bool {
     match want {
         Want::Module => modules.contains(name),
         want => names.get(name).is_some_and(|types| match want {
+            Want::Type(t) if TEXTURES.contains(&t) => types.iter().any(|t| TEXTURES.contains(t)),
             Want::Type(t) => types.contains(&t),
             Want::Blueprint => types.iter().any(|t| BLUEPRINTS.contains(t)),
             _ => true,

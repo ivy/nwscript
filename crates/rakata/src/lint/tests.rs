@@ -131,6 +131,35 @@ fn dangling_references_and_strrefs_past_the_talk_table() {
 }
 
 #[test]
+fn a_texture_site_resolves_to_a_tpc_a_tga_or_a_dds() {
+    let game = scratch("textures");
+    let mut s = TwoDa::new(["label", "iconresref"]);
+    s.add_row("0", &[("label", "meditate"), ("iconresref", "ip_med")])
+        .unwrap();
+    s.add_row("1", &[("label", "gone"), ("iconresref", "ip_gone")])
+        .unwrap();
+    s.add_row("2", &[("label", "packed"), ("iconresref", "ip_dds")])
+        .unwrap();
+    write(&game.join("Override/spells.2da"), &s.to_bytes().unwrap());
+    write(&game.join("Override/ip_med.tga"), b"");
+    write(&game.join("Override/ip_dds.dds"), b"");
+    let r = lint(&game, None, None);
+    assert_eq!(
+        brief(&r),
+        [(
+            "RW1901",
+            "Override/spells.2da",
+            "row 1, column iconresref",
+            "ip_gone"
+        )],
+        "{:#?}",
+        r.findings
+    );
+    assert_eq!(r.findings[0].want.as_deref(), Some("tpc"));
+    let _ = fs::remove_dir_all(&game);
+}
+
+#[test]
 fn a_tpc_beside_a_tga_and_names_differing_in_case() {
     let game = scratch("override");
     for f in [
