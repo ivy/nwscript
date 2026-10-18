@@ -302,6 +302,20 @@ fn not_a_talk_table(bytes: &[u8]) -> Error {
 mod tests {
     use super::*;
 
+    /// `bytes`, kept as a seed for the fuzz targets in the directory
+    /// `$RAKATA_FUZZ_SEEDS` names, when it is set.
+    fn seed(bytes: &[u8]) -> &[u8] {
+        if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+            use std::hash::{DefaultHasher, Hash, Hasher};
+            let mut h = DefaultHasher::new();
+            bytes.hash(&mut h);
+            let dir = std::path::Path::new(&dir);
+            std::fs::create_dir_all(dir).unwrap();
+            std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+        }
+        bytes
+    }
+
     fn sample() -> Tlk {
         let mut t = Tlk::new(Language::English);
         t.append(Entry::new("Bastila"));
@@ -350,7 +364,7 @@ mod tests {
     fn round_trips() {
         let t = sample();
         let b = t.to_bytes().unwrap();
-        let again = Tlk::parse(&b).unwrap();
+        let again = Tlk::parse(seed(&b)).unwrap();
         assert_eq!(again, t);
         assert_eq!(again.to_bytes().unwrap(), b);
     }
@@ -362,7 +376,7 @@ mod tests {
         let strref = t.append(Entry::new("Juhani"));
         assert_eq!(strref, StrRef::new(4));
         let b = t.to_bytes().unwrap();
-        let again = Tlk::parse(&b).unwrap();
+        let again = Tlk::parse(seed(&b)).unwrap();
         assert_eq!(again.len(), 5);
         assert_eq!(again.text(strref), Some("Juhani"));
         assert_eq!(again.entries[..4], Tlk::parse(&before).unwrap().entries[..]);
