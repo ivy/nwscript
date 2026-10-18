@@ -17,6 +17,7 @@ use serde::Serialize;
 
 use crate::audio::Audio;
 use crate::error::codes;
+use crate::key::NodeKey;
 use crate::model::{Dialog, Info, Kind, Link, Node, NodeRef};
 
 /// A voice file found for a node.
@@ -161,6 +162,13 @@ pub struct NodeView {
     pub id: String,
     pub kind: &'static str,
     pub index: usize,
+    /// The node's stable key, as [`NodeKey::of`] chooses it and
+    /// [`NodeKey`] displays it: `voice:RESREF`, `strref:N`, `text:"…"`, or
+    /// `index:E3 (fragile)`.
+    pub key: String,
+    /// Whether the key is the node's index, which moves when its list is
+    /// reordered.
+    pub fragile: bool,
     /// The `Speaker` tag as stored; replies have none.
     pub speaker: Option<String>,
     /// `owner` for an entry with an empty speaker, `tag` for an entry with
@@ -287,7 +295,8 @@ impl Builder<'_> {
         }
     }
 
-    fn node(&mut self, n: &Node<'_>) -> NodeView {
+    fn node(&mut self, dialog: &Dialog, n: &Node<'_>) -> NodeView {
+        let key = NodeKey::of(dialog, n.at);
         let text = n.text();
         let shown = self.lookup.text(&text);
         let voice = n.voice().map(|vo| VoiceView {
@@ -306,6 +315,8 @@ impl Builder<'_> {
             id: n.at.to_string(),
             kind: n.at.kind.name(),
             index: n.at.index,
+            key: key.to_string(),
+            fragile: key.is_fragile(),
             speaker,
             speaker_role,
             listener: n.listener(),
@@ -424,7 +435,7 @@ impl Transcript {
                 continue;
             }
             shown.insert(step.target, nodes.len());
-            let view = b.node(&node);
+            let view = b.node(dialog, &node);
             let links = node.links();
             let depth = if links.len() > 1 {
                 step.depth + 1
@@ -460,6 +471,42 @@ impl Transcript {
     /// The node shown as `id` (`E3`).
     pub fn node(&self, id: &str) -> Option<&NodeView> {
         self.nodes.iter().find(|n| n.id == id)
+    }
+
+    /// The nodes shown as `ids` (`E3`), each with its links: every link's
+    /// condition, then the node it leads to by id and key. An id the
+    /// transcript does not hold is left out.
+    pub fn nodes_text(&self, ids: &[&str]) -> String {
+        let mut text = Text {
+            t: self,
+            printed: HashSet::new(),
+            out: String::new(),
+        };
+        for (i, id) in ids.iter().enumerate() {
+            let Some(n) = self.node(id) else {
+                continue;
+            };
+            if i > 0 {
+                text.out.push('\n');
+            }
+            text.body(n, "", false);
+            if n.links.is_empty() {
+                let _ = writeln!(text.out, "  (no links)");
+            }
+            for l in &n.links {
+                if let Some(c) = &l.condition {
+                    text.script_block("  ", "if ", c);
+                }
+                let _ = match self.node(&l.target) {
+                    Some(to) if l.is_child => {
+                        writeln!(text.out, "  -> {} [{}] (a link)", to.id, to.key)
+                    }
+                    Some(to) => writeln!(text.out, "  -> {} [{}]", to.id, to.key),
+                    None => writeln!(text.out, "  -> {} (no such node)", l.target),
+                };
+            }
+        }
+        text.out
     }
 
     /// The script named `name`, without regard to case.
@@ -614,6 +661,12 @@ impl Text<'_> {
         let Some(n) = self.t.node(&row.node) else {
             return;
         };
+        self.body(n, &pad, row.is_child);
+    }
+
+    /// A node's line, `E3 [KEY] SPEAKER to LISTENER: "TEXT"`, and its
+    /// fields beneath it.
+    fn body(&mut self, n: &NodeView, pad: &str, is_child: bool) {
         let who = match n.speaker_role {
             "player" => "(player)".to_string(),
             "owner" => "(owner)".to_string(),
@@ -628,8 +681,12 @@ impl Text<'_> {
             (None, Some(s)) => format!("(strref {s}, not in the talk table)"),
             (None, None) => "(no text)".into(),
         };
-        let child = if row.is_child { " (a link)" } else { "" };
-        let _ = writeln!(self.out, "{pad}{} {who}{to}: {said}{child}", n.id);
+        let child = if is_child { " (a link)" } else { "" };
+        let _ = writeln!(
+            self.out,
+            "{pad}{} [{}] {who}{to}: {said}{child}",
+            n.id, n.key
+        );
         let pad = format!("{pad}     ");
         if let Some(s) = n.strref {
             let _ = writeln!(self.out, "{pad}strref {s}");

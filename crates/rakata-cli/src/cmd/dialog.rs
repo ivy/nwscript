@@ -13,7 +13,7 @@ use crate::cli::ProfileArg;
 use rakata::codes;
 use rakata::diag::{Diagnostic, SourceMap};
 use rakata::dialog::lint::{self, Entry, Known, Linter};
-use rakata::dialog::{Session, TranscriptOptions};
+use rakata::dialog::{NodeKey, Session, TranscriptOptions};
 use rakata::game::{ModuleName, Profile};
 
 #[derive(Args, Debug)]
@@ -40,7 +40,11 @@ when no global layer does or only Override/ does), patch.erf, the BIFs.
 Scripts and conditions are looked up the same way, so a module's dialogue
 needs its module; when several modules hold it, name one (RE1105).
 
-In the text, E3 is EntryList[3] and R0 is ReplyList[0]. An entry with an
+In the text, E3 is EntryList[3] and R0 is ReplyList[0], and each node's
+line carries in brackets its stable key, the one an edit names it by:
+voice:RESREF when its voice-over names it alone, else strref:N, else
+text:\"TEXT\" for text it embeds, else its index, marked (fragile) since
+indices move when a list is reordered. An entry with an
 empty Speaker is spoken by the dialogue's owner, shown as (owner); replies
 are the player's. A link to a node already shown prints `-> E3 (shown
 above)`; nodes no start reaches follow the tree. Animation numbers and
@@ -53,11 +57,21 @@ include libraries folded out, and verified by recompiling: [verified, 1 of 1
 functions] means the source recompiles to the original bytes. Scripts are
 cached by content hash, so a condition shared by many nodes is decompiled
 once. --format json gives the same transcript as structured nodes, scripts
-and tree rows, with the timings.
+and tree rows, with the timings; each node has its key and whether it is
+fragile.
+
+--node KEY shows only that node, with each of its links: the link's
+condition, then the node it leads to with that node's key. KEY is a stable
+key as the transcript prints it (voice:RESREF, strref:N, text:TEXT) or an
+index (E3, R0); repeat --node for several. A key that names no node fails
+with RE1102, one that names several with RE1103, one that does not parse
+with RE1104. With --format json, the result holds those nodes and the
+scripts they name instead of the whole transcript.
 
 Examples:
   rakata dialog show banter.dlg --game ~/games/swkotor
   rakata dialog show dan14_cutjuh.dlg --module danm14ac --game DIR --scripts
+  rakata dialog show banter.dlg --node voice:nglobebant00089_ --node R2 --game DIR
   rakata --format json dialog show banter.dlg --game DIR")]
     Show {
         /// The dialogue: a .dlg file, or NAME.dlg in the install.
@@ -69,6 +83,9 @@ Examples:
         /// Decompile each node's action script too, not only the conditions.
         #[arg(long)]
         scripts: bool,
+        /// Show only the node this key names, with its links and their conditions; repeatable.
+        #[arg(long = "node", value_name = "KEY")]
+        nodes: Vec<String>,
         /// The game the install belongs to.
         #[arg(long, value_enum, default_value_t = ProfileArg::K1)]
         profile: ProfileArg,
@@ -156,6 +173,7 @@ pub fn run(ctx: &Ctx, args: &DialogArgs) -> Exit {
             dialog,
             module,
             scripts,
+            nodes,
             profile,
         } => {
             let game = match ctx.require_game("dialog show") {
@@ -179,6 +197,22 @@ pub fn run(ctx: &Ctx, args: &DialogArgs) -> Exit {
                 Ok(l) => l,
                 Err(e) => return ctx.finish(env, "", fail(e), &map, Exit::Ok),
             };
+            let mut picked: Vec<String> = Vec::new();
+            for k in nodes {
+                let at = k
+                    .parse::<NodeKey>()
+                    .map_err(rakata::dialog::Error::from)
+                    .and_then(|key| session.resolve(&loaded.dialog, &key));
+                match at {
+                    Ok(at) => {
+                        let id = at.to_string();
+                        if !picked.contains(&id) {
+                            picked.push(id);
+                        }
+                    }
+                    Err(e) => return ctx.finish(env, "", fail(e), &map, Exit::Ok),
+                }
+            }
             let opened = start.elapsed().as_secs_f64();
             let transcript =
                 session.transcript(&loaded.dialog, TranscriptOptions { scripts: *scripts });
@@ -198,7 +232,12 @@ pub fn run(ctx: &Ctx, args: &DialogArgs) -> Exit {
                 Some(m) => format!("{} (module {m})\n", loaded.location),
                 None => format!("{}\n", loaded.location),
             };
-            text.push_str(&transcript.text());
+            if picked.is_empty() {
+                text.push_str(&transcript.text());
+            } else {
+                let ids: Vec<&str> = picked.iter().map(String::as_str).collect();
+                text.push_str(&transcript.nodes_text(&ids));
+            }
             text.push_str(&format!(
                 "\n{} scripts decompiled, {} verified, {} from the cache, {} missing; {:.2} s (install {:.2} s, include libraries {:.2} s, decompiling {:.2} s)\n",
                 stats.decompiled,
@@ -210,13 +249,40 @@ pub fn run(ctx: &Ctx, args: &DialogArgs) -> Exit {
                 stats.setup_seconds,
                 stats.decompile_seconds
             ));
-            env.result = json!({
-                "location": loaded.location,
-                "module": loaded.module,
-                "transcript": transcript,
-                "stats": stats,
-                "seconds": seconds,
-            });
+            env.result = if picked.is_empty() {
+                json!({
+                    "location": loaded.location,
+                    "module": loaded.module,
+                    "transcript": transcript,
+                    "stats": stats,
+                    "seconds": seconds,
+                })
+            } else {
+                let shown: Vec<_> = picked.iter().filter_map(|id| transcript.node(id)).collect();
+                let named: Vec<&str> = shown
+                    .iter()
+                    .flat_map(|n| {
+                        n.script
+                            .iter()
+                            .chain(n.links.iter().filter_map(|l| l.condition.as_ref()))
+                    })
+                    .map(String::as_str)
+                    .collect();
+                let scripts: Vec<_> = transcript
+                    .scripts
+                    .iter()
+                    .filter(|s| named.iter().any(|n| n.eq_ignore_ascii_case(&s.name)))
+                    .collect();
+                json!({
+                    "location": loaded.location,
+                    "module": loaded.module,
+                    "dialog": transcript.dialog,
+                    "nodes": shown,
+                    "scripts": scripts,
+                    "stats": stats,
+                    "seconds": seconds,
+                })
+            };
             ctx.finish(env, &text, diags, &map, Exit::Ok)
         }
     }

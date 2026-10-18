@@ -32,7 +32,15 @@ The transcript lists the starts in the order the engine tries them, each with it
 
 The engine opens a conversation with the first start whose condition passes, trying them in the order listed, so a start without a condition is the fallback and every start after it is unreachable. An entry that appears among the starts is itself a starting line: a reply added under it is offered whenever the conversation opens there. A voice resref shown with "no file under streamwaves/" is a note, not a finding: many vanilla lines name a voice-over that was never recorded, the game shows them unvoiced, and `dialog lint` reports a missing voice-over only for nodes the game would try to voice.
 
-To pick a node to edit, note its **voice resref** or **strref** from the transcript: those are its stable keys (`voice:nm14acjuha07024_`, `strref:38576`). A node with neither has only its index, which is fragile.
+Each node's line carries its stable key in brackets, the key an edit names it by: `E85 [voice:nglobebant00000_] Carth to Bastila: "…"`. It is `voice:RESREF` when the voice resref names that node alone, else `strref:N`, else `text:"…"` for text the node embeds, else `index:E3 (fragile)`: an index moves when another mod inserts a node, so prefer a node's content key. The JSON gives each node's `key` and `fragile`.
+
+To read one node rather than the whole tree, name it with `--node KEY` (repeatable; a stable key or an index such as `E3`):
+
+```bash
+rakata dialog show NAME.dlg --module STEM --game DIR --node voice:nglobebant00000_ --node R0
+```
+
+It prints the node and each of its links: the link's condition, decompiled, then `-> R95 [KEY]`, the node it leads to with that node's key. A key that matches no node fails with `RE1102`, one that matches several with `RE1103` (common for `text:` keys, and for a `strref:` two nodes share).
 
 A module's dialogue copied into `Override/` is shown with the one module whose capsules hold the same name, so its scripts resolve: the first line reads `Override/NAME.dlg (module STEM)`. When several modules hold it, `RE1105` names them; pass `--module STEM`.
 

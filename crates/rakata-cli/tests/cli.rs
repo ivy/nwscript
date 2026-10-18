@@ -468,3 +468,116 @@ fn dialog_show_writes_the_transcript_as_one_json_document() {
     assert_eq!(t["entries"], 0);
     assert!(t["nodes"].as_array().unwrap().is_empty());
 }
+
+/// E0 voiced `cli_vo`, linking to R0 under `k_con_x` and to R1; R0 and R1
+/// share strref 5, so only their indices name them; E1 is unlinked text.
+fn keyed_dialog() -> Vec<u8> {
+    use rakata_gff::{Gff, Label, LocString, Struct, Value};
+    let label = |s: &str| Label::new(s).unwrap();
+    let link = |index: u32, active: &str| {
+        let mut s = Struct::new(0);
+        s.push(label("Index"), Value::Dword(index))
+            .push(label("Active"), Value::resref(active).unwrap())
+            .push(label("IsChild"), Value::Byte(0));
+        s
+    };
+    let node = |list: &str, said: LocString, vo: &str, links: Vec<Struct>| {
+        let mut s = Struct::new(0);
+        s.push(label("Text"), Value::LocString(said))
+            .push(label("VO_ResRef"), Value::resref(vo).unwrap())
+            .push(label(list), Value::List(links));
+        s
+    };
+    let mut hi = LocString::none();
+    hi.set(0, b"Hi.");
+    let mut alone = LocString::none();
+    alone.set(0, b"Alone.");
+    let entries = vec![
+        node(
+            "RepliesList",
+            hi,
+            "cli_vo",
+            vec![link(0, "k_con_x"), link(1, "")],
+        ),
+        node("RepliesList", alone, "", vec![]),
+    ];
+    let replies = vec![
+        node("EntriesList", LocString::strref(5), "", vec![]),
+        node("EntriesList", LocString::strref(5), "", vec![]),
+    ];
+    let mut start = Struct::new(0);
+    start
+        .push(label("Index"), Value::Dword(0))
+        .push(label("Active"), Value::resref("").unwrap());
+    let mut g = Gff::new(*b"DLG ");
+    g.root
+        .push(label("EntryList"), Value::List(entries))
+        .push(label("ReplyList"), Value::List(replies))
+        .push(label("StartingList"), Value::List(vec![start]));
+    g.to_bytes().unwrap()
+}
+
+#[test]
+fn dialog_show_prints_each_nodes_key_and_node_shows_one_with_its_links() {
+    let dir = install("dialog-keys");
+    let file = dir.join("keys.dlg");
+    std::fs::write(&file, keyed_dialog()).unwrap();
+    let show = |args: &[&str]| {
+        rakata()
+            .args(["--game", dir.to_str().unwrap(), "dialog", "show"])
+            .arg(&file)
+            .args(args)
+            .output()
+            .unwrap()
+    };
+    let out = show(&[]);
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("E0 [voice:cli_vo] (owner): \"Hi.\""),
+        "{text}"
+    );
+    assert!(text.contains("R1 [index:R1 (fragile)] (player)"), "{text}");
+    assert!(text.contains("E1 [text:\"Alone.\"] (owner)"), "{text}");
+
+    let out = show(&["--node", "voice:CLI_VO", "--node", "R1"]);
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains(
+            "E0 [voice:cli_vo] (owner): \"Hi.\"\n     voice cli_vo, no file under streamwaves/\n  if k_con_x [missing]\n  -> R0 [index:R0 (fragile)]\n  -> R1 [index:R1 (fragile)]\n"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains("\nR1 [index:R1 (fragile)] (player)"),
+        "{text}"
+    );
+    assert!(!text.contains("E1"), "{text}");
+
+    let out = rakata()
+        .args(["--format", "json", "--game", dir.to_str().unwrap()])
+        .args(["dialog", "show"])
+        .arg(&file)
+        .args(["--node", "E0"])
+        .output()
+        .unwrap();
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let nodes = doc["result"]["nodes"].as_array().unwrap();
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0]["key"], "voice:cli_vo");
+    assert_eq!(nodes[0]["fragile"], false);
+    assert_eq!(doc["result"]["scripts"][0]["name"], "k_con_x");
+
+    for (key, code) in [
+        ("strref:9", "RE1102"),
+        ("strref:5", "RE1103"),
+        ("E7", "RE1102"),
+        ("Q1", "RE1104"),
+    ] {
+        let out = show(&["--node", key]);
+        assert_eq!(out.status.code(), Some(1), "{key}");
+        let err = String::from_utf8(out.stderr).unwrap();
+        assert!(err.contains(code), "{key}: {err}");
+    }
+}

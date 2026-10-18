@@ -273,7 +273,10 @@ fn the_transcript_shows_every_node_once_and_references_the_rest() {
     assert_eq!(t.node("E1").unwrap().speaker_role, "tag");
     assert_eq!(t.node("R0").unwrap().speaker_role, "player");
     let text = t.text();
-    assert!(text.contains("E0 (owner): \"Hello.\""), "{text}");
+    assert!(
+        text.contains("E0 [voice:oaj_hello] (owner): \"Hello.\""),
+        "{text}"
+    );
     assert!(text.contains("-> R1 (shown above)"), "{text}");
     assert!(text.contains("-> E1 (shown above, a link)"), "{text}");
     assert!(text.contains("animation 10055 on Mission"), "{text}");
@@ -286,6 +289,49 @@ fn the_transcript_shows_every_node_once_and_references_the_rest() {
     assert_eq!(json["nodes"][0]["animations"][0]["animation"], 10055);
     assert_eq!(json["scripts"][0]["name"], "k_con_start");
     assert_eq!(json["scripts"][0]["status"], "unresolved");
+}
+
+#[test]
+fn each_node_carries_the_key_nodekey_chooses_and_nodes_text_shows_its_links() {
+    let d = fixture();
+    let t = Transcript::build(&d, &mut Embedded, Options::default());
+    for n in &t.nodes {
+        let at = NodeRef {
+            kind: if n.kind == "entry" {
+                Kind::Entry
+            } else {
+                Kind::Reply
+            },
+            index: n.index,
+        };
+        let key = NodeKey::of(&d, at);
+        assert_eq!(n.key, key.to_string(), "{}", n.id);
+        assert_eq!(n.fragile, key.is_fragile(), "{}", n.id);
+    }
+    assert_eq!(t.node("E0").unwrap().key, "voice:oaj_hello");
+    assert_eq!(t.node("E2").unwrap().key, "voice:nglobebant00089_");
+    // E1's text is E0's, so only its index names it alone.
+    assert_eq!(t.node("E1").unwrap().key, "index:E1 (fragile)");
+    assert!(t.node("E1").unwrap().fragile);
+    let text = t.text();
+    assert!(text.contains("E1 [index:E1 (fragile)] Carth"), "{text}");
+
+    let one = t.nodes_text(&["E0", "R2"]);
+    assert!(
+        one.starts_with("E0 [voice:oaj_hello] (owner): \"Hello.\"\n"),
+        "{one}"
+    );
+    assert!(one.contains("  -> R0 [text:\"Hi.\"]\n"), "{one}");
+    assert!(
+        one.contains("  if k_con_test [not looked up]\n  -> R1 [text:\"Bye.\"]\n"),
+        "{one}"
+    );
+    assert!(one.contains("\n\nR2 [text:\"Again.\"] (player)"), "{one}");
+    assert!(
+        one.contains("  -> E1 [index:E1 (fragile)] (a link)"),
+        "{one}"
+    );
+    assert!(!one.contains("E2"), "{one}");
 }
 
 #[test]
