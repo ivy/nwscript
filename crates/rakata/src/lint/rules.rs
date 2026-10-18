@@ -39,6 +39,10 @@ pub(crate) enum Content {
     TwoDa(Vec<(usize, String, String)>),
     /// A script's engine calls.
     Script(Vec<Call>),
+    /// A model's or a layout's references: `(value, site)`, resrefs
+    /// lowercase, as `rakata_mdl::facts::refs` and `rakata_lyt::facts::refs`
+    /// give them.
+    Asset(Vec<(String, String)>),
 }
 
 /// One resource to check: where it lies and what it names.
@@ -89,6 +93,19 @@ pub(crate) fn object_types(table: &EngineTable) -> HashMap<i64, ResType> {
     out
 }
 
+/// What a model's or a layout's site names: a layout's rooms, tracks,
+/// obstacles and hooks, a model's supermodel and a reference node's model
+/// name models; a mesh's texture and lightmap and a light's flares name
+/// textures.
+pub(crate) fn asset_wants(ext: &str, site: &str) -> Want {
+    let label = site.rsplit('.').next().unwrap_or(site);
+    if ext == "mdl" && (label == "texture" || label == "lightmap" || label.starts_with("flare[")) {
+        Want::Type(ResType::Tpc)
+    } else {
+        Want::Type(ResType::Mdl)
+    }
+}
+
 impl Rules<'_> {
     /// Every finding of `item`.
     pub(crate) fn check(&self, item: &Item, out: &mut Vec<Finding>) {
@@ -96,16 +113,34 @@ impl Rules<'_> {
             Content::Gff(refs) => self.gff(item, refs, out),
             Content::TwoDa(cells) => self.twoda(item, cells, out),
             Content::Script(calls) => self.script(item, calls, out),
+            Content::Asset(refs) => {
+                for (value, site) in refs {
+                    let want = asset_wants(&item.ext, site);
+                    self.unresolved(codes::ASSET, item, site.clone(), value, want, out);
+                }
+            }
         }
     }
 
     fn dangling(&self, item: &Item, site: String, value: &str, want: Want, out: &mut Vec<Finding>) {
+        self.unresolved(codes::DANGLING, item, site, value, want, out);
+    }
+
+    fn unresolved(
+        &self,
+        code: &'static str,
+        item: &Item,
+        site: String,
+        value: &str,
+        want: Want,
+        out: &mut Vec<Finding>,
+    ) {
         let value = value.to_ascii_lowercase();
         if value.trim().is_empty() || self.universe.resolves(&value, want, &item.scope) {
             return;
         }
         out.push(Finding {
-            code: codes::DANGLING,
+            code,
             path: item.path.clone(),
             site,
             value,

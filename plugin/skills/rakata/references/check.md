@@ -19,7 +19,7 @@ Lint the original first (`--game VANILLA`): what it already reports is the game'
 rakata lint --game SCRATCH
 ```
 
-References that resolve to nothing in blueprints, 2DAs and scripts (RW1901), strrefs past `dialog.tlk` (RW1902), Override files whose names differ only in case (RW1903), and a `.tpc` in Override beside a `.tga` or `.dds` of the same name, which crashes the game (RE1901). The vanilla game has hundreds of findings of its own: run it once on the original with `--write-known FILE` (it prints every finding, so send the output to a file), then on the scratch install with `--known FILE`, and only the change's findings remain.
+References that resolve to nothing in blueprints, 2DAs and scripts (RW1901), and in models and layouts (RW1906: a mesh's texture or lightmap, a supermodel, a layout's room), strrefs past `dialog.tlk` (RW1902), Override files whose names differ only in case (RW1903), and a `.tpc` in Override beside a `.tga` or `.dds` of the same name, which crashes the game (RE1901). The vanilla game has hundreds of findings of its own: run it once on the original with `--write-known FILE` (it prints every finding, so send the output to a file), then on the scratch install with `--known FILE`, and only the change's findings remain.
 
 ## Diff against the original
 

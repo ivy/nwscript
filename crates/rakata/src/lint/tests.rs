@@ -27,9 +27,33 @@ fn write(path: &Path, data: &[u8]) {
     fs::write(path, data).unwrap();
 }
 
+/// A binary MDL of one trimesh node, `name`, with a texture and a
+/// lightmap: the model header, the name array, the name, the node.
+fn model(name: &str, texture: &str, lightmap: &str) -> Vec<u8> {
+    let put = |b: &mut Vec<u8>, at: usize, s: &[u8]| b[at..at + s.len()].copy_from_slice(s);
+    let word = |v: usize| (v as u32).to_le_bytes();
+    let (names, node) = (0xC4, 0xC8 + 16);
+    let mut d = vec![0u8; node + 80 + 332];
+    put(&mut d, 0x08, name.as_bytes());
+    put(&mut d, 0x28, &word(node));
+    put(&mut d, 0x88, b"NULL");
+    put(&mut d, 0xB8, &word(names));
+    put(&mut d, 0xBC, &word(1));
+    put(&mut d, names, &word(0xC8));
+    put(&mut d, 0xC8, name.as_bytes());
+    put(&mut d, node, &0x21u16.to_le_bytes());
+    put(&mut d, node + 80 + 88, texture.as_bytes());
+    put(&mut d, node + 80 + 120, lightmap.as_bytes());
+    let mut out = [[0u8; 4], word(d.len()), [0u8; 4]].concat();
+    out.extend(d);
+    out
+}
+
 /// An install whose Override holds a creature naming two scripts (one
 /// there, one not), a strref past the talk table, appearance.2da with a
-/// model nothing holds, and baseitems.2da with a strref past the table.
+/// model nothing holds, baseitems.2da with a strref past the table, a
+/// model whose texture is there and whose lightmap is not, and a layout
+/// placing that model, a `****` and a room nothing holds.
 fn install(name: &str) -> PathBuf {
     let dir = scratch(name);
     let mut tlk = Tlk::default();
@@ -47,7 +71,15 @@ fn install(name: &str) -> PathBuf {
         .push(l("LastName"), Value::LocString(LocString::strref(2)));
     write(&dir.join("Override/carth.utc"), &g.to_bytes().unwrap());
     write(&dir.join("Override/k_here.ncs"), b"NCS V1.0B\0\0\0\x0d");
-    write(&dir.join("Override/n_carth.mdl"), b"");
+    write(
+        &dir.join("Override/n_carth.mdl"),
+        &model("N_Carth", "N_Carth01", "N_Carth_lm0"),
+    );
+    write(&dir.join("Override/n_carth01.tga"), b"");
+    write(
+        &dir.join("Override/m01aa.lyt"),
+        b"beginlayout\r\n   roomcount 3\r\n      N_Carth 0 0 0\r\n      **** 0 0 0\r\n      M01aa_99 0 0 0\r\n   trackcount 0\r\n   obstaclecount 0\r\n   doorhookcount 0\r\ndonelayout\r\n",
+    );
 
     let mut a = TwoDa::new(["label", "modela", "texa"]);
     a.add_row(
@@ -121,12 +153,25 @@ fn dangling_references_and_strrefs_past_the_talk_table() {
             ),
             ("RW1902", "Override/carth.utc", "LastName", "2"),
             ("RW1901", "Override/carth.utc", "ScriptDeath", "k_gone"),
+            ("RW1906", "Override/m01aa.lyt", "room[2]", "m01aa_99"),
+            (
+                "RW1906",
+                "Override/n_carth.mdl",
+                "N_Carth.lightmap",
+                "n_carth_lm0"
+            ),
         ],
         "{:#?}",
         r.findings
     );
     assert_eq!(r.findings[3].want.as_deref(), Some("ncs"));
-    assert_eq!((r.checked, r.unread), (4, 0));
+    assert_eq!(r.findings[4].want.as_deref(), Some("mdl"));
+    assert_eq!(r.findings[5].want.as_deref(), Some("tpc"));
+    assert_eq!(
+        r.findings[5].message(None),
+        "`Override/n_carth.mdl` N_Carth.lightmap names `n_carth_lm0` as a tpc, and no layer of the install holds one"
+    );
+    assert_eq!((r.checked, r.unread), (6, 0));
     let _ = fs::remove_dir_all(&game);
 }
 
@@ -237,7 +282,7 @@ fn known_findings_are_counted_not_listed() {
         threads: 1,
     })
     .unwrap();
-    assert_eq!(r.findings.len(), 2);
+    assert_eq!(r.findings.len(), first.all.len() - 2);
     assert_eq!(r.known.values().sum::<usize>(), 2);
     let _ = fs::remove_dir_all(&game);
 }

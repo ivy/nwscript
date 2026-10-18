@@ -7,6 +7,10 @@
 //!   the site names in the scope it is loaded in.
 //! - RW1902: a strref in a GFF or a 2DA strref column at or past the end
 //!   of `dialog.tlk`.
+//! - RW1906: a model's or a layout's reference that resolves to nothing: a
+//!   mesh's texture or lightmap, a light's flare, a supermodel or a
+//!   reference node's model, a layout's room, track, obstacle or door
+//!   hook's room.
 //! - RW1903: two `Override/` files whose names differ only in case.
 //! - RE1901: a `.tpc` in `Override/` beside a `.tga` or `.dds` of the same
 //!   name, which crashes the game.
@@ -56,6 +60,8 @@ pub mod codes {
     pub const SKIPPED: &str = "RW1904";
     /// Resources that could not be read, so what they name went unchecked.
     pub const UNREAD: &str = "RW1905";
+    /// A model's or a layout's reference that resolves to nothing.
+    pub const ASSET: &str = "RW1906";
 }
 
 /// One finding.
@@ -88,7 +94,7 @@ impl Finding {
             format!("`{}` {}", self.path, self.site)
         };
         match self.code {
-            codes::DANGLING => match self.want.as_deref() {
+            codes::DANGLING | codes::ASSET => match self.want.as_deref() {
                 Some("any") | None => {
                     format!(
                         "{at} names `{}`, which no layer of the install holds",
@@ -149,7 +155,8 @@ pub struct Options<'a> {
 pub struct Report {
     /// `walk`, or `index` with the tree's label.
     pub source: String,
-    /// Resources whose contents were checked: GFFs, 2DAs and scripts.
+    /// Resources whose contents were checked: GFFs, 2DAs, scripts, models
+    /// and layouts.
     pub checked: usize,
     /// Resources of those types that did not read.
     pub unread: usize,

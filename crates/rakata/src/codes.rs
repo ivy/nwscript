@@ -169,6 +169,7 @@ nwscript_diag::codes! {
     RW1903 Warning "Override files whose names differ only in case";
     RW1904 Warning "a lint rule skipped: the install has no dialog.tlk or no nwscript.nss";
     RW1905 Warning "resources the lint could not read, so what they name is unchecked";
+    RW1906 Warning "a model's or a layout's reference that resolves to nothing in the install";
     RE2001 Error "a name `rakata decompile` takes that is not a script's NAME.ncs";
     RE2002 Error "a script several modules hold, with no module named";
     RE2003 Error "a script the decompiler could not recover";

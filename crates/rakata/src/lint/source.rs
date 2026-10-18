@@ -4,7 +4,8 @@
 //! Both read the same resources, keyed by the same paths, and give the
 //! same contents: a GFF's references from `rakata_gff::facts::refs` (a
 //! dialogue's through `rakata_dialog`), a table's cells, a script's calls
-//! from `nwscript_ncs::facts::calls`.
+//! from `nwscript_ncs::facts::calls`, a model's and a layout's references
+//! from `rakata_mdl::facts` and `rakata_lyt::facts`.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -28,7 +29,11 @@ const MAP_THRESHOLD: u64 = 1 << 20;
 
 /// Whether the lint reads resources of this type.
 fn is_checked(ty: ResType) -> bool {
-    rakata_index::is_gff(ty) || matches!(ty, ResType::TwoDa | ResType::Ncs)
+    rakata_index::is_gff(ty)
+        || matches!(
+            ty,
+            ResType::TwoDa | ResType::Ncs | ResType::Mdl | ResType::Lyt
+        )
 }
 
 /// What a source gave: the resources it read and those it could not.
@@ -85,6 +90,13 @@ fn content(ty: ResType, name: &str, bytes: &[u8], routines: &[Routine]) -> Resul
             }
             Ok(Content::TwoDa(cells))
         }
+        ResType::Mdl => Ok(asset_content(
+            rakata_mdl::facts::refs(bytes).map_err(|e| e.to_string())?,
+        )),
+        ResType::Lyt => {
+            let l = rakata_lyt::Lyt::parse(bytes).map_err(|e| e.to_string())?;
+            Ok(asset_content(rakata_lyt::facts::refs(&l)))
+        }
         _ => {
             let program = nwscript::ncs::decode(FileId(0), bytes)
                 .map_err(|d| format!("{}: {}", d.code.id, d.message))?;
@@ -106,6 +118,10 @@ fn content(ty: ResType, name: &str, bytes: &[u8], routines: &[Routine]) -> Resul
             Ok(Content::Script(calls))
         }
     }
+}
+
+fn asset_content(refs: Vec<rakata_res::Ref>) -> Content {
+    Content::Asset(refs.into_iter().map(|r| (r.value, r.site)).collect())
 }
 
 fn gff_content(g: &rakata_gff::Gff) -> Content {
@@ -378,6 +394,7 @@ pub(crate) fn index(
         let content = match ty {
             ResType::TwoDa => Content::TwoDa(Vec::new()),
             ResType::Ncs => Content::Script(Vec::new()),
+            ResType::Mdl | ResType::Lyt => Content::Asset(Vec::new()),
             _ => Content::Gff(Vec::new()),
         };
         at.insert(k.clone(), items.len());
@@ -404,8 +421,10 @@ pub(crate) fn index(
         } else {
             RefKind::StrRef
         };
-        if let Content::Gff(v) = &mut items[i].content {
-            v.push((kind, text(&r[3]), text(&r[4])));
+        match &mut items[i].content {
+            Content::Gff(v) => v.push((kind, text(&r[3]), text(&r[4]))),
+            Content::Asset(v) if kind == RefKind::ResRef => v.push((text(&r[3]), text(&r[4]))),
+            _ => {}
         }
     }
 

@@ -19,6 +19,10 @@ The rules, each with its code (`rakata explain CODE`):
           engine routine's resref parameter, naming no resource of the type
           the site names where it is loaded (a module's members in that
           module, anything else in any)
+  RW1906  a model's or a layout's reference that resolves to nothing: a
+          mesh's texture or lightmap, a light's flare, a supermodel, a
+          reference node's model, a layout's room, track, obstacle or door
+          hook room
   RW1902  a strref in a GFF or a 2DA strref column at or past the end of
           dialog.tlk
   RW1903  two Override files whose names differ only in case

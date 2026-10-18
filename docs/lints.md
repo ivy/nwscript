@@ -124,6 +124,7 @@ rakata lint --game DIR [--paths FILE] [--db FILE] [--known FILE] [--write-known 
 | Code | Severity | What |
 | --- | --- | --- |
 | RW1901 | warning | a reference that resolves to nothing in the install |
+| RW1906 | warning | a model's or a layout's reference that resolves to nothing in the install |
 | RW1902 | warning | a strref in a GFF or 2DA at or past the end of `dialog.tlk` |
 | RW1903 | warning | two `Override/` files whose names differ only in case |
 | RE1901 | error | a `.tpc` in `Override/` beside a `.tga` or `.dds` of the same name |
@@ -145,6 +146,15 @@ A name resolves when the install holds a resource of that name and type where th
 Empty resrefs are not references. A dialogue node's `VO_ResRef` is not checked: BioWare's dialogues name a recording for lines whether or not one was made (24,755 of the 37,989 voice-over names in the vanilla dialogues resolve to nothing, every reply's among them), the engine shows an unvoiced line's text, and `rakata dialog lint` checks voices per dialogue (RW1104).
 
 A GIT waypoint's `TemplateResRef` is not checked either. A waypoint instance holds the whole waypoint (its tag, names, map note and appearance), so the field records the blueprint it was made from, which BioWare's waypoint format describes as such; a creature, placeable, door, sound or trigger instance holds a position and the blueprint the engine loads, and its `TemplateResRef` is checked.
+
+### RW1906: a model's or a layout's reference that resolves to nothing
+
+What the binary models and the room layouts name, as the index records it (`refs` in [`index.md`](index.md#refsfrom_hash-kind-value-site)):
+
+- A model's mesh textures and lightmaps (`NODE.texture`, `NODE.lightmap`) and its lights' flare textures (`NODE.flare[N]`), each a texture: a `.tpc`, `.tga` or `.dds` of the name satisfies it, as for a site typed `tpc` above. Every mesh kind is read, a room's AABB walkmesh node too.
+- A model's supermodel (`supermodel`) and a reference node's model (`NODE.model`), and a layout's rooms, swoop track pieces, obstacles and door hooks' rooms (`room[N]`, `track[N]`, `obstacle[N]`, `doorhook[N].room`), each a model.
+
+`NULL`, `****` and empty names are not references. A name is matched as written, without regard to case: of the textures the vanilla models name and nothing holds, one has a longer name beside it (`pmbf`, with `pmbf01` and `pmbf02`), and whether the engine completes a mesh's texture name as it completes `appearance.2da`'s prefixes is not established ([`mdl.md`](formats/mdl.md#what-a-model-names)). Where a texture loads from does not change the answer: the BIFs hold the lightmaps as TGA, the texture packs the rest as TPC, and either resolves. A walkmesh names nothing, so has no rule.
 
 ### RW1902: a strref past the talk table
 
@@ -179,7 +189,7 @@ Which type a GFF field and a 2DA column name, and which 2DA columns hold strrefs
 
 ### The vanilla game's findings
 
-Over the vanilla install, 24,801 GFFs, 2DAs and scripts: 549 RW1901, and no RW1902, RW1903 or RE1901. A few of each kind were checked by hand against the index; none of the names resolves as any type anywhere in the install.
+Over the vanilla install, 24,801 GFFs, 2DAs and scripts: 549 RW1901, and no RW1902, RW1903 or RE1901. Its models and layouts, 3,196 resources more, add 2,601 RW1906. A few of each kind were checked by hand against the index; none of the names resolves as any type anywhere in the install.
 
 | Where | Findings | Example |
 | --- | --- | --- |
@@ -189,6 +199,9 @@ Over the vanilla install, 24,801 GFFs, 2DAs and scripts: 549 RW1901, and no RW19
 | dialogues | 38 | `dan13_tareelok.dlg` conditions on `k_pdan_taree01`, `03` and `05` |
 | GUIs | 25 | `partyselection.gui`'s `CONTROLS[1].BORDER.FILL` is `po_no` |
 | blueprints | 68 | the toolset templates `*.btc` and `*.bic` name NWN's `nw_e0_default*` and `nw_c2_default*` scripts; `c_sebulba.utc`'s `Portrait` is `po_mark1_` |
+| model lightmaps (RW1906) | 2,357 | 51 models name lightmaps the game does not ship: `ROOM_aNNNNN` names (611 in `m31ad_00a`; `M01aa_04a_a0002t` in the Endar Spire's `m01aa_04a`, `DOR_LHR02_a00004` in `dor_lhr02`) and `MODEL_lmNNN` in models nothing names (`crossgob`, `hal01gob`) |
+| model textures (RW1906) | 219 | character and cutscene models (`n_commkidm`'s `pmbf`, the cutscene characters' `h_f_lo01headtest` teeth), toolset markers' `toolcolors`, `w_metal_tex` on the robes |
+| flares, supermodels, layouts (RW1906) | 25 | the light flares `fxp_flare02` in `m12ac_01a` to `m12ah_01a`; the supermodels `CSpar2` and `S_Male02H`; `stunt_endbridge.lyt`'s hooks on rooms `M01aa_09a`, `M01aa_11a`, `M01aa_12a` |
 
 ### Measurements
 
