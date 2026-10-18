@@ -55,17 +55,20 @@ fuzz_target!(|data: &[u8]| {
     };
     let target = before.vars.first().and_then(|g| {
         let (text, value) = match &g.value {
-            GlobalValue::Boolean(b) => (format!("boolean:{}", !b), GlobalValue::Boolean(!b)),
+            GlobalValue::Boolean(b) => (format!("{}", !b), GlobalValue::Boolean(!b)),
             GlobalValue::Number(n) => {
                 let v = n.wrapping_add(1);
-                (format!("number:{v}"), GlobalValue::Number(v))
+                (format!("{v}"), GlobalValue::Number(v))
             }
-            GlobalValue::String(_) => {
-                ("string:fuzz".to_owned(), GlobalValue::String("fuzz".into()))
-            }
+            GlobalValue::String(_) => ("fuzz".to_owned(), GlobalValue::String("fuzz".into())),
             GlobalValue::Location(_) => return None,
         };
-        let a = Assignment::parse(&format!("{}={text}", g.name)).ok()?;
+        // Built, not parsed: the name as the file spells it, spaces and all.
+        let a = Assignment {
+            name: g.name.clone(),
+            kind: Some(g.value.global_kind()),
+            text,
+        };
         Some((a, g.name.clone(), value))
     });
     if let Some((a, _, _)) = &target {
