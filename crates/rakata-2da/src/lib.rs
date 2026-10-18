@@ -33,6 +33,7 @@
 
 mod codepage;
 mod error;
+pub mod facts;
 
 use std::collections::HashMap;
 use std::fmt;
