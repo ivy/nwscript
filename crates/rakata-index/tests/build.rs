@@ -73,6 +73,7 @@ fn routines() -> Vec<Routine> {
             p("oTarget", ArgType::Object),
             p("nScriptVar", ArgType::Int),
         ],
+        ret: ArgType::Void,
     }]
 }
 

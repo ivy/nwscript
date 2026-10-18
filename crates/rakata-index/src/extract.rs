@@ -14,6 +14,8 @@ use serde_json::json;
 pub struct Routine {
     pub name: String,
     pub params: Vec<Param>,
+    /// What it returns.
+    pub ret: ArgType,
 }
 
 /// One parameter of a routine.
@@ -437,9 +439,10 @@ fn script(bytes: &[u8], routines: &[Routine]) -> Extracted {
             .and_then(|f| f.params.get(k))
             .map(|p| p.ty)
     };
+    let ret = |r: u16| routines.get(usize::from(r)).map(|f| f.ret);
     let mut out = Extracted::status(Status::Parsed, None);
     let mut refs = Vec::new();
-    for c in nwscript_ncs::facts::calls(&program, param) {
+    for c in nwscript_ncs::facts::calls(&program, param, ret) {
         let f = routines.get(usize::from(c.routine));
         let name = f.map_or_else(|| format!("routine_{}", c.routine), |f| f.name.clone());
         let args: Vec<serde_json::Value> = c
@@ -551,6 +554,7 @@ mod tests {
                     ty: ArgType::Int,
                 },
             ],
+            ret: ArgType::Void,
         }];
         let x = extract(ResType::Ncs, "k_pdan_juhani27", &bytes, &routines);
         assert_eq!(x.status, Some(Status::Parsed));

@@ -179,13 +179,13 @@ Which type a GFF field and a 2DA column name, and which 2DA columns hold strrefs
 
 ### The vanilla game's findings
 
-Over the vanilla install, 24,801 GFFs, 2DAs and scripts: 537 RW1901, and no RW1902, RW1903 or RE1901. A few of each kind were checked by hand against the index; none of the names resolves as any type anywhere in the install.
+Over the vanilla install, 24,801 GFFs, 2DAs and scripts: 549 RW1901, and no RW1902, RW1903 or RE1901. A few of each kind were checked by hand against the index; none of the names resolves as any type anywhere in the install.
 
 | Where | Findings | Example |
 | --- | --- | --- |
 | `module.ifo` event scripts | 189 | every module's `Mod_OnPlrDeath`, `Mod_OnPlrDying` and `Mod_OnSpawnBtnDn` name Neverwinter Nights' `nw_o0_death`, `nw_o0_dying` and `nw_o0_respawn` |
 | 2DA cells | 165 | `genericdoors.2da` rows 0 to 10 name models `t_door01` to `t_door11`; `modulesave.2da` rows 116 to 122 name modules `m12ac` to `m45mg` |
-| script literals | 52 | `k_pebn_exithawk.ncs` passes `lev_40ac` to `StartNewModule` (the module is `lev_m40ac`); `k_sup_galaxymap.ncs` passes the movie `5_9` |
+| script literals | 64 | `k_pebn_exithawk.ncs` passes `lev_40ac` to `StartNewModule` (the module is `lev_m40ac`); `k_sup_galaxymap.ncs` passes the movie `5_9`; `k_ptar_zaaltalk.ncs` starts the conversation `tar05_zaalbar`, which no dialogue is |
 | dialogues | 38 | `dan13_tareelok.dlg` conditions on `k_pdan_taree01`, `03` and `05` |
 | GUIs | 25 | `partyselection.gui`'s `CONTROLS[1].BORDER.FILL` is `po_no` |
 | blueprints | 68 | the toolset templates `*.btc` and `*.bic` name NWN's `nw_e0_default*` and `nw_c2_default*` scripts; `c_sebulba.utc`'s `Portrait` is `po_mark1_` |

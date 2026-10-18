@@ -75,10 +75,34 @@ fn routines() -> Vec<Routine> {
                 p("oTarget", ArgType::Object),
                 p("nNth", ArgType::Int),
             ],
+            ret: ArgType::Object,
         },
         Routine {
             name: "GetGlobalBoolean".into(),
             params: vec![p("sIdentifier", ArgType::String)],
+            ret: ArgType::Int,
+        },
+        Routine {
+            name: "GetFirstPC".into(),
+            params: vec![],
+            ret: ArgType::Object,
+        },
+        Routine {
+            name: "GetItemPossessedBy".into(),
+            params: vec![
+                p("oCreature", ArgType::Object),
+                p("sItemTag", ArgType::String),
+            ],
+            ret: ArgType::Object,
+        },
+        Routine {
+            name: "SetLocalString".into(),
+            params: vec![
+                p("oObject", ArgType::Object),
+                p("sVarName", ArgType::String),
+                p("sValue", ArgType::String),
+            ],
+            ret: ArgType::Void,
         },
     ]
 }

@@ -62,6 +62,8 @@ fn arg_type(t: &Type) -> ArgType {
         Type::String => ArgType::String,
         Type::Object => ArgType::Object,
         Type::Vector => ArgType::Vector,
+        Type::Action => ArgType::Action,
+        Type::Void => ArgType::Void,
         _ => ArgType::Other,
     }
 }
@@ -94,6 +96,7 @@ pub fn routines_of(table: &nwscript::sema::EngineTable) -> Vec<Routine> {
                     ty: arg_type(&p.ty),
                 })
                 .collect(),
+            ret: arg_type(&f.ret),
         })
         .collect()
 }

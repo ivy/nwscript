@@ -173,3 +173,47 @@ fn the_transition_chain_and_oaj_done_over_the_modded_build() {
         "no dialogue condition reads OAJ_DONE: {r}"
     );
 }
+
+/// Ajunta Pall's sword: every vanilla script that holds the tag
+/// `k37_itm_freedont` passes it to `GetItemPossessedBy` beside an object
+/// copied from a local, and each is found with its site.
+#[test]
+fn every_script_naming_the_sword_over_the_vanilla_install() {
+    let Ok(game) = std::env::var("RAKATA_GAME_K1") else {
+        eprintln!("skipped: $RAKATA_GAME_K1 is unset; set it to a vanilla KotOR 1 install");
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("idx.sqlite");
+    build(Path::new(&game), &db);
+    let (r, _) = timed(&db, &["k37_itm_freedont", "--direct"]);
+    let hits = r["result"]["hits"].as_array().unwrap();
+    let mut scripts: Vec<&str> = hits
+        .iter()
+        .filter(|h| h["kind"] == "tag")
+        .filter_map(|h| h["resource"].as_str()?.strip_suffix(".ncs"))
+        .collect();
+    scripts.dedup();
+    assert_eq!(
+        scripts,
+        [
+            "k35_uth_giveswrd",
+            "k35_uth_hassword",
+            "k36_fre_hassword",
+            "k37_sha_goodswrd",
+            "k37_sta_hastrue",
+            "k37_sta_taketrue",
+            "k37_statue_sword",
+            "k_pkor_dest_tuka",
+            "k_pkor_hastrue",
+            "k_pkor_spn_shaar",
+        ],
+        "{r}"
+    );
+    assert!(
+        hits.iter().any(|h| h["resource"] == "k35_uth_hassword.ncs"
+            && h["site"] == "@130 GetItemPossessedBy.sItemTag"),
+        "{r}"
+    );
+    assert!(hits.iter().all(|h| h["unresolved"].is_null()), "{r}");
+}

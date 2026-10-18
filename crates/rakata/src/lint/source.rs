@@ -94,7 +94,8 @@ fn content(ty: ResType, name: &str, bytes: &[u8], routines: &[Routine]) -> Resul
                     .and_then(|f| f.params.get(k))
                     .map(|p| p.ty)
             };
-            let calls = nwscript::ncs::facts::calls(&program, param)
+            let ret = |r: u16| routines.get(usize::from(r)).map(|f| f.ret);
+            let calls = nwscript::ncs::facts::calls(&program, param, ret)
                 .into_iter()
                 .map(|c| Call {
                     offset: c.offset,
