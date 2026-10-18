@@ -141,7 +141,7 @@ CREATE VIEW tree_resources AS
   SELECT t.label AS tree, l.path, l.member, l.name, l.type, l.hash, c.status
   FROM locations l JOIN trees t ON t.id = l.tree JOIN contents c ON c.hash = l.hash;
 CREATE VIEW node_text AS
-  SELECT l.tree, l.path, l.member, n.hash, n.node, n.strref,
+  SELECT l.tree, l.path, l.member, n.hash, n.node, n.kind, n.idx, n.strref,
          COALESCE(n.text, s.text) AS text
   FROM dialog_nodes n
   JOIN locations l ON l.hash = n.hash
