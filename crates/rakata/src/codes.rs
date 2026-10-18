@@ -116,6 +116,9 @@ nwscript_diag::codes! {
     RE1304 Error "a strref the talk table does not hold";
     RE1305 Error "an install without a dialog.tlk";
     RE1306 Error "an output file could not be written";
+    RE1601 Error "a diff of a directory against a file";
+    RW1601 Warning "a resource that does not read as its format, compared by hash";
+    RW1602 Warning "a file of a tree the diff could not read";
 }
 
 /// The rakata code with this id, if registered; case does not matter.
