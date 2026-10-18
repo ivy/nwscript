@@ -1,4 +1,5 @@
 ---
+number: 76
 title: "Rakata M6 Install: `rakata install` at parity with HoloPatcher and TSLPatcher; the patch series retired"
 kind: milestone
 priority: p2

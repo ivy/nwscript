@@ -1,4 +1,5 @@
 ---
+number: 56
 title: "Rakata M2 Know: corpus, dialogue transcripts, the index, refs, the Canderous report"
 kind: milestone
 priority: p1

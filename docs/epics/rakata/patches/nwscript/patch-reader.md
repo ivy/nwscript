@@ -1,4 +1,5 @@
 ---
+number: 77
 title: "rakata-patch: `changes.ini` and `namespaces.ini` read with TSLPatcher's semantics, the plan, `install --dry-run`"
 kind: task
 priority: p2

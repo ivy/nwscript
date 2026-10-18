@@ -1,4 +1,5 @@
 ---
+number: 75
 title: "rakata-index: facts, references and full text over a tree in SQLite, incremental by content hash"
 kind: task
 priority: p1

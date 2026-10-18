@@ -1,4 +1,5 @@
 ---
+number: 59
 title: "The `rakata` façade crate and `rakata` binary: envelope, exit codes, `explain`, `--game`"
 kind: task
 priority: p1

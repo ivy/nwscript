@@ -1,4 +1,5 @@
 ---
+number: 94
 title: "The release covers the workspace: the `rakata` binary, the `rakata` wheel and the plugin at one version"
 kind: task
 priority: p2

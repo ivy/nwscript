@@ -1,4 +1,5 @@
 ---
+number: 95
 title: "`rakata save set`: a save with changed globals or party, byte-identical elsewhere"
 kind: task
 priority: p2

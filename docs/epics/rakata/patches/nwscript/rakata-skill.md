@@ -1,4 +1,5 @@
 ---
+number: 92
 title: "The skill teaches the data workflow (which, show, refs, author, lint); fresh-agent test with a data change"
 kind: task
 priority: p2

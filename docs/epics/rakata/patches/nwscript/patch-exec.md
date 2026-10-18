@@ -1,4 +1,5 @@
 ---
+number: 78
 title: "rakata-patch executor: TSLPatcher's pipeline, memory tokens, compile through nwscript, and a report read back from the tree"
 kind: task
 priority: p2

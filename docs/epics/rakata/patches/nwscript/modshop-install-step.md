@@ -1,4 +1,5 @@
 ---
+number: 87
 title: "modshop's patcher step runs `rakata install`; the PyKotor patch series retires into regression tests"
 kind: task
 priority: p3

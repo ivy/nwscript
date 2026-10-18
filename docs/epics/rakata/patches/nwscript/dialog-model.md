@@ -1,4 +1,5 @@
 ---
+number: 65
 title: "rakata-dialog: the DLG model with stable keys, and `rakata dialog show`"
 kind: task
 priority: p1

@@ -1,4 +1,5 @@
 ---
+number: 73
 title: "`rakata dialog lint`: the dialogue faults play has found, as stable codes"
 kind: task
 priority: p2

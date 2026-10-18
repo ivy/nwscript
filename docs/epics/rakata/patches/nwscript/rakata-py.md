@@ -1,4 +1,5 @@
 ---
+number: 69
 title: "rakata-py: the Python module `rakata` with `rakata.nwscript` inside it, built with maturin"
 kind: task
 priority: p1

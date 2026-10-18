@@ -1,4 +1,5 @@
 ---
+number: 71
 title: "`rakata corpus`: every module script decompiled, with origin headers, folded includes and a call index"
 kind: task
 priority: p1

@@ -1,4 +1,5 @@
 ---
+number: 70
 title: "Approve the release and CI setup for the data layers: cargo-dist targets, wheels, PyPI, semver checks"
 kind: gate
 priority: p2

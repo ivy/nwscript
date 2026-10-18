@@ -1,4 +1,5 @@
 ---
+number: 66
 title: "rakata-2da: tables with every header variant the engine accepts, written in BioWare's layout, diffed by cell"
 kind: task
 priority: p1

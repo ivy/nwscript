@@ -1,4 +1,5 @@
 ---
+number: 88
 title: "`nws --game-dir`: includes and nwscript.nss resolved from an install through rakata-game"
 kind: task
 priority: p3

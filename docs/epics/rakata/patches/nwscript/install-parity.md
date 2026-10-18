@@ -1,4 +1,5 @@
 ---
+number: 81
 title: "Parity: `rakata install` over every HoloPatcher step of the full build, each difference explained against TSLPatcher"
 kind: task
 priority: p3

@@ -1,4 +1,5 @@
 ---
+number: 63
 title: "rakata-tlk: dialog.tlk read, `LocalizedString` resolution, append with the returned strref, write"
 kind: task
 priority: p1

@@ -1,4 +1,5 @@
 ---
+number: 85
 title: "`rakata lint`: dangling references, strrefs past the TLK, case-variant duplicates and `.tpc` shadows over a tree"
 kind: task
 priority: p2

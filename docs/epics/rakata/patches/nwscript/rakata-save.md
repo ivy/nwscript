@@ -1,4 +1,5 @@
 ---
+number: 90
 title: "rakata-save and `rakata save show`: a save's globals, party and creatures by name"
 kind: task
 priority: p1

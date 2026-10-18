@@ -1,4 +1,5 @@
 ---
+number: 82
 title: "modshop's side of the roadmap: `docs/proposals/rakata-in-modshop.md`, and how a local Rakata build enters a key"
 kind: task
 priority: p1

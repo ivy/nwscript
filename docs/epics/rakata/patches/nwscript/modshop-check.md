@@ -1,4 +1,5 @@
 ---
+number: 86
 title: "modshop runs the rakata lints over its mods: `modshop kotor lint`, in `mise run check` and per entry"
 kind: task
 priority: p3

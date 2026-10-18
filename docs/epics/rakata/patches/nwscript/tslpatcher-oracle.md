@@ -1,4 +1,5 @@
 ---
+number: 80
 title: "Spike: drive TSLPatcher under Wine without its GUI, as the installer's oracle"
 kind: spike
 priority: p3

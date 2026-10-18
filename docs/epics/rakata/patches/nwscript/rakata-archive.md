@@ -1,4 +1,5 @@
 ---
+number: 60
 title: "rakata-archive: KEY/BIF, ERF and RIM read, written back identically, members added and replaced"
 kind: task
 priority: p1

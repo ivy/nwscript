@@ -1,4 +1,5 @@
 ---
+number: 64
 title: "rakata-game: the install model, `rakata which`, and the `Resolver` for nwscript"
 kind: task
 priority: p1

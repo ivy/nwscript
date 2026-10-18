@@ -1,4 +1,5 @@
 ---
+number: 61
 title: "`rakata conformance`: round-trip every resource of a tree and classify each file"
 kind: task
 priority: p1

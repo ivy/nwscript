@@ -1,4 +1,5 @@
 ---
+number: 72
 title: "Rakata M5 Prove: dialogue and tree lints, the semantic diff, lints in modshop's check"
 kind: milestone
 priority: p2

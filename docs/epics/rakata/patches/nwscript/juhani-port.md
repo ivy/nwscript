@@ -1,4 +1,5 @@
 ---
+number: 83
 title: "Port Oops! All Juhani onto the rakata Python module, with modshop's chain hash unchanged"
 kind: task
 priority: p2
@@ -32,3 +33,4 @@ The proposal governs this work: `docs/proposals/rakata.md` in `~/src/github.com/
 - Repository rules: no mod authors' files or build outputs in git; no device identity; nothing edited in the game folder by hand. Commit messages are conventional; do not push.
 - `k_pdan_14juh_d` compiles in BioWare's mode (`--declarations bioware --compat bioware`); keep those flags in the compile call.
 - If a byte difference comes from LIP or GFF layout (PyKotor's writer versus BioWare's), that is the expected "equal after re-read" case: explain it, do not chase identical bytes.
+- `uv sync` removes a locally installed wheel: a `rakata` wheel put into modshop's `.venv` by hand disappears on the next sync (modshop's `docs/proposals/rakata-in-modshop.md` names this cost). The port must survive it, so the wheel comes in through the path that proposal describes, never a hand install.

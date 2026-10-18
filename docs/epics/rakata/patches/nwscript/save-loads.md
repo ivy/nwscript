@@ -1,4 +1,5 @@
 ---
+number: 96
 title: "Load a save written by `rakata save set` on the handheld and confirm the changed global"
 kind: gate
 priority: p2

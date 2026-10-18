@@ -1,4 +1,5 @@
 ---
+number: 54
 title: "Accept the Rakata proposal: status line, README, AGENTS.md, the test data variables"
 kind: task
 priority: p0

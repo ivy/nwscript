@@ -1,4 +1,5 @@
 ---
+number: 79
 title: "`rakata diff`: two trees or two resources by field, cell, string, member and dialogue node"
 kind: task
 priority: p2

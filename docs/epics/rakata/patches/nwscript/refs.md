@@ -1,4 +1,5 @@
 ---
+number: 91
 title: "`rakata refs`: every reference to a strref, resref, tag or global in every direction, and the Canderous report"
 kind: task
 priority: p1

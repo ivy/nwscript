@@ -1,4 +1,5 @@
 ---
+number: 68
 title: "The authoring API: the Juhani mod's operations as validated library calls on the façade"
 kind: task
 priority: p1

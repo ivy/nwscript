@@ -1,10 +1,12 @@
 # Rakata: the data layers, in the order the Calo mod needs them
 
-The decomposition of [../../rakata.md](../../rakata.md). Forty-four nodes in one skift project, `nwscript` (the slug stays when the repository is renamed; only `vcs_url` changes): seven milestone grouping nodes, three gates, one spike and 33 tasks, with three nodes parented to the existing release milestone `#9`. Frontmatter is the op, the body is the work order. **Nothing has been applied.**
+The decomposition of [../../rakata.md](../../rakata.md). Forty-four nodes in one skift project, `nwscript` (the slug stays when the repository is renamed; only `vcs_url` changes): seven milestone grouping nodes, three gates, one spike and 33 tasks, with three nodes parented to the existing release milestone `#9`. Frontmatter is the op, the body is the work order. Filed on 2026-10-17 as `nwscript#53` through `nwscript#96`; each file's `number` key names its node.
 
 Agents receive a node body and nothing else, so each body restates what its reader needs and cites files in the repositories: `docs/proposals/rakata.md` and `docs/prd.md` here, modshop's `CLAUDE.md`, `games/kotor/CLAUDE.md`, its ideas and patches READMEs, and `docs/proposals/rakata-in-modshop.md` once the `modshop-proposal` node writes it. No body names this epic.
 
 ## Before applying
+
+What had to hold when the patch was applied; it did.
 
 - **Commit the proposal.** `docs/proposals/rakata.md` is uncommitted; `accept-prd` is the node that commits it as accepted and is the root of the graph. Applying before it exists on `main` is fine; dispatching any other node before `accept-prd` is done is not, because every body cites that file.
 - **The first graph is the ground.** `#9` (M7 Release), `#45` (release workflow), `#46`, `#48`, `#51` (its gates) are referenced by number and resolve to the filed nodes. `release-workspace`, `approve-release-setup` and `rakata-skill` take `parent: "#9"`, so that milestone now closes only when the data layers' release work does; a comment on `#9` saying so is worth leaving when this is applied. `#50` (fresh-agent test for scripts) is untouched; `rakata-skill` is its counterpart for data.

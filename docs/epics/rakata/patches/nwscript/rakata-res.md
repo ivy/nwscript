@@ -1,4 +1,5 @@
 ---
+number: 58
 title: "rakata-res: `ResRef`, the resource type table, content hashes"
 kind: task
 priority: p1
