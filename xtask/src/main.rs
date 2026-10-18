@@ -1,8 +1,10 @@
 //! Development tasks. `cargo xtask corpus --help` for the corpus commands,
-//! `cargo xtask grammar-census --help` for the grammar's evidence.
+//! `cargo xtask grammar-census --help` for the grammar's evidence,
+//! `cargo xtask ini-census --help` for what the mods' change files contain.
 
 mod corpus;
 mod grammar_census;
+mod ini_census;
 
 use std::process::ExitCode;
 
@@ -11,8 +13,11 @@ fn main() -> ExitCode {
     let result = match args.first().map(String::as_str) {
         Some("corpus") => corpus::main(&args[1..]),
         Some("grammar-census") => grammar_census::main(&args[1..]),
+        Some("ini-census") => ini_census::main(&args[1..]),
         _ => {
-            eprintln!("usage: cargo xtask corpus --help | cargo xtask grammar-census --help");
+            eprintln!(
+                "usage: cargo xtask corpus --help | cargo xtask grammar-census --help | cargo xtask ini-census --help"
+            );
             return ExitCode::from(2);
         }
     };

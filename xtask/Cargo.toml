@@ -1,6 +1,6 @@
 [package]
 name = "xtask"
-description = "Development tasks: corpus extraction and verification, the grammar census."
+description = "Development tasks: corpus extraction and verification, the grammar census, the ini census."
 version = "0.0.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -10,6 +10,7 @@ publish = false
 [dependencies]
 rakata-archive = { workspace = true }
 rakata-res = { workspace = true }
+rakata-patch = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 toml = "0.8"
