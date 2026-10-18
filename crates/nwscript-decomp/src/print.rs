@@ -60,7 +60,9 @@ impl Printer<'_> {
         for l in self.cx.header.lines() {
             let _ = writeln!(self.out, "// {l}");
         }
-        self.out.push('\n');
+        if !self.cx.header.is_empty() {
+            self.out.push('\n');
+        }
         for inc in self.cx.includes {
             let _ = writeln!(self.out, "#include \"{inc}\"");
         }
@@ -77,6 +79,10 @@ impl Printer<'_> {
         // Globals first: functions refer to them.
         for (i, f) in self.s.funcs.iter().enumerate() {
             if f.kind != FuncKind::Globals {
+                continue;
+            }
+            let silent = self.cx.notes.get(i).is_none_or(|n| n.is_empty());
+            if silent && f.body.as_ref().is_ok_and(|b| b.is_empty()) {
                 continue;
             }
             let first = self.line();

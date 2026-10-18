@@ -166,6 +166,17 @@ pub struct Global {
     pub fields: usize,
 }
 
+/// Which functions the printed source writes a status comment above.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Notes {
+    /// Every function, with its status.
+    #[default]
+    All,
+    /// Only a function that is not verified: its status after the code
+    /// `nws decompile` warns of it with (E0602), or alone when unchecked.
+    Unverified,
+}
+
 /// A recovered program, ready to print.
 pub struct Decompiled<'t> {
     script: Script,
@@ -173,6 +184,7 @@ pub struct Decompiled<'t> {
     pub functions: Vec<Function>,
     header: Option<Vec<String>>,
     includes: Vec<String>,
+    notes: Notes,
 }
 
 /// Recover source from a program. Functions start [`Status::Unchecked`] or
@@ -204,6 +216,7 @@ pub fn decompile<'t>(program: &Program, table: &'t EngineTable) -> Result<Decomp
         functions,
         header: None,
         includes: Vec::new(),
+        notes: Notes::All,
     })
 }
 
@@ -279,9 +292,15 @@ impl Decompiled<'_> {
     }
 
     /// Print these lines, each a `//` comment, above the source in place
-    /// of the default header.
+    /// of the default header; no lines print none.
     pub fn set_header(&mut self, lines: Vec<String>) {
         self.header = Some(lines);
+    }
+
+    /// Which functions [`Decompiled::source`] comments on;
+    /// [`Notes::All`] unless set.
+    pub fn set_notes(&mut self, notes: Notes) {
+        self.notes = notes;
     }
 
     /// The libraries a fold included, in order.
@@ -457,7 +476,14 @@ impl Decompiled<'_> {
         let notes: Vec<String> = self
             .functions
             .iter()
-            .map(|f| f.status.to_string())
+            .map(|f| match (self.notes, &f.status) {
+                (Notes::All, status) => status.to_string(),
+                (Notes::Unverified, Status::Verified) => String::new(),
+                (Notes::Unverified, Status::Unchecked) => f.status.to_string(),
+                (Notes::Unverified, status) => {
+                    format!("{}: {status}", nwscript_diag::codes::E0602.id)
+                }
+            })
             .collect();
         let total = self.functions.len();
         let header = match &self.header {

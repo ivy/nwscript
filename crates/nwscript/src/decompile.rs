@@ -9,7 +9,7 @@ use nwscript_ncs::decode;
 use nwscript_sema::EngineTable;
 
 pub use nwscript_decomp::{
-    CompileError, Compiler, Decompiled, Fold, FoldStruct, Function, Global, Kind, Status,
+    CompileError, Compiler, Decompiled, Fold, FoldStruct, Function, Global, Kind, Notes, Status,
 };
 
 /// Decode NCS bytes and recover their source; with a compiler, verify each

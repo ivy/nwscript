@@ -1,7 +1,7 @@
 //! Recovery and verification on hand-assembled programs, against a small
 //! engine table written for these tests.
 
-use nwscript_decomp::{CompileError, Status, decompile};
+use nwscript_decomp::{CompileError, Notes, Status, decompile};
 use nwscript_diag::FileId;
 use nwscript_ncs::{Program, asm, encode};
 use nwscript_sema::EngineTable;
@@ -130,6 +130,18 @@ fn a_difference_is_reported_at_its_original_offset() {
     assert!(source_of(&d).contains(&format!(
         "// unverified: recompiles differently from offset {at}\nint sub_27e("
     )));
+
+    // With only the unverified marked and no header, the verified globals
+    // and main carry no comment, and sub_27e its code.
+    d.set_notes(Notes::Unverified);
+    d.set_header(Vec::new());
+    let quiet = source_of(&d);
+    assert!(!quiet.contains("// verified"), "{quiet}");
+    assert!(!quiet.starts_with('\n'), "{quiet}");
+    assert!(quiet.contains(&format!(
+        "// E0602: unverified: recompiles differently from offset {at}\nint sub_27e("
+    )));
+    assert_eq!(quiet.matches("//").count(), 1, "{quiet}");
 }
 
 #[test]
