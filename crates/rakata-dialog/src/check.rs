@@ -1,6 +1,8 @@
 //! The reference checks: what a dialogue names outside itself, asked of the
 //! install. A node's script and a link's condition resolve to bytecode; a
-//! voiced node's voice-over has its file; a strref lies inside the talk
+//! voiced node's voice-over has its file (a node is voiced, as
+//! [`crate::Node::voiced`] says, when it names a voice-over, no `Sound`,
+//! and a `SoundExists` other than `0`); a strref lies inside the talk
 //! table; a global a condition reads is declared in `globalcat.2da`.
 //!
 //! The crate does no I/O, so the install answers through [`References`];
@@ -30,10 +32,42 @@ pub trait References {
     /// cannot be read.
     fn globals_read(&mut self, condition: &ResRef) -> Vec<String>;
 
+    /// The globals the condition script reads, as [`References::globals_read`]
+    /// names them, with the `GetGlobal*` calls whose name is computed
+    /// rather than a literal, which no check can follow. By default, the
+    /// names alone.
+    fn global_reads(&mut self, condition: &ResRef) -> GlobalReads {
+        GlobalReads {
+            names: self.globals_read(condition),
+            ..GlobalReads::default()
+        }
+    }
+
+    /// Whether `globalcat.2da` declares any global whose name starts with
+    /// `prefix`, without regard to case; `None` when there is no table to
+    /// ask, or the implementation cannot say.
+    fn declares_prefix(&mut self, prefix: &str) -> Option<bool> {
+        let _ = prefix;
+        None
+    }
+
     /// Whether `globalcat.2da` declares the global, without regard to
     /// case; `None` when there is no table to ask, and the check is
     /// skipped.
     fn declares_global(&mut self, name: &str) -> Option<bool>;
+}
+
+/// What a condition reads of the globals.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct GlobalReads {
+    /// The literal names, each once, in the order the bytecode passes them.
+    pub names: Vec<String>,
+    /// The literal prefixes of names built by appending a computed part
+    /// (`"OAJ_DOWN_" + IntToString(n)`), each once.
+    pub prefixes: Vec<String>,
+    /// The routines (`GetGlobalNumber`, ...) called with a name computed
+    /// with no literal prefix, each once.
+    pub computed: Vec<String>,
 }
 
 /// Where in a dialogue a finding lies.
@@ -60,7 +94,9 @@ impl fmt::Display for Place {
 /// One reference the install cannot satisfy.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Finding {
-    /// The registered code: `RW1102`, `RW1104`, `RW1105` or `RW1106`.
+    /// The registered code: `RW1102`, `RW1104`, `RW1105` or `RW1106` from
+    /// [`check`], and from [`crate::lint`] also `RW1101` and `RW1107` to
+    /// `RW1110`.
     pub code: &'static str,
     /// Where it lies.
     pub place: Place,
@@ -68,10 +104,13 @@ pub struct Finding {
     /// link leaves; for a start, the entry it enters), as
     /// [`NodeKey::of`] chooses it.
     pub key: NodeKey,
-    /// What is referred to: the script, the voice resref, the strref, or
-    /// the global.
+    /// What is referred to: the script, the voice resref, the strref, the
+    /// global, the condition (for a computed global), the missing node
+    /// (for a dangling link), or the disagreement (for `SoundExists`);
+    /// empty for an unreached node.
     pub subject: String,
-    /// For an undeclared global, the condition that reads it.
+    /// For an undeclared global, the condition that reads it; for a
+    /// computed one, the routine it calls.
     pub via: Option<String>,
 }
 
@@ -96,6 +135,34 @@ impl Finding {
                 "shows strref {}, past the end of the talk table",
                 self.subject
             ),
+            codes::DANGLING_LINK => format!(
+                "links to {}, which the dialogue does not have",
+                self.subject
+            ),
+            codes::UNREACHED_NODE => {
+                "is reached by no start, through any chain of links".to_string()
+            }
+            codes::MISSING_LIP => format!(
+                "is voiced by {}, and no layer holds {}.lip",
+                self.subject, self.subject
+            ),
+            codes::UNDECIDABLE_GLOBAL => match self.via.as_deref() {
+                Some(v) if v.ends_with('*') => format!(
+                    "has the condition {}, which reads a global named {v} with the rest computed, and the install cannot say whether globalcat.2da declares one",
+                    self.subject
+                ),
+                v => format!(
+                    "has the condition {}, which passes a computed name to {}, so the global it reads cannot be checked",
+                    self.subject,
+                    v.unwrap_or("?")
+                ),
+            },
+            codes::UNDECLARED_GLOBAL if self.subject.ends_with('*') => format!(
+                "has the condition {}, which reads a global named {} with the rest computed, and globalcat.2da declares none with that prefix",
+                self.via.as_deref().unwrap_or("?"),
+                self.subject
+            ),
+            codes::SOUND_EXISTS => format!("has {}", self.subject),
             _ => format!(
                 "has the condition {}, which reads the global {}, and globalcat.2da does not declare it",
                 self.via.as_deref().unwrap_or("?"),
@@ -133,7 +200,7 @@ pub fn check(dialog: &Dialog, refs: &mut dyn References) -> Vec<Finding> {
         {
             out.push(find(codes::MISSING_SCRIPT, s.to_string()));
         }
-        if let Some(vo) = node.voice()
+        if let Some(vo) = node.voiced()
             && !refs.resolves(&vo, ResType::Wav)
         {
             out.push(find(codes::MISSING_VOICE, vo.to_string()));

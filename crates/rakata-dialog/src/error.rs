@@ -37,6 +37,16 @@ pub mod codes {
     pub const STRREF_PAST_TLK: &str = "RW1105";
     /// A condition reading a global `globalcat.2da` does not declare.
     pub const UNDECLARED_GLOBAL: &str = "RW1106";
+    /// A node no start reaches, by any chain of links.
+    pub const UNREACHED_NODE: &str = "RW1107";
+    /// A voiced node whose voice-over has no lip-sync file.
+    pub const MISSING_LIP: &str = "RW1108";
+    /// A condition passing a computed name to a `GetGlobal*` routine, so
+    /// the global it reads cannot be checked.
+    pub const UNDECIDABLE_GLOBAL: &str = "RW1109";
+    /// A `SoundExists` that disagrees with the node's `Sound` and
+    /// `VO_ResRef`.
+    pub const SOUND_EXISTS: &str = "RW1110";
 }
 
 /// An error in reading a dialogue or addressing one of its nodes.

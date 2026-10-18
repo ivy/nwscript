@@ -95,6 +95,11 @@ nwscript_diag::codes! {
     RW1104 Warning "a voiced node whose voice-over no layer or streamwaves/ holds";
     RW1105 Warning "a node whose strref lies past the end of the talk table";
     RW1106 Warning "a condition reading a global globalcat.2da does not declare";
+    RW1107 Warning "a dialogue node no start reaches";
+    RW1108 Note "a voiced dialogue node whose voice-over has no lip-sync file";
+    RW1109 Warning "a condition that computes the name of the global it reads";
+    RW1110 Warning "a dialogue node whose SoundExists disagrees with its Sound and VO_ResRef";
+    RE1109 Error "a known-findings list for `dialog lint` that does not read";
     RE1201 Error "a directory that is not a saved game";
     RE1202 Error "a module the save holds no state for";
     RE1203 Error "a save member lacking a field the game writes";

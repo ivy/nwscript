@@ -19,7 +19,10 @@
 //! lists (or inside a node's own links), and [`Dialog::reorder`], which
 //! moves indices, is named apart. [`check()`] lists the references the
 //! install cannot satisfy (a script or condition, a voice-over, a strref, a
-//! global a condition reads), asked through [`References`].
+//! global a condition reads), asked through [`References`]; [`lint()`] adds
+//! the rules that read the whole dialogue: dangling links, nodes no start
+//! reaches, voiced nodes without lip sync, globals read by a computed name,
+//! and `SoundExists` disagreeing with the audio the node names.
 //!
 //! A [`Transcript`] renders the conversation for reading, as text or as
 //! structured nodes, with what lies outside the dialogue (the talk table,
@@ -38,13 +41,15 @@ mod edit;
 mod error;
 pub mod facts;
 mod key;
+mod lint;
 mod model;
 mod transcript;
 
-pub use check::{Finding, Place, References, check};
+pub use check::{Finding, GlobalReads, Place, References, check};
 pub use edit::{CAMERA_STATIC, NO_DELAY, NewNode, Text};
 pub use error::{Error, Result, codes};
 pub use key::NodeKey;
+pub use lint::lint;
 pub use model::{Animation, Dialog, Info, Kind, Link, Node, NodeRef, localized};
 pub use transcript::{
     AnimationView, Embedded, LinkView, Lookup, NodeView, Options, Row, Script, ScriptStatus,

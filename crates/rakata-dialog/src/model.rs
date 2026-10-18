@@ -246,6 +246,24 @@ impl<'a> Node<'a> {
         resref(self.raw, "VO_ResRef")
     }
 
+    /// `SoundExists`, the first of its copies: nonzero where BioWare's
+    /// tool found the line's audio, `0` where it did not, `None` when the
+    /// node has no such field.
+    pub fn sound_exists(&self) -> Option<i64> {
+        number(self.raw, "SoundExists")
+    }
+
+    /// The voice-over the node plays: `VO_ResRef`, unless `SoundExists` is
+    /// `0`, which BioWare's tool writes on a line it has no recording for
+    /// (the vanilla player replies name placeholders such as
+    /// `_m13aabast01001_`), or the node names a `Sound`, which the engine
+    /// plays instead (a Wookiee's speech, or a line recorded under another
+    /// name).
+    pub fn voiced(&self) -> Option<ResRef> {
+        self.voice()
+            .filter(|_| self.sound_exists() != Some(0) && self.sound().is_none())
+    }
+
     /// `Sound`: a sound played with the line.
     pub fn sound(&self) -> Option<ResRef> {
         resref(self.raw, "Sound")
