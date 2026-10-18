@@ -1089,6 +1089,7 @@ dependencies = [
  "predicates",
  "rakata",
  "rakata-archive",
+ "rakata-gff",
  "rakata-res",
  "serde_json",
  "tempfile",

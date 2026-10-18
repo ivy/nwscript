@@ -7,6 +7,8 @@ pub use corpus::CorpusArgs;
 mod cat;
 mod explain;
 mod install;
+mod save;
+pub use save::SaveArgs;
 mod which;
 pub use cat::CatArgs;
 mod gff;
@@ -89,6 +91,7 @@ pub fn run(cli: Cli) -> Exit {
         Command::TwoDa(args) => twoda::run(&ctx, &args),
         Command::Tlk(args) => tlk::run(&ctx, &args),
         Command::Lip(args) => lip::run(&ctx, &args),
+        Command::Save(args) => save::run(&ctx, &args),
         Command::Which {
             name,
             module,

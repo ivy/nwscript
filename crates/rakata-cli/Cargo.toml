@@ -21,6 +21,7 @@ rakata-res = { workspace = true }
 assert_cmd = "2.2"
 tempfile = "3"
 rakata-archive = { workspace = true }
+rakata-gff = { workspace = true }
 predicates = "3.1"
 serde_json = "1"
 

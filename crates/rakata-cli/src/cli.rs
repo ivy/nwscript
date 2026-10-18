@@ -25,6 +25,8 @@ Examples:
   rakata 2da diff globalcat.2da globalcat.2da --game-a VANILLA --game-b BUILD
   rakata tlk show 42724 --game DIR         the string a strref names
   rakata lip show ./n_juhani_01.lip        a lip-sync file's keyframes
+  rakata save show SAVEDIR --module danm14ac --creature carth
+                                           a creature as the save has it
 
 Exit codes: 0 success, 1 errors reported, 2 bad invocation,
 3 a comparison found a difference, 101 internal error.";
@@ -139,4 +141,6 @@ pub enum Command {
     Tlk(crate::cmd::TlkArgs),
     /// Show a lip-sync file's keyframes.
     Lip(crate::cmd::LipArgs),
+    /// A saved game by name: globals, the party, each module's creatures with their flags, effects and action queues, and the pending events.
+    Save(crate::cmd::SaveArgs),
 }
