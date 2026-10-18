@@ -17,9 +17,11 @@ rakata refs OAJ_DONE --kind global --db FILE
 rakata refs 42724 --kind strref --db FILE
 rakata refs k_transabort --kind resref --db FILE
 rakata refs k_trg_transfail.ncs --from --db FILE
+rakata refs lhr_flr01 --kind resref --db FILE    # the models whose meshes use a texture
+rakata refs m01aa_01a --kind resref --db FILE    # the layouts that place a room model
 ```
 
-Each hit is the resource holding the reference, the site in it (a GFF field path, `row N COLUMN` of a 2DA, `@OFFSET Routine.param` of a script) and every place the install holds that resource. Indirect hits follow: a script that names the thing leads to the dialogue nodes, links and events that run it. `--direct` leaves those out. `--from` lists what one resource refers to. Without `--kind`, every kind the word can be is tried. An empty answer says how many resources the index could not read, since a reference inside one of them cannot have been found.
+Each hit is the resource holding the reference, the site in it (a GFF field path, `row N COLUMN` of a 2DA, `@OFFSET Routine.param` of a script, `NODE.texture`, `NODE.lightmap` or `supermodel` of a model, `room[N]` or `doorhook[N].room` of a layout) and every place the install holds that resource. Indirect hits follow: a script that names the thing leads to the dialogue nodes, links and events that run it. `--direct` leaves those out. `--from` lists what one resource refers to. Without `--kind`, every kind the word can be is tried. An empty answer says how many resources the index could not read, since a reference inside one of them cannot have been found.
 
 ## Plot state: flags and quests
 

@@ -1,6 +1,7 @@
 //! From one resource's bytes to its rows: the format crates' extractors
 //! (`rakata_dialog::facts`, `rakata_gff::facts`, `rakata_2da::facts`,
-//! `rakata_tlk::facts`, `nwscript_ncs::facts`) chosen by the resource's
+//! `rakata_tlk::facts`, `nwscript_ncs::facts`, `rakata_mdl::facts`,
+//! `rakata_lyt::facts`) chosen by the resource's
 //! type, and their facts laid out as the tables' columns. Nothing here
 //! touches the database or the file system.
 
@@ -221,6 +222,8 @@ pub(crate) fn extract(ty: ResType, name: &str, bytes: &[u8], routines: &[Routine
             ResType::Tlk => tlk(bytes),
             ResType::Ncs => script(bytes, routines),
             ResType::Nss => source(bytes),
+            ResType::Mdl => model(bytes),
+            ResType::Lyt => layout(bytes),
             _ => Extracted::status(Status::NoReader, None),
         }
     }
@@ -379,6 +382,28 @@ fn tlk(bytes: &[u8]) -> Extracted {
     }
     out.refs(f.refs);
     out
+}
+
+fn model(bytes: &[u8]) -> Extracted {
+    match rakata_mdl::facts::refs(bytes) {
+        Ok(refs) => {
+            let mut out = Extracted::status(Status::Parsed, None);
+            out.refs(refs);
+            out
+        }
+        Err(e) => failed(e),
+    }
+}
+
+fn layout(bytes: &[u8]) -> Extracted {
+    match rakata_lyt::Lyt::parse(bytes) {
+        Ok(l) => {
+            let mut out = Extracted::status(Status::Parsed, None);
+            out.refs(rakata_lyt::facts::refs(&l));
+            out
+        }
+        Err(e) => failed(e),
+    }
 }
 
 fn source(bytes: &[u8]) -> Extracted {
@@ -685,6 +710,18 @@ mod tests {
                 }
             ))
         );
+    }
+
+    #[test]
+    fn a_layout_names_its_room_models_and_a_bad_model_fails() {
+        let lyt = b"beginlayout\r\n   roomcount 1\r\n      M01aa_01a 0 0 0\r\n   trackcount 0\r\n   obstaclecount 0\r\n   doorhookcount 0\r\ndonelayout\r\n";
+        let x = extract(ResType::Lyt, "m01aa", lyt, &[]);
+        assert_eq!(x.status, Some(Status::Parsed), "{:?}", x.reason);
+        let r = x.rows.iter().find(|(t, _)| *t == Table::Refs).unwrap();
+        assert_eq!(r.1, [text("resref"), text("m01aa_01a"), text("room[0]")]);
+        let x = extract(ResType::Mdl, "x", b"# ASCII model", &[]);
+        assert_eq!(x.status, Some(Status::Failed));
+        assert!(x.reason.unwrap().contains("RE24"));
     }
 
     #[test]

@@ -8,7 +8,8 @@
 //! dialogue's nodes and links, a GFF's fields, a table's cells, the talk
 //! table's strings, a script's engine calls with their literal arguments
 //! (from the bytecode, through `nwscript-ncs`), every reference each makes
-//! to a resref, strref, tag or global (`refs`), and full text over node
+//! to a resref, strref, tag or global (`refs`, a model's textures and a
+//! layout's rooms among them), and full text over node
 //! text, comments, strings, call arguments and script source (`search`).
 //! A content is parsed once however many trees, paths and archives hold
 //! it, so a tree built from its parent and the paths that changed since
@@ -16,7 +17,8 @@
 //!
 //! The extractors are the format crates' (`rakata_dialog::facts`,
 //! `rakata_gff::facts`, `rakata_2da::facts`, `rakata_tlk::facts`,
-//! `nwscript_ncs::facts`) and are pure; this crate is the store, and the
+//! `nwscript_ncs::facts`, `rakata_mdl::facts`, `rakata_lyt::facts`) and
+//! are pure; this crate is the store, and the
 //! one crate of the workspace that owns a file. The database is built in
 //! memory and written once. [`digest`] proves two databases hold the same
 //! facts about a tree, [`coverage`] says what each file contributed, and

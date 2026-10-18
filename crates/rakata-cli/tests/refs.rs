@@ -217,6 +217,28 @@ fn every_script_naming_the_sword_over_the_vanilla_install() {
     );
     assert!(hits.iter().all(|h| h["unresolved"].is_null()), "{r}");
 
+    // What the assets name: the Endar Spire's layout places its first room,
+    // and the room models use its floor texture.
+    let (r, _) = timed(&db, &["m01aa_01a", "--kind", "resref"]);
+    let hits = r["result"]["hits"].as_array().unwrap();
+    assert!(
+        hits.iter()
+            .any(|h| h["resource"] == "m01aa.lyt" && h["site"] == "room[8]"),
+        "{r}"
+    );
+    let (r, names) = timed(&db, &["lhr_flr01", "--kind", "resref"]);
+    for m in ["m01aa_01a.mdl", "m01aa_04a.mdl", "m01aa_10.mdl"] {
+        assert!(names.iter().any(|n| n == m), "{m} not in {names:?}");
+    }
+    assert!(
+        r["result"]["hits"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|h| h["site"].as_str().unwrap().ends_with(".texture")),
+        "{r}"
+    );
+
     // The Terentatek's tag reaches its calls through a function of the
     // script's own: a weaker match, listed apart.
     let out = rakata()

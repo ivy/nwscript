@@ -3,7 +3,7 @@
 //! database of another version is rebuilt, never read.
 
 /// The schema's version, kept in `meta` under `schema`.
-pub const VERSION: u32 = 3;
+pub const VERSION: u32 = 4;
 
 /// The tables, created empty.
 pub const TABLES: &str = "

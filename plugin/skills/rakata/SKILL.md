@@ -25,7 +25,7 @@ Read only the file the task needs, from this skill's `references/` directory:
 | Task | File |
 |---|---|
 | Which copy the game loads; read a resource, a table, a string, a dialogue, an item's properties, an area's instances, one script decompiled | `find.md` |
-| What refers to a strref, script, tag or global; who sets and reads a flag or global; a quest's journal entries and their writers; search the install | `refs.md` |
+| What refers to a strref, script, tag or global; which models use a texture and which layouts place a model; who sets and reads a flag or global; a quest's journal entries and their writers; search the install | `refs.md` |
 | Make a change: add dialogue nodes and links, declare a global, compile a condition, edit a table or blueprint, write to Override | `author.md` |
 | Check a change: lint a dialogue or the install, diff against the original | `check.md` |
 | Working in the Rakata repository itself (tests, game files, the clean room) | `repository.md` |

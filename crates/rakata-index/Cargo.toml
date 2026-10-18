@@ -14,6 +14,8 @@ rakata-2da = { workspace = true }
 rakata-archive = { workspace = true }
 rakata-dialog = { workspace = true }
 rakata-gff = { workspace = true }
+rakata-lyt = { workspace = true }
+rakata-mdl = { workspace = true }
 rakata-res = { workspace = true }
 rakata-tlk = { workspace = true }
 rusqlite = { version = "0.39", features = ["bundled", "backup"] }

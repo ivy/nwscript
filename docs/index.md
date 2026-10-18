@@ -1,6 +1,6 @@
 # The index
 
-`rakata index` keeps, in one SQLite file, the facts of every resource a game tree holds: where each lies, what each says, every reference each makes to the game's symbols, and full text over what people read. It is the query surface the dialogue lints, `rakata refs`, the tree lint and the agent skill read; this document is their reference for the schema. The crate is `rakata-index`; the extractors that decide what a resource contributes are pure functions in the format crates (`rakata_dialog::facts`, `rakata_gff::facts`, `rakata_2da::facts`, `rakata_tlk::facts`, `nwscript_ncs::facts`).
+`rakata index` keeps, in one SQLite file, the facts of every resource a game tree holds: where each lies, what each says, every reference each makes to the game's symbols, and full text over what people read. It is the query surface the dialogue lints, `rakata refs`, the tree lint and the agent skill read; this document is their reference for the schema. The crate is `rakata-index`; the extractors that decide what a resource contributes are pure functions in the format crates (`rakata_dialog::facts`, `rakata_gff::facts`, `rakata_2da::facts`, `rakata_tlk::facts`, `nwscript_ncs::facts`, `rakata_mdl::facts`, `rakata_lyt::facts`).
 
 ## Commands
 
@@ -33,7 +33,7 @@ Hashes are SHA-256 as sixty-four lowercase hex digits. A resource's name is its 
 
 ### `meta(key, value)`
 
-`schema` holds the schema version (currently 3). There is no migration: a database of another version is refused (RE1502), by `build` as by every reader, and is built again into a new file (or after deleting the old one). The version changes with any table or column, or with what an extractor puts in one.
+`schema` holds the schema version (currently 4). There is no migration: a database of another version is refused (RE1502), by `build` as by every reader, and is built again into a new file (or after deleting the old one). The version changes with any table or column, or with what an extractor puts in one.
 
 ### `trees(id, label, parent, root)`
 
@@ -55,9 +55,9 @@ One row per file of a tree's walk and per member of each archive in it. `path` i
 
 One row per file of the tree, walked or not, and per archive member: what each contributed. The statuses:
 
-- `parsed`: a reader read it, and its facts are in the tables below. Readers exist for every GFF type (dialogues, blueprints, areas, instances, journals, factions, GUIs, paths), 2DA, TLK, NCS and NSS.
+- `parsed`: a reader read it, and its facts are in the tables below. Readers exist for every GFF type (dialogues, blueprints, areas, instances, journals, factions, GUIs, paths), 2DA, TLK, NCS, NSS, binary MDL and LYT. A model is read from its MDL alone, for what it names; its MDX has no reader.
 - `container`: an archive (KEY, BIF, ERF, MOD, SAV, HAK, RIM); its members have rows of their own. An archive inside an archive is `no_reader`.
-- `no_reader`: no reader for its type (textures, models, walkmeshes, sounds, lip-sync files): located and hashed only. `rakata index coverage` and the build's output count these by type.
+- `no_reader`: no reader for its type (textures, MDX, walkmeshes, room visibility, sounds, lip-sync files): located and hashed only. `rakata index coverage` and the build's output count these by type.
 - `failed`: a reader rejected it, or the file could not be read; `reason` holds the error with its code. A file that could not be read has a coverage row and no location.
 - `outside`: a file of the tree outside the folders the game loads resources from (the executable, configuration, movies, `streamwaves/` audio): recorded, not read, not hashed.
 
@@ -99,12 +99,12 @@ One row per `CONSTS` in a script's bytecode: the instruction's file offset and t
 
 One row per naming of a symbol by a content. The kinds:
 
-- `resref`: a resource, by lowercase resref. From every non-empty `CResRef` field of a GFF (a dialogue's `Script`, `Active`, `VO_ResRef`, `Sound`; a blueprint's `Conversation`, `TemplateResRef`, event scripts); from a talk-table entry's voice-over; and from a script's string literal passed to a parameter whose name speaks of a script, template, resref, dialogue, sound, movie or module (`ExecuteScript`'s `sScript`, `CreateObject`'s `sTemplate`).
+- `resref`: a resource, by lowercase resref. From every non-empty `CResRef` field of a GFF (a dialogue's `Script`, `Active`, `VO_ResRef`, `Sound`; a blueprint's `Conversation`, `TemplateResRef`, event scripts); from a talk-table entry's voice-over; from a script's string literal passed to a parameter whose name speaks of a script, template, resref, dialogue, sound, movie or module (`ExecuteScript`'s `sScript`, `CreateObject`'s `sTemplate`); from a model's supermodel, each mesh's texture and lightmap, each light's flare textures and each reference node's model (`NULL` and empty names are not references; emitters are not read); and from a layout's rooms, swoop track pieces, obstacles and door hooks' rooms (`****` is not a reference). A walkmesh names nothing: its perimeter edges lead into rooms by their position in the layout, not by name.
 - `strref`: a line of the talk table, in decimal. From every `CExoLocString` with a strref and every `StrRef` field, from each 2DA cell holding a decimal number in a column of strrefs (`name`, `description`, `spelldesc`, `gameplayhint`, `storyhint`, `trapname`, and any column whose name contains `strref` or `stringref`), and from a script's integer literal passed to a parameter named for a strref (`nStrRef`).
 - `tag`: an object's tag, as written. From a `CExoString` field labelled `Tag`, `LinkedTo`, `KeyName`, `Speaker`, `Listener`, `Participant` or `Quest`, and from a script's string literal passed to a parameter whose name contains `Tag`.
 - `global`: a global variable, as written. From each row of `globalcat.2da` (its `name` cell), and from a script's string literal passed to `GetGlobal*` or `SetGlobal*`.
 
-`value` compares without regard to case. `site` says where in the content: a GFF field path for a GFF or dialogue (`EntryList[3].RepliesList[0].Active`), `@OFFSET Routine.param` for a script (`@4793 ExecuteScript.sScript`), `row N` for `globalcat.2da` and `row N COLUMN` for a 2DA's strref cell, `strref N` for a talk table.
+`value` compares without regard to case. `site` says where in the content: a GFF field path for a GFF or dialogue (`EntryList[3].RepliesList[0].Active`), `@OFFSET Routine.param` for a script (`@4793 ExecuteScript.sScript`), `row N` for `globalcat.2da` and `row N COLUMN` for a 2DA's strref cell, `strref N` for a talk table, `supermodel`, `NODE.texture`, `NODE.lightmap`, `NODE.flare[N]` or `NODE.model` for a model (`NODE` the node's name), and `room[N]`, `track[N]`, `obstacle[N]` or `doorhook[N].room` for a layout, by position in its section.
 
 ### `search(body, kind, hash, site)`
 
@@ -153,6 +153,18 @@ FROM search s
 JOIN dialog_nodes n ON n.strref = CAST(s.site AS INTEGER)
 JOIN locations l ON l.hash = n.hash
 WHERE search MATCH 'rakghoul*' AND s.kind = 'string';
+```
+
+The models that use a texture, and the layouts that place a model:
+
+```sql
+SELECT DISTINCT l.name AS model, r.site
+FROM refs r JOIN locations l ON l.hash = r.from_hash
+WHERE l.type = 'mdl' AND r.kind = 'resref' AND r.value = 'lhr_flr01' AND r.site LIKE '%.texture';
+
+SELECT DISTINCT l.name AS area, r.site
+FROM refs r JOIN locations l ON l.hash = r.from_hash
+WHERE l.type = 'lyt' AND r.value = 'm01aa_01a';
 ```
 
 Everything that names a resref, and where:
