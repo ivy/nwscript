@@ -22,6 +22,24 @@ The first line is the winner, `wins LOCATION … sha256 HASH`; the rest are ever
 
 Each takes a file path as well (`./edited.dlg`), so the same commands read what a mod wrote.
 
+## Textures, layouts, walkmeshes and models
+
+```bash
+rakata texture show lhr_flr01.tpc --game DIR
+rakata lyt show m01aa.lyt --game DIR
+rakata walkmesh show m01aa_01a.wok --game DIR
+rakata mdl show m01aa_01a.mdl --game DIR
+```
+
+Each reads one resource in the same three forms as `gff show`, and tells the format by its extension; a resource of another format fails with `RE1307`, whose help names the command that reads it.
+
+- `texture show` reads a `.tpc` (size, pixel format `dxt1`/`dxt5`/`rgb`/`rgba`/`grey`, one image, a cube's six faces or an animation sheet's frames, each level's size and offset, then the TXI it carries), a `.txi` (one `KEY VALUE` line per instruction) or a `.tga` (size, image type, depth, origin; the lightmaps are TGAs, `ROOM_lm0.tga`). A texture name resolves through the texture packs too: `rakata which` shows the pack it came from.
+- `lyt show` reads a `.lyt` (each room model and its position, swoop tracks and obstacles, each door hook with its room, position and orientation) or a `.vis` (`ROOM  sees N: ROOM ...`, the rooms drawn from each).
+- `walkmesh show` reads a `.wok`, `.pwk` or `.dwk`: counts, the bounds of its vertices, the faces of each surface material, and `transitions`, the perimeter edges leading into each room by its index in the area's layout. With `--game` the materials are labelled and walkable faces counted through `surfacemat.2da`; `RW1301` says the install has none that reads. A WOK's vertices are already in the area's frame, so its bounds sit where its room stands in the LYT; a DWK's or PWK's are the object's own.
+- `mdl show` reads a model with its MDX (found as the MDL was: through the install, beside a path, in the same archive; `RW1302` when it is missing): the classification and supermodel, the node tree with each node's kind (`dummy`, `trimesh`, `skin`, `dangly`, `aabb` for a room's walkmesh, `light`, `emitter`, `reference`, `saber`), each mesh's texture, lightmap and vertex and face counts, and the animations. The supermodel chain is resolved by name through the install, each model listed with where it lay, then every animation the model inherits and from which; `RW1303` names a supermodel that is not found.
+
+`--format json` gives each node's number, parent, transform and controller count, and each mesh's flags, stride and attributes.
+
 ## A blueprint or an area, read
 
 ```bash
