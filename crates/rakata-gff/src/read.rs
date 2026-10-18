@@ -302,11 +302,17 @@ impl Reader<'_> {
                 Value::List(elements)
             }
         };
+        let width = match ty {
+            FieldType::Byte | FieldType::Char => Some(0xFF),
+            FieldType::Word | FieldType::Short => Some(0xFFFF),
+            _ => None,
+        };
         Ok(Field {
             label,
             value,
             index: Some(index),
             list_at,
+            wide: width.and_then(|m: u32| (d & !m != 0).then_some(d)),
         })
     }
 

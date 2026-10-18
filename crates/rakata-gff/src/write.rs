@@ -216,6 +216,21 @@ fn encode_data(v: &Value, out: &mut Vec<u8>) {
     }
 }
 
+/// The word a simple field stores in its entry: the word it was read with,
+/// high bits and all, while its value is unchanged.
+fn wide_word(f: &Field) -> u32 {
+    let word = simple_word(&f.value);
+    let mask = match f.value {
+        Value::Byte(_) | Value::Char(_) => 0xFF,
+        Value::Word(_) | Value::Short(_) => 0xFFFF,
+        _ => return word,
+    };
+    match f.wide {
+        Some(w) if w & mask == word => w,
+        _ => word,
+    }
+}
+
 /// The word a simple value stores in its field entry.
 fn simple_word(v: &Value) -> u32 {
     match v {
@@ -332,7 +347,7 @@ impl Gff {
                     encode_data(&node.f.value, &mut data);
                     at
                 }
-                _ => simple_word(&node.f.value),
+                _ => wide_word(node.f),
             };
             push_u32(&mut field_bytes, ty.id());
             push_u32(&mut field_bytes, field_label[pos]);

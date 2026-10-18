@@ -442,6 +442,11 @@ pub struct Field {
     /// the element count there, as read; the slot is reused only while the
     /// count is unchanged.
     pub(crate) list_at: Option<(u32, u32)>,
+    /// For a `BYTE`, `CHAR`, `WORD` or `SHORT`, the data word as read when
+    /// it carries bits above the value's width (the game's saves store a
+    /// negative `SHORT` sign-extended); written back while the value's own
+    /// bits are unchanged.
+    pub(crate) wide: Option<u32>,
 }
 
 impl Field {
@@ -451,6 +456,7 @@ impl Field {
             value,
             index: None,
             list_at: None,
+            wide: None,
         }
     }
 

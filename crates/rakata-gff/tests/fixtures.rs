@@ -385,3 +385,23 @@ fn a_file_edited_in_shape_keeps_its_slots_and_appends() {
         "gff: UTC V3.2; sections adjacent; data: all used; field indices: 28 unused bytes; list indices: all used; locstring totals: all right; narrow fields: clean"
     );
 }
+
+#[test]
+fn a_narrow_field_stored_sign_extended_writes_back_as_read() {
+    // The game's saves store a negative SHORT with its sign extended through
+    // the whole data word (0xFFFFFFD6 for -42), where BioWare's blueprints
+    // zero the upper half.
+    let mut bytes = creature("Bastila", -42, 3).to_bytes().unwrap();
+    let fo = u32_at(&bytes, 16) as usize;
+    let word = fo + 3 * 12 + 8; // CurrentHitPoints, the fourth field
+    assert_eq!(u32_at(&bytes, word), 0x0000_FFD6);
+    bytes[word + 2..word + 4].copy_from_slice(&[0xFF, 0xFF]);
+
+    let mut g = Gff::parse(&bytes).unwrap();
+    assert_eq!(g.root.get("CurrentHitPoints"), Some(&Value::Short(-42)));
+    assert_eq!(g.to_bytes().unwrap(), bytes);
+
+    // A changed value is written in the value's own width.
+    g.root.set(label("CurrentHitPoints"), Value::Short(5));
+    assert_eq!(u32_at(&g.to_bytes().unwrap(), word), 5);
+}
