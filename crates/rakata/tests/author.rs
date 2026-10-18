@@ -849,3 +849,169 @@ fn the_mod_and_its_errors_cross_threads_as_the_bindings_need() {
     send_sync::<rakata::author::Error>();
     send_sync::<Dialog>();
 }
+
+/// A second module, `othermod`, whose `.rim` holds `members`.
+fn other_module(root: &Path, members: &[(&str, &[u8])]) {
+    let mut rim = Rim::new();
+    for (n, data) in members {
+        rim.add(id(n), data.to_vec()).unwrap();
+    }
+    fs::write(root.join("modules/othermod.rim"), rim.to_bytes().unwrap()).unwrap();
+}
+
+#[test]
+fn a_mod_moved_to_another_module_keeps_its_writes_and_refuses_an_unknown_one() {
+    let root = make("set-module", false);
+    other_module(&root, &[("k_other.ncs", b"other's")]);
+    let mut m = open(&root);
+    let mut t = TwoDa::parse(&m.loaded(id("globalcat.2da")).unwrap().bytes).unwrap();
+    globals::declare(&mut t, "CN_MET", GlobalType::Boolean).unwrap();
+    m.write_override("globalcat.2da", &t.to_bytes().unwrap())
+        .unwrap();
+    assert!(m.loaded(id("k_other.ncs")).is_err());
+
+    m.set_module(Some("othermod")).unwrap();
+    assert_eq!(
+        m.module().map(ToString::to_string).as_deref(),
+        Some("othermod")
+    );
+    assert_eq!(
+        m.loaded(id("k_other.ncs")).unwrap().location,
+        "modules/othermod.rim:k_other.ncs"
+    );
+    assert!(m.loaded(id("globalcat.2da")).unwrap().written);
+    assert!(m.loaded(id("k_replaced.ncs")).is_err());
+
+    let e = m.set_module(Some("nomod")).unwrap_err();
+    assert_eq!(e.code(), "RE0403");
+    assert_eq!(
+        m.module().map(ToString::to_string).as_deref(),
+        Some("othermod")
+    );
+    m.set_module(None).unwrap();
+    assert!(m.module().is_none());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn an_override_write_is_guarded_against_another_modules_own_copy() {
+    let root = make("other-modules", false);
+    other_module(
+        &root,
+        &[
+            ("k_replaced.ncs", b"othermod's own k_replaced"),
+            ("appearance.2da", b"othermod's own appearance"),
+            ("k_same.ncs", REPLACED),
+        ],
+    );
+    let m = open(&root);
+    // testmod's copy is its .rim's; othermod's differs
+    let e = m.guard_other_modules(id("k_replaced.ncs")).unwrap_err();
+    assert_eq!(e.code(), codes::OTHER_MODULE_DIFFERS);
+    let text = e.to_string();
+    assert!(
+        text.contains("othermod.rim holds othermod's own k_replaced.ncs"),
+        "{text}"
+    );
+    assert!(text.contains("the copy testmod loads"), "{text}");
+    // A global resource a module carries its own copy of
+    let e = m.guard_other_modules(id("appearance.2da")).unwrap_err();
+    assert_eq!(e.code(), codes::OTHER_MODULE_DIFFERS);
+    // No other module holds it, or holds the same bytes
+    m.guard_other_modules(id("globalcat.2da")).unwrap();
+    m.guard_other_modules(id("k_nowhere.ncs")).unwrap();
+    // A copy in Override already serves every module
+    fs::write(root.join("Override/k_replaced.ncs"), b"a mod's").unwrap();
+    open(&root)
+        .guard_other_modules(id("k_replaced.ncs"))
+        .unwrap();
+    fs::remove_dir_all(&root).unwrap();
+
+    let root = make("other-modules-same", false);
+    other_module(&root, &[("k_replaced.ncs", REPLACED)]);
+    open(&root)
+        .guard_other_modules(id("k_replaced.ncs"))
+        .unwrap();
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn a_nodes_script_is_replaced_only_when_it_runs_the_one_named() {
+    let root = make("replace-script", false);
+    let m = open(&root);
+    let mut d = Dialog::parse("banter.dlg", &m.loaded(id("banter.dlg")).unwrap().bytes).unwrap();
+    let e3 = NodeKey::Voice(ResRef::new("vo_three").unwrap());
+    let before = d.to_bytes().unwrap();
+    let e = dlg::replace_script(&mut d, &e3, Some("k_old"), Some("k_new")).unwrap_err();
+    assert_eq!(e.code(), codes::SCRIPT_DIFFERS);
+    assert!(e.to_string().contains("runs no script, not `k_old`"), "{e}");
+    assert_eq!(d.to_bytes().unwrap(), before);
+    let e = dlg::replace_script(
+        &mut d,
+        &NodeKey::Text("Nobody.".into()),
+        None,
+        Some("k_new"),
+    )
+    .unwrap_err();
+    assert_eq!(e.code(), "RE1102");
+
+    dlg::replace_script(&mut d, &e3, None, Some("k_new")).unwrap();
+    assert_eq!(
+        d.node(NodeRef::entry(3))
+            .unwrap()
+            .script()
+            .unwrap()
+            .to_string(),
+        "k_new"
+    );
+    dlg::replace_script(&mut d, &e3, Some("K_NEW"), Some("k_newer")).unwrap();
+    assert_eq!(
+        d.node(NodeRef::entry(3))
+            .unwrap()
+            .script()
+            .unwrap()
+            .to_string(),
+        "k_newer"
+    );
+    // Only the one field changed, in place
+    let a = Dialog::parse("banter.dlg", &before).unwrap();
+    for n in a.all() {
+        let now = d.node(n.at).unwrap();
+        if n.at == NodeRef::entry(3) {
+            let fields = |s: &Struct| {
+                s.fields
+                    .iter()
+                    .map(|f| f.label.to_string())
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(fields(now.raw()), fields(n.raw()));
+        } else {
+            assert_eq!(now.raw(), n.raw(), "{} changed", n.at);
+        }
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn a_globals_type_is_its_declared_one_and_an_undeclared_global_is_refused() {
+    let root = make("global-type", false);
+    let m = open(&root);
+    let t = TwoDa::parse(&m.loaded(id("globalcat.2da")).unwrap().bytes).unwrap();
+    assert_eq!(
+        globals::type_of(&t, "MAIN_PLOT").unwrap(),
+        GlobalType::Number
+    );
+    assert_eq!(
+        globals::type_of(&t, "oaj_done").unwrap(),
+        GlobalType::Boolean
+    );
+    let e = globals::type_of(&t, "CN_UNDECLARED").unwrap_err();
+    assert_eq!(e.code(), codes::GLOBAL_UNDECLARED);
+    assert!(
+        e.to_string().contains("does not declare CN_UNDECLARED"),
+        "{e}"
+    );
+    let e = globals::type_of(&TwoDa::new(["name"]), "MAIN_PLOT").unwrap_err();
+    assert_eq!(e.code(), "RE0706");
+    fs::remove_dir_all(root).unwrap();
+}

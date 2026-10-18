@@ -41,6 +41,13 @@ pub mod codes {
     pub const NOT_A_WAVE: &str = "RE1413";
     /// Bytes written as NCS that do not decode.
     pub const NOT_NCS: &str = "RE1414";
+    /// Another module's own copy of a resource that a write to `Override/`
+    /// would replace there, and that differs from the copy the mod edits.
+    pub const OTHER_MODULE_DIFFERS: &str = "RE1415";
+    /// A dialogue node whose script is not the one an edit replaces.
+    pub const SCRIPT_DIFFERS: &str = "RE1416";
+    /// A global `globalcat.2da` does not declare.
+    pub const GLOBAL_UNDECLARED: &str = "RE1417";
 }
 
 /// An authoring operation's refusal.
@@ -117,6 +124,25 @@ pub enum Error {
     BadCues { what: String, reason: String },
     /// A voice-over that is not RIFF WAVE.
     NotAWave { name: String },
+    /// Another module holds its own copy of the resource, which differs
+    /// from the copy the mod edits; `Override/` would replace it there too.
+    OtherModuleDiffers {
+        id: ResId,
+        /// The module the mod works in, if it names one.
+        here: Option<String>,
+        module: String,
+        /// The capsule's file name.
+        capsule: String,
+    },
+    /// The node does not run the script the edit replaces.
+    ScriptDiffers {
+        dialog: String,
+        key: String,
+        expected: Option<String>,
+        found: Option<String>,
+    },
+    /// `globalcat.2da` does not declare the global.
+    GlobalUndeclared { name: String },
 }
 
 /// The authoring API's result type.
@@ -155,6 +181,9 @@ impl Error {
             Error::DuplicateLine { .. } => codes::DUPLICATE_LINE,
             Error::BadCues { .. } => codes::BAD_CUES,
             Error::NotAWave { .. } => codes::NOT_A_WAVE,
+            Error::OtherModuleDiffers { .. } => codes::OTHER_MODULE_DIFFERS,
+            Error::ScriptDiffers { .. } => codes::SCRIPT_DIFFERS,
+            Error::GlobalUndeclared { .. } => codes::GLOBAL_UNDECLARED,
         }
     }
 
@@ -224,6 +253,39 @@ impl Error {
             Error::BadCues { what, reason } => format!("{what} does not read: {reason}"),
             Error::NotAWave { name } => format!(
                 "{name} does not begin with a RIFF WAVE header, which the game's voice files carry"
+            ),
+            Error::OtherModuleDiffers {
+                id,
+                here,
+                module,
+                capsule,
+            } => {
+                let edited = match here {
+                    Some(h) => format!("the copy {h} loads"),
+                    None => "the global copy".to_string(),
+                };
+                format!(
+                    "{capsule} holds {module}'s own {id}, which is not {edited}; written to Override, the edit would replace it in {module} too"
+                )
+            }
+            Error::ScriptDiffers {
+                dialog,
+                key,
+                expected,
+                found,
+            } => {
+                let name = |s: &Option<String>| match s {
+                    Some(s) => format!("`{s}`"),
+                    None => "no script".to_string(),
+                };
+                format!(
+                    "{dialog}'s node {key} runs {}, not {}, the script the edit replaces",
+                    name(found),
+                    name(expected)
+                )
+            }
+            Error::GlobalUndeclared { name } => format!(
+                "globalcat.2da does not declare {name}; the engine keeps no such global, reading it answers 0 and setting it does nothing"
             ),
         }
     }

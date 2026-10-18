@@ -107,29 +107,17 @@ impl Mod {
     /// the global layers alone. Fails when the install has no capsule of
     /// that module.
     pub fn open(install: impl Into<Arc<Install>>, module: Option<&str>) -> Result<Mod> {
-        let install = install.into();
-        let module = match module {
-            None => None,
-            Some(m) => {
-                let name = ModuleName::new(m);
-                if !install.modules().contains(&name) {
-                    return Err(Error::Game(rakata_game::Error::NoSuchModule {
-                        module: m.to_string(),
-                        dir: find_ci(install.root(), "modules"),
-                    }));
-                }
-                Some(name)
-            }
-        };
-        Ok(Mod {
-            install,
-            module,
+        let mut m = Mod {
+            install: install.into(),
+            module: None,
             written: HashMap::new(),
             voices: None,
             tlk: None,
             globals: None,
             routines: None,
-        })
+        };
+        m.set_module(module)?;
+        Ok(m)
     }
 
     /// The install.
@@ -140,6 +128,37 @@ impl Mod {
     /// The module the mod works in.
     pub fn module(&self) -> Option<&ModuleName> {
         self.module.as_ref()
+    }
+
+    /// Work in `module` from now on, or in the global layers alone, keeping
+    /// every write made so far: a mod whose scenes lie in several modules
+    /// writes its scripts and globals once, then each module's dialogues
+    /// with the checks run against that module. Fails, with the module
+    /// unchanged, when the install has no capsule of it (`RE0403`).
+    pub fn set_module(&mut self, module: Option<&str>) -> Result<()> {
+        let module = match module {
+            None => None,
+            Some(m) => Some(self.module_named(m)?),
+        };
+        if module != self.module {
+            self.module = module;
+            // Read through `loaded`, which searches the module's capsules
+            self.globals = None;
+            self.routines = None;
+        }
+        Ok(())
+    }
+
+    fn module_named(&self, m: &str) -> Result<ModuleName> {
+        let name = ModuleName::new(m);
+        if self.install.modules().contains(&name) {
+            Ok(name)
+        } else {
+            Err(Error::Game(rakata_game::Error::NoSuchModule {
+                module: m.to_string(),
+                dir: find_ci(self.install.root(), "modules"),
+            }))
+        }
     }
 
     fn relative(&self, l: &Location) -> String {
@@ -232,6 +251,50 @@ impl Mod {
                         .into_owned(),
                     expected,
                     found: c.hash,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Guard a resource the mod writes to `Override/` from the copy the
+    /// module loads: `Override/` outranks every module's capsules, so the
+    /// write replaces the resource in every module, and a module holding
+    /// its own copy that differs (two cantinas each with their own copy of
+    /// one conversation) would lose it. Passes when `Override/` already
+    /// holds a copy, or the mod wrote one, since every module loads that
+    /// already. Fails naming the first other module whose own copy differs
+    /// from this module's (`RE1415`).
+    pub fn guard_other_modules(&self, id: ResId) -> Result<()> {
+        if self.written.contains_key(&id) {
+            return Ok(());
+        }
+        let here = self.install.resolve(id, self.module.as_ref())?;
+        if here.candidates.iter().any(|c| c.layer == Layer::Override) {
+            return Ok(());
+        }
+        let edited = here.candidates.first().map(|c| c.hash);
+        for module in self.install.modules() {
+            if Some(module) == self.module.as_ref() {
+                continue;
+            }
+            let there = self.install.resolve(id, Some(module))?;
+            let own = there
+                .candidates
+                .iter()
+                .find(|c| c.layer == Layer::Module && Some(c.hash) != edited);
+            if let Some(c) = own {
+                return Err(Error::OtherModuleDiffers {
+                    id,
+                    here: self.module.as_ref().map(ToString::to_string),
+                    module: module.to_string(),
+                    capsule: c
+                        .location
+                        .path()
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .into_owned(),
                 });
             }
         }

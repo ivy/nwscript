@@ -17,7 +17,7 @@ use rakata_res::ResRef;
 
 pub use rakata_dialog::{CAMERA_STATIC, NO_DELAY, Text};
 
-use super::Result;
+use super::{Error, Result};
 
 fn condition(c: Option<&str>) -> Result<Option<ResRef>> {
     Ok(match c {
@@ -53,6 +53,39 @@ pub fn link(
     let f = from.resolve(dialog)?;
     let t = to.resolve(dialog)?;
     Ok(dialog.push_link(f, t, self::condition(condition)?, at)?)
+}
+
+/// Change the script the node `at` runs when it is shown from `old` to
+/// `new` (`None` for no script), as a mod changes what one of the game's
+/// lines does: a companion's join reply running the mod's join script.
+/// Names compare without case. Fails, with the dialogue unchanged, on a key
+/// that names no node or several, and when the node does not run `old`
+/// (`RE1416`): another mod changed it, or the key names another node.
+pub fn replace_script(
+    dialog: &mut Dialog,
+    at: &NodeKey,
+    old: Option<&str>,
+    new: Option<&str>,
+) -> Result<()> {
+    let n = at.resolve(dialog)?;
+    let expected = condition(old)?;
+    let new = condition(new)?;
+    let found = dialog.node(n).and_then(|node| node.script());
+    let same = match (&found, &expected) {
+        (None, None) => true,
+        (Some(f), Some(e)) => f.to_string().eq_ignore_ascii_case(&e.to_string()),
+        _ => false,
+    };
+    if !same {
+        return Err(Error::ScriptDiffers {
+            dialog: dialog.name().to_string(),
+            key: at.to_string(),
+            expected: expected.map(|r| r.to_string()),
+            found: found.map(|r| r.to_string()),
+        });
+    }
+    dialog.set_script(n, new)?;
+    Ok(())
 }
 
 /// Remove every link out of the node `from`. Nodes keep their indices; the

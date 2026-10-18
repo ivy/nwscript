@@ -45,6 +45,12 @@ class Mod:
     def install(self) -> Install: ...
     @property
     def module(self) -> str | None: ...
+    def set_module(self, module: str | None = None) -> None:
+        """Work in `module` from now on (`None`: the global layers alone), keeping every write
+        made so far; RE0403, with the module unchanged, when the install has no capsule of it."""
+    def guard_other_modules(self, name: str) -> None:
+        """A write of `name` to Override replaces it in every module: RE1415 names a module whose
+        own copy differs from the one this module loads."""
     def loaded(self, name: str) -> Loaded:
         """`NAME.EXT` as the game loads it, this mod's writes first; RE0404 when no layer holds
         it."""

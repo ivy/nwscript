@@ -138,3 +138,23 @@ def test_a_script_name_over_sixteen_bytes_is_refused_at_construction() -> None:
         scripts.Source("k_oaj_seventeen01", "void main() { }")
     assert e.value.code == "RE0101"
     assert e.value.message == "resource name `k_oaj_seventeen01` is 17 bytes; a resref holds at most 16"
+
+
+def test_a_globals_type_and_an_undeclared_one() -> None:
+    table = rakata.TwoDa.new(["name", "type"])
+    globals.declare(table, "CN_MET", "Number")
+    assert globals.type_of(table, "cn_met") == "Number"
+    with pytest.raises(rakata.RakataError) as e:
+        globals.type_of(table, "CN_UNDECLARED")
+    assert e.value.code == "RE1417"
+
+
+def test_a_nodes_script_is_replaced_under_a_guard() -> None:
+    d = rakata.Dialog.new("cn_test.dlg", rakata.Gff.new("DLG"))
+    join = dialog.add_reply(d, "Join me.", script="k_join_old")
+    with pytest.raises(rakata.RakataError) as e:
+        dialog.replace_script(d, join, "k_other", "k_join_new")
+    assert e.value.code == "RE1416"
+    dialog.replace_script(d, join, "K_JOIN_OLD", "k_join_new")
+    node = d.node(join)
+    assert node is not None and node.script == "k_join_new"

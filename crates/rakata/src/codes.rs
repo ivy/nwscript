@@ -136,6 +136,9 @@ nwscript_diag::codes! {
     RE1412 Error "a transcript or a set of mouth cues that does not read";
     RE1413 Error "a voice-over for streamwaves/ that is not a RIFF WAVE file";
     RE1414 Error "bytes written as NCS that do not decode";
+    RE1415 Error "another module's own copy of a resource a write to Override would replace, unlike the copy the mod edits";
+    RE1416 Error "a dialogue node whose script is not the one an edit replaces";
+    RE1417 Error "a global globalcat.2da does not declare";
     RE1501 Error "the index database could not be read or written";
     RE1502 Error "an index database of another schema version";
     RE1503 Error "a tree the index database does not hold";

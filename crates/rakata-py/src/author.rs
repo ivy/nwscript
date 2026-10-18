@@ -106,6 +106,23 @@ impl PyMod {
         self.inner.module().map(ToString::to_string)
     }
 
+    /// Work in `module` from now on, or in the global layers alone with
+    /// `None`, keeping every write made so far. Raises `RE0403`, with the
+    /// module unchanged, when the install has no capsule of it.
+    #[pyo3(signature = (module = None))]
+    fn set_module(&mut self, module: Option<&str>) -> PyResult<()> {
+        self.inner.set_module(module).map_err(fail)
+    }
+
+    /// Guard a resource the mod writes to `Override/` from the copy this
+    /// module loads: another module holding its own, different copy would
+    /// lose it. Raises `RE1415` naming that module.
+    fn guard_other_modules(&self, name: &str) -> PyResult<()> {
+        self.inner
+            .guard_other_modules(res_id(name, None)?)
+            .map_err(fail)
+    }
+
     /// The copy of `name` (`NAME.EXT`) the game loads: this mod's own write
     /// when it made one, else the install's in the engine's order. Raises
     /// `RE0404` when no layer holds it.
@@ -240,8 +257,16 @@ mod globals {
         globals::declare(&mut table.inner, name, ty).map_err(fail)
     }
 
+    /// The type `table` declares `name` with: `"Boolean"` or `"Number"`.
+    /// Raises `RE1417` when no row declares it.
+    #[pyfunction]
+    fn type_of(table: PyRef<'_, PyTwoDa>, name: &str) -> PyResult<&'static str> {
+        Ok(globals::type_of(&table.inner, name).map_err(fail)?.name())
+    }
+
     pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_function(wrap_pyfunction!(declare, m)?)?;
+        m.add_function(wrap_pyfunction!(type_of, m)?)?;
         Ok(())
     }
 }
@@ -448,6 +473,20 @@ mod dialog {
         dialog::link(&mut dialog.inner, &f, &t, condition, at).map_err(fail)
     }
 
+    /// Change the script the node `at` runs from `old` to `new` (`None`
+    /// for none), names compared without case. Raises `RE1416`, with the
+    /// dialogue unchanged, when the node does not run `old`.
+    #[pyfunction]
+    fn replace_script(
+        mut dialog: PyRefMut<'_, PyDialog>,
+        at: &Bound<'_, PyAny>,
+        old: Option<&str>,
+        new: Option<&str>,
+    ) -> PyResult<()> {
+        let k = key(at)?;
+        dialog::replace_script(&mut dialog.inner, &k, old, new).map_err(fail)
+    }
+
     /// Remove every link out of `source`.
     #[pyfunction]
     fn unlink_all(mut dialog: PyRefMut<'_, PyDialog>, source: &Bound<'_, PyAny>) -> PyResult<()> {
@@ -491,6 +530,7 @@ mod dialog {
         m.add_function(wrap_pyfunction!(add_reply, m)?)?;
         m.add_function(wrap_pyfunction!(link, m)?)?;
         m.add_function(wrap_pyfunction!(unlink_all, m)?)?;
+        m.add_function(wrap_pyfunction!(replace_script, m)?)?;
         m.add_function(wrap_pyfunction!(start, m)?)?;
         m.add_function(wrap_pyfunction!(reorder, m)?)?;
         m.add_function(wrap_pyfunction!(empty_like, m)?)?;

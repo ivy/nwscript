@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 import rakata
-from rakata.author import blueprint, dialog, scripts
+from rakata.author import blueprint, dialog, globals, scripts
 
 # k_pdan_juhani31.ncs as danm14ac_s.rim ships it
 JUHANI31_SHA256 = "f684480ac7b9ace19d012f2107eb1f28f916d2f7d349965fe0185559ec44ef28"
@@ -76,3 +76,19 @@ def test_scripts_compile_against_the_install(scratch_install: Path) -> None:
     with pytest.raises(rakata.RakataError) as e:
         scripts.compile(m, [scripts.Source("k_oaj_bad", "void main() { Nope(); }")])
     assert e.value.code == "RE1408"
+
+
+def test_mod_moves_between_modules_and_guards_their_own_copies(scratch_install: Path) -> None:
+    m = rakata.Mod.open(rakata.Install(scratch_install), "tar_m02ae")
+    globalcat = rakata.TwoDa.parse(m.loaded("globalcat.2da").bytes)
+    globals.declare(globalcat, "CN_TEST_FLAG")
+    m.write_override("globalcat.2da", globalcat.to_bytes())
+    # Both cantinas carry their own tar03_cand031.dlg, and they differ
+    with pytest.raises(rakata.RakataError) as e:
+        m.guard_other_modules("tar03_cand031.dlg")
+    assert e.value.code == "RE1415" and "tar_m03ae" in e.value.message
+    m.set_module("tar_m03ae")
+    assert m.module == "tar_m03ae" and m.loaded("globalcat.2da").written
+    with pytest.raises(rakata.RakataError) as e:
+        m.set_module("no_such_module")
+    assert e.value.code == "RE0403" and m.module == "tar_m03ae"
