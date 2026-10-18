@@ -6,6 +6,20 @@ use rakata_gff::{
     Change, Error, FieldType, Gff, Label, LocString, Path, Struct, Value, codes, diff,
 };
 
+/// `bytes`, kept as a seed for the fuzz targets in the directory
+/// `$RAKATA_FUZZ_SEEDS` names, when it is set.
+fn seed(bytes: &[u8]) -> &[u8] {
+    if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        bytes.hash(&mut h);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+    }
+    bytes
+}
+
 fn label(s: &str) -> Label {
     Label::new(s).unwrap()
 }
@@ -95,7 +109,7 @@ fn a_file_built_from_scratch_has_the_one_pass_layout() {
     let f3 = fo as usize + 3 * 12;
     assert_eq!(u32_at(&bytes, f3 + 8), 24);
 
-    let back = Gff::parse(&bytes).unwrap();
+    let back = Gff::parse(seed(&bytes)).unwrap();
     assert_eq!(back, g);
     assert!(back.semantic_eq(&g));
     assert_eq!(back.to_bytes().unwrap(), bytes);
@@ -104,12 +118,12 @@ fn a_file_built_from_scratch_has_the_one_pass_layout() {
 #[test]
 fn set_through_a_path_then_write_read_and_get_leaves_the_rest_unchanged() {
     let original = creature("Bastila", 24, 3);
-    let mut g = Gff::parse(&original.to_bytes().unwrap()).unwrap();
+    let mut g = Gff::parse(seed(&original.to_bytes().unwrap())).unwrap();
     let tag = Path::parse("Tag").unwrap();
     let old = g.set(&tag, Value::string("Bastila_Fallen")).unwrap();
     assert_eq!(old, Value::string("Bastila"));
     let bytes = g.to_bytes().unwrap();
-    let back = Gff::parse(&bytes).unwrap();
+    let back = Gff::parse(seed(&bytes)).unwrap();
     assert_eq!(back.get(&tag).unwrap(), &Value::string("Bastila_Fallen"));
     let changes = diff(&original, &back);
     assert_eq!(
@@ -199,6 +213,9 @@ fn paths_parse_and_print_and_resolve() {
         "A]",
         "A[0]x",
         "ThisLabelIsFarTooLongForGff",
+        // A NUL would end the label's text and leave the rest as padding,
+        // which prints as another path (found by fuzzing).
+        "RIR\u{1b}\0IM V1.0M V1.0",
     ] {
         let e = Path::parse(bad).unwrap_err();
         assert_eq!(e.code(), codes::BAD_PATH, "{bad}");
@@ -268,7 +285,7 @@ fn every_type_round_trips() {
         .push(label("Vector"), Value::Vector([1.0, 2.0, 3.0]))
         .push(label("StrRef"), Value::StrRef(123));
     let bytes = g.to_bytes().unwrap();
-    let back = Gff::parse(&bytes).unwrap();
+    let back = Gff::parse(seed(&bytes)).unwrap();
     assert_eq!(back, g);
     assert_eq!(back.to_bytes().unwrap(), bytes);
     assert_eq!(
@@ -288,7 +305,7 @@ fn every_type_round_trips() {
 #[test]
 fn labels_are_shared_across_structs_and_kept_in_table_order() {
     let g = creature("Bastila", 24, 3);
-    let mut back = Gff::parse(&g.to_bytes().unwrap()).unwrap();
+    let mut back = Gff::parse(seed(&g.to_bytes().unwrap())).unwrap();
     assert_eq!(back.labels.len(), 9);
     // Two more fields with a label already present, and one new.
     if let Value::List(items) = back.root.get_mut("ClassList").unwrap() {
@@ -299,7 +316,7 @@ fn labels_are_shared_across_structs_and_kept_in_table_order() {
         items.push(c);
     }
     let bytes = back.to_bytes().unwrap();
-    let again = Gff::parse(&bytes).unwrap();
+    let again = Gff::parse(seed(&bytes)).unwrap();
     assert_eq!(again.labels.len(), 10);
     assert!(again.labels[9].is("Extra"));
     assert_eq!(u32_at(&bytes, 28), 10);
@@ -310,17 +327,17 @@ fn the_reader_refuses_what_it_should_with_the_registered_codes() {
     let g = creature("Bastila", 24, 3);
     let bytes = g.to_bytes().unwrap();
 
-    let e = Gff::parse(b"RIM V1.0").unwrap_err();
+    let e = Gff::parse(seed(b"RIM V1.0")).unwrap_err();
     assert_eq!(e.code(), codes::NOT_GFF);
     assert_eq!(e.code(), "RE0601");
 
-    let e = Gff::parse(&bytes[..bytes.len() - 1]).unwrap_err();
+    let e = Gff::parse(seed(&bytes[..bytes.len() - 1])).unwrap_err();
     assert_eq!(e.code(), codes::TRUNCATED);
 
     let mut cut = bytes.clone();
     let dofs = u32_at(&bytes, 32) as usize;
     cut[dofs..dofs + 4].copy_from_slice(&1000u32.to_le_bytes()); // the resref's size byte and beyond
-    let e = Gff::parse(&cut).unwrap_err();
+    let e = Gff::parse(seed(&cut)).unwrap_err();
     assert!(
         matches!(e.code(), codes::TRUNCATED | codes::TOO_LONG),
         "{e}"
@@ -329,12 +346,15 @@ fn the_reader_refuses_what_it_should_with_the_registered_codes() {
     let mut bad_label = bytes.clone();
     let fo = u32_at(&bytes, 16) as usize;
     bad_label[fo + 4..fo + 8].copy_from_slice(&99u32.to_le_bytes());
-    assert_eq!(Gff::parse(&bad_label).unwrap_err().code(), codes::BAD_INDEX);
+    assert_eq!(
+        Gff::parse(seed(&bad_label)).unwrap_err().code(),
+        codes::BAD_INDEX
+    );
 
     let mut bad_type = bytes.clone();
     bad_type[fo..fo + 4].copy_from_slice(&19u32.to_le_bytes());
     assert_eq!(
-        Gff::parse(&bad_type).unwrap_err().code(),
+        Gff::parse(seed(&bad_type)).unwrap_err().code(),
         codes::UNKNOWN_TYPE
     );
 
@@ -342,7 +362,7 @@ fn the_reader_refuses_what_it_should_with_the_registered_codes() {
     let mut cycle = bytes.clone();
     let lio = u32_at(&bytes, 48) as usize;
     cycle[lio + 4..lio + 8].copy_from_slice(&0u32.to_le_bytes());
-    let e = Gff::parse(&cycle).unwrap_err();
+    let e = Gff::parse(seed(&cycle)).unwrap_err();
     assert_eq!(e.code(), codes::BAD_INDEX);
 
     assert_eq!(
@@ -359,7 +379,7 @@ fn the_reader_refuses_what_it_should_with_the_registered_codes() {
 fn a_file_edited_in_shape_keeps_its_slots_and_appends() {
     // Build, write, read: every struct and field now has a file position.
     let g = creature("Bastila", 24, 3);
-    let mut read = Gff::parse(&g.to_bytes().unwrap()).unwrap();
+    let mut read = Gff::parse(seed(&g.to_bytes().unwrap())).unwrap();
     // Add a root field: the root's index list no longer fits where it was
     // (seven entries at 0, followed by the class struct's at 28), so it is
     // appended and the old list stays as stale bytes, as the engine's own
@@ -376,7 +396,7 @@ fn a_file_edited_in_shape_keeps_its_slots_and_appends() {
     assert_eq!(fc, 10);
     let fo = u32_at(&bytes, 16) as usize;
     assert_eq!(u32_at(&bytes, fo + 9 * 12), FieldType::Byte.id());
-    let back = Gff::parse(&bytes).unwrap();
+    let back = Gff::parse(seed(&bytes)).unwrap();
     assert!(back.semantic_eq(&read));
     let s = rakata_gff::survey(&bytes).unwrap();
     assert_eq!(s.field_indices_bytes - s.field_indices_used, 28);
@@ -397,7 +417,7 @@ fn a_narrow_field_stored_sign_extended_writes_back_as_read() {
     assert_eq!(u32_at(&bytes, word), 0x0000_FFD6);
     bytes[word + 2..word + 4].copy_from_slice(&[0xFF, 0xFF]);
 
-    let mut g = Gff::parse(&bytes).unwrap();
+    let mut g = Gff::parse(seed(&bytes)).unwrap();
     assert_eq!(g.root.get("CurrentHitPoints"), Some(&Value::Short(-42)));
     assert_eq!(g.to_bytes().unwrap(), bytes);
 

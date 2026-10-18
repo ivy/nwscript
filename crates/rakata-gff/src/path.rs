@@ -3,9 +3,9 @@
 //! A path is a sequence of labels separated by `.`, each optionally followed
 //! by `[n]` to pick the n-th struct of a list field:
 //! `EntryList[3].RepliesList[0].Index`, `Map.MapResX`, `Tag`. The empty
-//! path names the root struct. A label is any text without `.`, `[` or
-//! `]`, so `Creature List[0].TemplateResRef` works; a label holding those
-//! characters cannot be addressed by a path.
+//! path names the root struct. A label is any text without `.`, `[`, `]`
+//! or NUL, so `Creature List[0].TemplateResRef` works; a label holding
+//! those characters cannot be addressed by a path.
 
 use std::fmt;
 use std::str::FromStr;
@@ -52,6 +52,10 @@ impl Path {
             }
             if label.contains(']') {
                 return Err(bad("a `]` without its `[`"));
+            }
+            // A NUL ends a label's text; what follows it would be padding.
+            if label.contains('\0') {
+                return Err(bad("a label holding a NUL"));
             }
             segments.push(Segment::Field(
                 Label::new(label).map_err(|_| bad("a label longer than sixteen bytes"))?,
