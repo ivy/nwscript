@@ -422,10 +422,12 @@ impl<'h> Executor<'h> {
         if let Some(r) = data() {
             return r.map_err(|e| read_failure(source_name, e));
         }
+        // The BIFs never change, and Override was looked at above, so the
+        // listing the install was opened with serves however stale it is.
         if let (Dest::Folder(_), Target::File(_)) = (dest, target)
             && let Ok(id) = ResId::parse(&target_name)
             && let Some((loc, bytes)) = self
-                .install()?
+                .install
                 .read(id, None)
                 .map_err(|e| Failure::new(e.code(), e.to_string()))?
         {
