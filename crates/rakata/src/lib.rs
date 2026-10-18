@@ -11,12 +11,17 @@ pub mod codes;
 pub mod conformance;
 pub mod corpus;
 pub mod formats;
+pub mod inspect;
 pub mod patch;
 
 pub use nwscript_diag as diag;
 pub use nwscript_diag::{Exit, InputRecord, OutputRecord};
+pub use rakata_2da as twoda;
 pub use rakata_game as game;
+pub use rakata_gff as gff;
+pub use rakata_lip as lip;
 pub use rakata_res as res;
+pub use rakata_tlk as tlk;
 
 use std::path::PathBuf;
 
