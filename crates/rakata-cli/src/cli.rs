@@ -53,13 +53,21 @@ pub struct Cli {
 
 #[derive(Args, Debug)]
 pub struct Global {
-    /// The game install: the folder holding chitin.key. Required by commands that read the game; it has no default.
+    /// The game install: the folder holding chitin.key. Required by commands that read the game; without it, --db supplies the root of the one tree the index holds, or of the tree --tree names.
     #[arg(long, global = true, value_name = "DIR")]
     pub game: Option<PathBuf>,
 
-    /// Output format. json writes exactly one document to stdout.
-    #[arg(long, global = true, value_enum, default_value_t = Format::Text)]
-    pub format: Format,
+    /// The index database, as `rakata index build` wrote it. Without --game, the root of its tree is the install.
+    #[arg(long, global = true, value_name = "FILE")]
+    pub db: Option<PathBuf>,
+
+    /// The tree of --db whose root is the install, when --game is absent and the index holds several.
+    #[arg(long, global = true, value_name = "LABEL")]
+    pub tree: Option<String>,
+
+    /// Output format; json writes exactly one document to stdout. Without it, text, and compact when an agent runs rakata (CLAUDECODE=1, or another variable DataDog pup's user agent checks): tables unpadded, `index query` as TSV.
+    #[arg(long, global = true, value_enum)]
+    pub format: Option<Format>,
 
     /// Suppress warnings in text mode.
     #[arg(short, long, global = true)]

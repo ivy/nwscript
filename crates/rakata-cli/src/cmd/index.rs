@@ -85,9 +85,12 @@ the database fails with RE1504, and the statements after a failure do not
 run.
 
 Each statement that returns rows prints as an aligned table with a header,
-NULL as an empty cell, and a blank line between tables. --format json gives
-the column names and the rows as arrays, {columns, rows}; a script with more
-than one such statement gives an array of them, in order.
+NULL as an empty cell, and a blank line between tables. A cell of more than
+60 characters in any column but the last is cut to 60, ending in `…`. When an
+agent runs rakata and --format is absent, each table is TSV instead: the
+header and the rows, tab-separated, unpadded and never cut. --format json
+gives the column names and the rows as arrays, {columns, rows}, never cut; a
+script with more than one such statement gives an array of them, in order.
 
 Tables, joined through hash (a content's SHA-256); locations says where each
 content lies:
@@ -237,7 +240,8 @@ pub fn run(ctx: &Ctx, args: &IndexArgs) -> Exit {
             let sets = index::open(&db).and_then(|c| index::query_script(&c, &sql));
             match sets {
                 Ok(sets) => {
-                    let text = sets.iter().map(table).collect::<Vec<_>>().join("\n");
+                    let render = if ctx.out.compact { tsv } else { table };
+                    let text = sets.iter().map(render).collect::<Vec<_>>().join("\n");
                     let set = |r: &index::Rows| json!({ "columns": r.columns, "rows": r.rows });
                     env.result = match sets.as_slice() {
                         [one] => set(one),
@@ -359,12 +363,50 @@ fn cell(v: &serde_json::Value) -> String {
     }
 }
 
-/// The rows as an aligned table under a header.
+/// The widest cell an aligned table prints in a column it pads, as
+/// `rakata index query --help` states it.
+const CELL_WIDTH: usize = 60;
+
+/// `s` cut to `width` characters, the last of them `…`, when it is longer.
+fn cut(s: String, width: usize) -> String {
+    if s.chars().count() <= width {
+        return s;
+    }
+    let mut t: String = s.chars().take(width - 1).collect();
+    t.push('…');
+    t
+}
+
+/// The rows as TSV: the header and each row, tab-separated, every cell whole.
+fn tsv(rows: &index::Rows) -> String {
+    let mut out = rows.columns.join("\t");
+    out.push('\n');
+    for r in &rows.rows {
+        out.push_str(&r.iter().map(cell).collect::<Vec<_>>().join("\t"));
+        out.push('\n');
+    }
+    out
+}
+
+/// The rows as an aligned table under a header, each padded cell cut to
+/// [`CELL_WIDTH`].
 fn table(rows: &index::Rows) -> String {
+    let last = rows.columns.len().saturating_sub(1);
     let cells: Vec<Vec<String>> = rows
         .rows
         .iter()
-        .map(|r| r.iter().map(cell).collect())
+        .map(|r| {
+            r.iter()
+                .enumerate()
+                .map(|(i, v)| {
+                    if i < last {
+                        cut(cell(v), CELL_WIDTH)
+                    } else {
+                        cell(v)
+                    }
+                })
+                .collect()
+        })
         .collect();
     let mut width: Vec<usize> = rows.columns.iter().map(|c| c.chars().count()).collect();
     for r in &cells {

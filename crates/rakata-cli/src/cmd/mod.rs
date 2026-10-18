@@ -44,7 +44,11 @@ use std::path::{Path, PathBuf};
 pub struct Ctx {
     /// The install `--game` named, unchecked: a command that reads it opens
     /// it and reports what it finds there.
+    /// Without `--game`, the root of the index's tree when `--db` names an
+    /// index that settles which tree.
     pub game: Option<PathBuf>,
+    /// Why `--db` gave no install, when it was passed without `--game`.
+    pub no_game_from_db: Option<String>,
     pub out: Output,
 }
 
@@ -68,10 +72,13 @@ impl Ctx {
         if has_errors(&diags) { Exit::Errors } else { ok }
     }
 
-    /// The install, or a usage error naming the flag.
+    /// The install, or a usage error naming the flags.
     pub fn require_game(&self, command: &str) -> Result<&Path, Exit> {
         self.game.as_deref().ok_or_else(|| {
             eprintln!("{}", missing_game(command));
+            if let Some(why) = &self.no_game_from_db {
+                eprintln!("note: {why}");
+            }
             Exit::Usage
         })
     }
@@ -80,13 +87,77 @@ impl Ctx {
 /// The message a command needing an install prints without one.
 fn missing_game(command: &str) -> String {
     format!(
-        "error: `rakata {command}` needs a game install: pass --game DIR, the folder holding chitin.key"
+        "error: `rakata {command}` needs a game install: pass --game DIR, the folder holding chitin.key, or --db FILE, an index holding one tree (--tree LABEL names one of several)"
+    )
+}
+
+/// The root of the tree of the index at `db` that `tree` names, or of its
+/// one tree; otherwise why there is none.
+fn tree_root(db: &Path, tree: Option<&str>) -> Result<PathBuf, String> {
+    let at = db.display();
+    let conn = rakata::index::open(db).map_err(|e| format!("--db {at}: {}", e.message()))?;
+    let rows = rakata::index::query(&conn, "SELECT label, root FROM trees ORDER BY id")
+        .map_err(|e| format!("--db {at}: {}", e.message()))?;
+    let trees: Vec<(&str, &str)> = rows
+        .rows
+        .iter()
+        .filter_map(|r| Some((r.first()?.as_str()?, r.get(1)?.as_str()?)))
+        .collect();
+    let labels = || {
+        trees
+            .iter()
+            .map(|(l, _)| format!("`{l}`"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    match (tree, trees.as_slice()) {
+        (Some(t), _) => trees
+            .iter()
+            .find(|(l, _)| *l == t)
+            .map(|(_, r)| PathBuf::from(r))
+            .ok_or_else(|| format!("--db {at} holds no tree `{t}`; it holds {}", labels())),
+        (None, [(_, root)]) => Ok(PathBuf::from(root)),
+        (None, []) => Err(format!("--db {at} holds no tree")),
+        (None, many) => Err(format!(
+            "--db {at} holds {} trees ({}); name one with --tree",
+            many.len(),
+            labels()
+        )),
+    }
+}
+
+/// The `--db` and `--tree` a command was given: its own, or the global ones.
+fn index_flags(cli: &Cli) -> (Option<PathBuf>, Option<String>) {
+    use index::IndexAction as A;
+    let (db, tree) = match &cli.command {
+        Command::Refs(a) => (a.db.db.clone(), a.tree.clone()),
+        Command::Index(a) => match &a.action {
+            A::Build { db, tree, .. } | A::Digest { db, tree } | A::Coverage { db, tree, .. } => {
+                (db.db.clone(), tree.clone())
+            }
+            A::Query { db, .. } => (db.db.clone(), None),
+        },
+        _ => (None, None),
+    };
+    (
+        db.or_else(|| cli.global.db.clone()),
+        tree.or_else(|| cli.global.tree.clone()),
     )
 }
 
 pub fn run(cli: Cli) -> Exit {
+    let (mut game, mut no_game_from_db) = (cli.global.game.clone(), None);
+    if game.is_none()
+        && let (Some(db), tree) = index_flags(&cli)
+    {
+        match tree_root(&db, tree.as_deref()) {
+            Ok(root) => game = Some(root),
+            Err(why) => no_game_from_db = Some(why),
+        }
+    }
     let ctx = Ctx {
-        game: cli.global.game,
+        game,
+        no_game_from_db,
         out: Output::new(cli.global.format, cli.global.color, cli.global.quiet),
     };
     match cli.command {
@@ -136,15 +207,17 @@ mod tests {
     fn ctx(game: Option<&str>) -> Ctx {
         Ctx {
             game: game.map(PathBuf::from),
-            out: Output::new(Format::Text, ColorArg::Never, false),
+            no_game_from_db: None,
+            out: Output::new(Some(Format::Text), ColorArg::Never, false),
         }
     }
 
     #[test]
-    fn a_command_needing_the_game_without_it_is_a_usage_error_naming_the_flag() {
+    fn a_command_needing_the_game_without_it_is_a_usage_error_naming_the_flags() {
         assert_eq!(ctx(None).require_game("which"), Err(Exit::Usage));
         let msg = missing_game("which");
         assert!(msg.contains("--game"), "{msg}");
+        assert!(msg.contains("--db"), "{msg}");
         assert!(msg.contains("`rakata which`"), "{msg}");
     }
 

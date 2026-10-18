@@ -38,6 +38,7 @@ The usual change runs through all four in order: find the copy, find what touche
 - **Address nodes by stable key, never by index alone.** `voice:RESREF` or `strref:N` survive other mods' insertions; `E3` and `R0` move and are marked fragile. Text keys often match several nodes.
 - **Write what a dialogue refers to before the dialogue.** A dialogue write is checked against the install and refused (RE1407) if a script, condition or global it adds is missing: compile and write scripts, declare globals, then write the dialogue.
 - **`--format json` writes exactly one document to stdout**; parse it instead of scraping text. Exit codes: 0 ok, 1 errors reported (a lint with a finding), 2 bad invocation, 3 a diff found a difference.
+- **Text is compact for you.** With `CLAUDECODE=1` (or another agent's variable) and no `--format`, tables print unpadded and `index query` prints TSV; transcripts are unchanged. `--format text` gives the aligned form a person sees.
 - **Vanilla has findings.** The shipped game already has dangling scripts and undeclared globals; a finding on a node you did not touch is not yours. Lint the original first so you know what was there.
 - **Scripts are a separate toolchain.** Writing or reading NWScript beyond a short condition is the `nwscript` skill's (`nws`); the Python module compiles through the same compiler.
 

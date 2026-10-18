@@ -153,7 +153,7 @@ pub fn run(ctx: &Ctx, args: &RefsArgs) -> Exit {
         }
     }
     let seconds = started.elapsed().as_secs_f64();
-    let mut text = render(&answer);
+    let mut text = render(&answer, ctx.out.compact);
     if let Some(c) = &coverage {
         text.push_str(&format!(
             "the index could not search {} resources: no reader for {}, {} failed\n",
@@ -205,9 +205,9 @@ fn site(h: &Hit) -> String {
     }
 }
 
-/// The answer as text: a heading, then the hits as aligned columns, the
-/// indirect ones under what they go through.
-fn render(a: &Answer) -> String {
+/// The answer as text: a heading, then the hits as columns, aligned unless
+/// `compact`, the indirect ones under what they go through.
+fn render(a: &Answer, compact: bool) -> String {
     let mut out = String::new();
     let direct = a.hits.iter().filter(|h| h.via.is_none()).count();
     let what = match a.direction {
@@ -246,7 +246,7 @@ fn render(a: &Answer) -> String {
         })
         .collect();
     let mut width = [0usize; 2];
-    for (_, r) in &rows {
+    for (_, r) in rows.iter().filter(|_| !compact) {
         for i in 0..2 {
             width[i] = width[i].max(r[i].chars().count());
         }

@@ -75,7 +75,15 @@ fn build_query_digest_and_coverage_over_a_small_install() {
         serde_json::json!([["global", "K_SWG_HELENA", "row 0"]])
     );
     let text = rakata()
-        .args(["index", "query", "--db", s(&db), "SELECT label FROM trees"])
+        .args([
+            "--format",
+            "text",
+            "index",
+            "query",
+            "--db",
+            s(&db),
+            "SELECT label FROM trees",
+        ])
         .output()
         .unwrap();
     assert_eq!(
@@ -109,7 +117,7 @@ fn build_query_digest_and_coverage_over_a_small_install() {
                   SELECT value FROM g;\n\
                   SELECT count(*) AS n FROM g;";
     let text = rakata()
-        .args(["index", "query", "--db", s(&db), script])
+        .args(["--format", "text", "index", "query", "--db", s(&db), script])
         .output()
         .unwrap();
     assert_eq!(
@@ -150,6 +158,115 @@ fn build_query_digest_and_coverage_over_a_small_install() {
         "SELECT count(*) FROM refs",
     ]);
     assert_eq!(q["result"]["rows"], serde_json::json!([[1]]));
+}
+
+/// `index query`'s text as a person's terminal gets it (no agent variable
+/// set) or as an agent's does (`CLAUDECODE=1`), with `extra` flags.
+fn query_text(agent: bool, db: &Path, extra: &[&str], sql: &str) -> String {
+    let mut c = rakata();
+    c.env_clear();
+    if agent {
+        c.env("CLAUDECODE", "1");
+    }
+    let out = c
+        .args(extra)
+        .args(["index", "query", "--db", s(db), sql])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8(out.stdout).unwrap()
+}
+
+#[test]
+fn an_agent_gets_tsv_unless_format_says_otherwise() {
+    let dir = tempfile::tempdir().unwrap();
+    let game = dir.path().join("game");
+    install(&game);
+    let db = dir.path().join("idx.sqlite");
+    json(&[
+        "index",
+        "build",
+        "--game",
+        s(&game),
+        "--db",
+        s(&db),
+        "--tree",
+        "t",
+    ]);
+    let long = "x".repeat(70);
+    let sql = format!("SELECT '{long}' AS a, 'b' AS b, '{long}' AS c");
+
+    let padded = format!(
+        "a{}b  c\n{}…  b  {long}\n(1 rows)\n",
+        " ".repeat(61),
+        "x".repeat(59)
+    );
+    assert_eq!(query_text(false, &db, &[], &sql), padded);
+    assert_eq!(query_text(true, &db, &["--format", "text"], &sql), padded);
+
+    let tsv = format!("a\tb\tc\n{long}\tb\t{long}\n");
+    assert_eq!(query_text(true, &db, &[], &sql), tsv);
+
+    for agent in [false, true] {
+        let j: Json =
+            serde_json::from_str(&query_text(agent, &db, &["--format", "json"], &sql)).unwrap();
+        assert_eq!(j["result"]["columns"], serde_json::json!(["a", "b", "c"]));
+        assert_eq!(j["result"]["rows"], serde_json::json!([[long, "b", long]]));
+    }
+}
+
+#[test]
+fn db_supplies_game_when_the_index_settles_the_tree() {
+    let dir = tempfile::tempdir().unwrap();
+    let game = dir.path().join("game");
+    install(&game);
+    let db = dir.path().join("idx.sqlite");
+    json(&[
+        "index",
+        "build",
+        "--game",
+        s(&game),
+        "--db",
+        s(&db),
+        "--tree",
+        "t",
+    ]);
+
+    // One tree: its root is the install, for refs and for a command that
+    // needs --game.
+    let r = json(&["refs", "K_SWG_HELENA", "--kind", "global", "--db", s(&db)]);
+    assert_eq!(r["result"]["hits"].as_array().unwrap().len(), 1, "{r}");
+    let w = json(&["--db", s(&db), "which", "globalcat.2da"]);
+    assert_eq!(w["game"], s(&game), "{w}");
+
+    // Two trees: --tree names one, and without it the error names the flags.
+    json(&[
+        "index",
+        "build",
+        "--game",
+        s(&game),
+        "--db",
+        s(&db),
+        "--tree",
+        "u",
+    ]);
+    let w = json(&["--db", s(&db), "--tree", "u", "which", "globalcat.2da"]);
+    assert_eq!(w["game"], s(&game), "{w}");
+    let out = rakata()
+        .args(["--db", s(&db), "which", "globalcat.2da"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("--game") && err.contains("--db"), "{err}");
+    assert!(
+        err.contains("2 trees (`t`, `u`); name one with --tree"),
+        "{err}"
+    );
 }
 
 fn tree(var: &str) -> Option<PathBuf> {

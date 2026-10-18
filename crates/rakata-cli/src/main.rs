@@ -2,6 +2,7 @@
 //! façade; this crate parses arguments and writes either rendered text or
 //! the JSON envelope, the same envelope and exit codes as `nws`.
 
+mod agent;
 mod cli;
 mod cmd;
 mod output;

@@ -8,12 +8,19 @@ use std::io::{IsTerminal, Write};
 
 pub struct Output {
     pub format: Format,
+    /// Text for an agent: tables unpadded, `index query` as TSV. Set when
+    /// no `--format` was given and [`crate::agent::detected`].
+    pub compact: bool,
     pub color: render::Color,
     pub quiet: bool,
 }
 
 impl Output {
-    pub fn new(format: Format, color: ColorArg, quiet: bool) -> Self {
+    /// `format` as `--format` gave it; without it, text, compact when an
+    /// agent runs this process.
+    pub fn new(format: Option<Format>, color: ColorArg, quiet: bool) -> Self {
+        let compact = format.is_none() && crate::agent::detected();
+        let format = format.unwrap_or(Format::Text);
         let color = match color {
             ColorArg::Always => render::Color::Always,
             ColorArg::Never => render::Color::Never,
@@ -29,6 +36,7 @@ impl Output {
         };
         Output {
             format,
+            compact,
             color,
             quiet,
         }

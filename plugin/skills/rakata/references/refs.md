@@ -8,6 +8,8 @@ rakata index build --game DIR --tree vanilla --db FILE
 
 A few seconds for KotOR 1, a few hundred MB on disk. Without `--db` it goes to `~/.cache/rakata/index.sqlite`; pass `--db` to every later command to keep installs apart. `--tree LABEL` names the tree inside the file; building again under the same label replaces it, so rebuild after changing the tree.
 
+The index records each tree's root, so `--db FILE` stands in for `--game DIR` on any command: without `--game`, the install is the root of the one tree the index holds, or of the tree `--tree LABEL` names when it holds several (`rakata --db FILE which NAME.EXT`).
+
 ## refs
 
 ```bash
@@ -41,4 +43,4 @@ A report with a shared prelude is one script: the `CREATE TEMP VIEW` statements 
 rakata index query --db FILE --file report.sql
 ```
 
-Each statement that returns rows prints as its own table, a blank line between them. With `--format json` one such statement gives `{columns, rows}` and several give an array of them, in order. Statements that would change the database (`INSERT`, `DELETE`, `CREATE TABLE`, …) fail with `RE1504`, and nothing after the failure runs.
+Each statement that returns rows prints as its own table, a blank line between them. Run by an agent (`CLAUDECODE=1` and the like) with no `--format`, each table is TSV: a header line, then one line per row, tab-separated and never cut; `--format text` gives the aligned table a person sees, which cuts a cell of more than 60 characters in any column but the last. With `--format json` one such statement gives `{columns, rows}` and several give an array of them, in order. Statements that would change the database (`INSERT`, `DELETE`, `CREATE TABLE`, …) fail with `RE1504`, and nothing after the failure runs.
