@@ -26,7 +26,7 @@ The first measure is met (#83): the Juhani mod, ported onto the `rakata` Python 
 
 ## Unmerged branches, by node
 
-Each is committed and builds; none is merged, because each one's full `cargo test --workspace` run with the game variables was interrupted by the pause. To resume: rebase each onto `main`, run the four checks with `RAKATA_GAME_K1`, `RAKATA_BUILD` and `RAKATA_SAVES` set, merge, and complete the node with the agent's report (summarised here).
+Each is committed and builds; none is merged. `calo-a-fixes` and #122 are fully verified (the four checks with the game variables set); #121's and #123's full `cargo test --workspace` runs with the game variables were interrupted by the pause. To resume: rebase each onto `main`, run the four checks with `RAKATA_GAME_K1`, `RAKATA_BUILD` and `RAKATA_SAVES` set, merge, and complete the node with the agent's report (summarised here).
 
 | Node | Branch (nwscript unless noted) | What it holds |
 | --- | --- | --- |
