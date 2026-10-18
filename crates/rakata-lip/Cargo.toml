@@ -1,0 +1,16 @@
+[package]
+name = "rakata-lip"
+description = "The lip-sync files of Aurora-family games: a line's duration and its keyframes, each a time and one of sixteen mouth shapes; read, written back bit for bit, and made from cues."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+rakata-archive = { workspace = true }
+
+[lints]
+workspace = true

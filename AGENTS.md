@@ -13,7 +13,7 @@ A Rust workspace: a toolset for the data of BioWare's Aurora-family games, KotOR
 | `rakata-gff` | the GFF tree, lossless read, BioWare-layout write, paths, diff | planned |
 | `rakata-2da` | tables, every header variant the engine accepts, diff | planned |
 | `rakata-tlk` | `dialog.tlk` and `LocalizedString`, append | present |
-| `rakata-lip` | lip-sync files | planned |
+| `rakata-lip` | lip-sync files: the duration and the keyframes, read, written bit for bit, made from cues | present |
 | `rakata-game` | the install: search order, `which`, the `Resolver` for nwscript | present |
 | `rakata-dialog` | DLG model, stable keys, transcript, lints | planned |
 | `rakata-save` | save games by name | planned |
@@ -58,6 +58,7 @@ The layout is `nss/`, `ncs/`, `nwscript.nss` as shipped, `oracle/` (the include 
 - Diagnostics are data (`nwscript-diag`): every error has a registered code with an explanation; never build one from rendered text.
 - Rakata codes come in blocks of a hundred, one per crate or command family, so parallel branches never collide: `rakata-res` RE01xx, `rakata-archive` RE02xx, `rakata-patch` RE03xx/RW03xx, `rakata-game` RE04xx/RW04xx, conformance RE05xx/RW05xx; the next crate takes the next free block and records it here.
 - `rakata-tlk` holds RE08xx and RW08xx.
+- `rakata-lip` holds RE09xx and RW09xx.
 - Markdown: one paragraph per line, no hard wrapping. Documents state current facts, not their history.
 - Commits: small and coherent, conventional-commit subjects, no AI attribution.
 - Prior work is described with respect: what it achieved and the constraints it was built under.
