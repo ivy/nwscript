@@ -361,13 +361,20 @@ impl TwoDa {
     /// [`Terminator`], one copy of each distinct string in first-occurrence
     /// row-major order, the size field equal to the strings' length. Fails
     /// when a row's cell count is not the column count, a string holds a
-    /// terminator or a character outside the code page, or the strings
-    /// exceed the 16-bit offsets.
+    /// terminator or a character outside the code page, a column name is
+    /// empty in NUL-ended names, or the strings exceed the 16-bit offsets.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let end = self.terminator.byte();
         let mut out = Vec::with_capacity(64 + self.rows.len() * self.columns.len() * 4);
         out.extend_from_slice(SIGNATURE);
         for name in &self.columns {
+            // A NUL where a name would begin ends the list.
+            if end == 0 && name.is_empty() {
+                return Err(Error::Unrepresentable {
+                    what: "an empty column name".to_owned(),
+                    reason: "in NUL-ended names it would end the list".to_owned(),
+                });
+            }
             let bytes = encode(name, || format!("column `{name}`"), &[b'\t', 0])?;
             out.extend_from_slice(&bytes);
             out.push(end);
@@ -547,25 +554,26 @@ impl TwoDa {
 
     /// How `other` differs from this table, by row label and column name.
     /// Rows pair by label; where a label repeats, its first occurrence
-    /// pairs with the first, the second with the second, and so on. Row and
-    /// column order is not compared.
+    /// pairs with the first, the second with the second, and so on; columns
+    /// pair by name the same way. Row and column order is not compared.
     pub fn diff(&self, other: &TwoDa) -> Vec<Change> {
         let mut changes = Vec::new();
-        for name in &self.columns {
-            if other.column_index(name).is_none() {
+        let ours = pair_columns(&self.columns, &other.columns);
+        for (name, partner) in self.columns.iter().zip(&ours) {
+            if partner.is_none() {
                 changes.push(Change::ColumnRemoved { name: name.clone() });
             }
         }
-        for name in &other.columns {
-            if self.column_index(name).is_none() {
+        let theirs = pair_columns(&other.columns, &self.columns);
+        for (name, partner) in other.columns.iter().zip(&theirs) {
+            if partner.is_none() {
                 changes.push(Change::ColumnAdded { name: name.clone() });
             }
         }
-        let shared: Vec<(usize, usize)> = self
-            .columns
+        let shared: Vec<(usize, usize)> = ours
             .iter()
             .enumerate()
-            .filter_map(|(a, name)| other.column_index(name).map(|b| (a, b)))
+            .filter_map(|(a, b)| b.map(|b| (a, b)))
             .collect();
 
         let mut theirs: HashMap<&str, Vec<usize>> = HashMap::new();
@@ -608,6 +616,24 @@ impl TwoDa {
         }
         changes
     }
+}
+
+/// For each of the names `a`, the position in `b` of the same name's same
+/// occurrence: the nth column so named pairs with the nth.
+fn pair_columns(a: &[String], b: &[String]) -> Vec<Option<usize>> {
+    let mut theirs: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (i, name) in b.iter().enumerate() {
+        theirs.entry(name).or_default().push(i);
+    }
+    let mut seen: HashMap<&str, usize> = HashMap::new();
+    a.iter()
+        .map(|name| {
+            let nth = seen.entry(name).or_insert(0);
+            let partner = theirs.get(name.as_str()).and_then(|v| v.get(*nth)).copied();
+            *nth += 1;
+            partner
+        })
+        .collect()
 }
 
 /// `text` as bytes of the code page, refusing any of `forbidden` (the

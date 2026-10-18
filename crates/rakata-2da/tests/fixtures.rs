@@ -114,6 +114,50 @@ fn the_layout_line_tells_the_two_apart() {
 }
 
 #[test]
+fn a_repeated_column_name_pairs_by_occurrence_in_a_diff() {
+    // Found by fuzzing: the second `icon` was compared with the first, so a
+    // table differed from itself.
+    let mut a = TwoDa::new(["label", "icon", "icon"]);
+    a.add_row("0", &[("label", "x")]).unwrap();
+    a.rows[0].cells[2] = "second".into();
+    assert!(a.diff(&a).is_empty());
+    let mut b = a.clone();
+    b.rows[0].cells[2] = "changed".into();
+    assert_eq!(
+        a.diff(&b),
+        [rakata_2da::Change::Cell {
+            label: "0".into(),
+            column: "icon".into(),
+            before: "second".into(),
+            after: "changed".into(),
+        }]
+    );
+    let mut c = TwoDa::new(["label", "icon"]);
+    c.add_row("0", &[("label", "x")]).unwrap();
+    assert_eq!(
+        a.diff(&c),
+        [rakata_2da::Change::ColumnRemoved {
+            name: "icon".into()
+        }]
+    );
+}
+
+#[test]
+fn an_empty_column_name_is_refused_where_names_end_in_nul() {
+    // Found by fuzzing: written as a NUL where a name begins, it ended the
+    // list, and the table read back without it.
+    let mut t = TwoDa::new(["labeln", ""]);
+    t.terminator = rakata_2da::Terminator::Nul;
+    assert_eq!(
+        t.to_bytes().unwrap_err().code(),
+        rakata_2da::codes::UNREPRESENTABLE
+    );
+    t.terminator = rakata_2da::Terminator::Tab;
+    let bytes = t.to_bytes().unwrap();
+    assert_eq!(TwoDa::parse(seed(&bytes)).unwrap(), t);
+}
+
+#[test]
 fn a_row_count_past_the_bytes_is_refused_before_it_allocates() {
     // 1.2 billion rows in a 50-byte file: the reader once reserved room
     // for every label (18 GB) before reading one. Found by fuzzing.
