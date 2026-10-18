@@ -10,6 +10,11 @@
 //! is walkable is a column of `surfacemat.2da`, read by
 //! [`SurfaceMaterials::from_2da`] from the table the caller loads.
 //!
+//! [`Walkmesh::to_bytes`] writes one back in the layout BioWare's files
+//! use, every stored value as read: the AABB tree, adjacency and perimeter
+//! edges are kept, not derived, so a vanilla file writes back byte for
+//! byte.
+//!
 //! The vertex array borrows from the input ([`Vertices`]), so the input
 //! must outlive the [`Walkmesh`]; the faces, adjacency, edges and tree are
 //! owned, since each face gathers four arrays.
@@ -21,6 +26,7 @@
 mod bwm;
 mod error;
 mod surface;
+mod write;
 
 pub use bwm::{
     AabbNode, EdgeRef, Face, HEADER_LEN, Kind, PerimeterEdge, SIGNATURE, Vec3, Vertices, Walkmesh,

@@ -19,6 +19,9 @@ pub mod codes {
     /// A surface material table without a `walk` column, or with a `walk`
     /// cell that is not a number.
     pub const BAD_SURFACE_TABLE: &str = "RE2505";
+    /// A count, offset or index too large for the field the writer stores
+    /// it in.
+    pub const TOO_LARGE: &str = "RE2506";
 }
 
 /// An error in reading a walkmesh or a surface material table.
@@ -57,6 +60,16 @@ pub enum Error {
         /// Why.
         reason: String,
     },
+    /// A count, offset or index too large for the field the writer stores
+    /// it in.
+    TooLarge {
+        /// The value, and where it goes.
+        what: &'static str,
+        /// The value.
+        value: u64,
+        /// The largest value the field holds.
+        limit: u64,
+    },
 }
 
 /// This crate's result type.
@@ -71,6 +84,7 @@ impl Error {
             Error::UnknownKind { .. } => codes::UNKNOWN_KIND,
             Error::BadIndex { .. } => codes::BAD_INDEX,
             Error::BadSurfaceTable { .. } => codes::BAD_SURFACE_TABLE,
+            Error::TooLarge { .. } => codes::TOO_LARGE,
         }
     }
 }
@@ -102,6 +116,10 @@ impl fmt::Display for Error {
                 "the walkmesh's {what} {at} is {value}, and the array it names holds {limit}"
             ),
             Error::BadSurfaceTable { reason } => write!(f, "surface material table: {reason}"),
+            Error::TooLarge { what, value, limit } => write!(
+                f,
+                "the walkmesh's {what} is {value}, and the field it is written to holds at most {limit}"
+            ),
         }
     }
 }

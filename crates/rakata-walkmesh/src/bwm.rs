@@ -75,6 +75,14 @@ impl<'a> Vertices<'a> {
     pub fn to_vec(&self) -> Vec<Vec3> {
         self.iter().collect()
     }
+
+    /// The vertices stored in `bytes`, twelve a vertex as [`as_bytes`]
+    /// returns them; `None` when the length is not a multiple of twelve.
+    ///
+    /// [`as_bytes`]: Vertices::as_bytes
+    pub fn from_bytes(bytes: &'a [u8]) -> Option<Vertices<'a>> {
+        bytes.len().is_multiple_of(12).then_some(Vertices { bytes })
+    }
 }
 
 /// One edge of one face: edge `edge` of face `face` runs from the face's
@@ -204,6 +212,12 @@ pub struct Walkmesh<'a> {
     /// The AABB tree over the faces, root first; empty in every PWK and DWK
     /// and in WOKs with no faces.
     pub aabb: Vec<AabbNode>,
+    /// The header's field at offset 108, kept as read: 0 in every PWK and
+    /// DWK and in most WOKs. What it means is not established.
+    pub unknown: u32,
+    /// The bytes after the last array, kept as read and written back after
+    /// it. Empty in every vanilla file.
+    pub trailer: &'a [u8],
 }
 
 fn u32_at(b: &[u8], at: usize) -> u32 {
@@ -290,6 +304,23 @@ impl<'a> Walkmesh<'a> {
         let adjacency_bytes = array(bytes, "adjacency array", h(116), h(112), 12)?;
         let edge_bytes = array(bytes, "perimeter edge array", h(124), h(120), 8)?;
         let perimeter_bytes = array(bytes, "perimeter array", h(132), h(128), 4)?;
+        // The trailer starts where the last array to end does, whatever
+        // order the header placed them in.
+        let end = [
+            (h(76), vertex_bytes),
+            (h(84), face_bytes),
+            (h(88), material_bytes),
+            (h(92), normal_bytes),
+            (h(96), distance_bytes),
+            (h(104), aabb_bytes),
+            (h(116), adjacency_bytes),
+            (h(124), edge_bytes),
+            (h(132), perimeter_bytes),
+        ]
+        .iter()
+        .filter(|(_, b)| !b.is_empty())
+        .map(|&(at, b)| at as usize + b.len())
+        .fold(HEADER_LEN, usize::max);
 
         let vertices = Vertices {
             bytes: vertex_bytes,
@@ -425,6 +456,8 @@ impl<'a> Walkmesh<'a> {
             perimeter_edges,
             perimeters,
             aabb,
+            unknown: h(108),
+            trailer: bytes.get(end..).unwrap_or(&[]),
         })
     }
 

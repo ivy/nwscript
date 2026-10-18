@@ -62,6 +62,8 @@ In every file the arrays lie in this order, each starting where the one before e
 
 An empty array's offset is where it would start in every WOK (in a WOK with no faces every offset is 136). In a PWK or DWK the vertex to plane-distance offsets follow the same rule (136 in the 74 PWKs that are a bare header), and the offsets of the AABB, adjacency, perimeter edge and perimeter arrays, which are empty in every PWK and DWK, are 0 (**measured**). A reader takes an array of count 0 as empty whatever its offset.
 
+A file another tool wrote may carry bytes after its last array: `plc_airtaxitor3.pwk`, a mod's placeable, ends with 500 bytes no header offset reaches, a run of words that are −1 or small integers (**measured**, the one such file among the 121 walkmeshes of a modded build's `Override/`). A reader keeps them, and `rakata-walkmesh` writes them back after the last array.
+
 ### Vertices and the frame
 
 Metres, Z up. A WOK's vertices are in the area's frame, the room's LYT origin already applied: each of the 14 non-empty rooms of `m01aa` has its `m01aa.lyt` origin inside its vertices' X–Y extent (`M01aa_01a` at (15.7058, 22.2345) spans X 10.1–20.7, Y 15.2–30.4), and neighbouring rooms meet in area coordinates (`M01aa_01a` and `M01aa_02a` share two vertices bit for bit) (**measured**). A runtime does not add the LYT origin to a WOK. A PWK's or DWK's vertices lie within 18.1 m (PWK) and 12.4 m (DWK) of the origin on every axis (**measured**), in the object's own frame, placed by the object's position and bearing (**inferred**).

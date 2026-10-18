@@ -4,7 +4,8 @@
 //! faces first and exactly the adjacency's faces, adjacency paired both
 //! ways, the perimeter edges exactly the edges with no face across them in
 //! closed loops, the AABB tree's leaves one per face. Walkability is read
-//! from the install's own `surfacemat.2da`. Run with `--nocapture` to see
+//! from the install's own `surfacemat.2da`. Each file writes back byte for
+//! byte. Run with `--nocapture` to see
 //! the counts.
 //!
 //! Reads the user's own install from `$RAKATA_GAME_K1` (the folder holding
@@ -254,6 +255,8 @@ fn every_vanilla_walkmesh_reads() {
                         Kind::Object
                     };
                     assert_eq!(w.kind, want, "{name}");
+                    assert!(w.trailer.is_empty(), "{name}");
+                    assert!(w.to_bytes().unwrap() == bytes, "{name} writes back changed");
                     census(&name, &w, &table, &mut c);
                     if ty == ResType::Dwk {
                         for k in 0..2 {

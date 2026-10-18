@@ -1,11 +1,13 @@
 //! Walkmeshes built here, byte by byte, in the layout of
 //! `docs/formats/walkmesh.md`: an area room with adjacency, a perimeter and
 //! an AABB tree; an empty placeable; a door with its points; and each way
-//! a file can fail to read.
+//! a file can fail to read. Each writes back byte for byte, and a walkmesh
+//! built in memory writes and reads back the same.
 
 use rakata_2da::TwoDa;
 use rakata_walkmesh::{
-    EdgeRef, Error, HEADER_LEN, Kind, PerimeterEdge, SurfaceMaterials, Walkmesh, codes,
+    AabbNode, EdgeRef, Error, Face, HEADER_LEN, Kind, PerimeterEdge, SurfaceMaterials, Vertices,
+    Walkmesh, codes,
 };
 
 /// A walkmesh's arrays, laid out as the vanilla files lay them out.
@@ -366,6 +368,184 @@ fn an_index_naming_nothing_is_refused() {
             e @ Error::BadIndex { what: got, .. } => {
                 assert_eq!(got, what, "{e}");
                 assert_eq!(e.code(), codes::BAD_INDEX);
+            }
+            e => panic!("{what}: {e}"),
+        }
+    }
+}
+
+#[test]
+fn files_in_the_vanilla_layout_write_back_byte_for_byte() {
+    let placeable = Build {
+        kind: 0,
+        points: [
+            [0.1, 0.2, 0.0],
+            [0.3, 0.4, 0.0],
+            [0.0; 3],
+            [0.0; 3],
+            [0.5; 3],
+        ],
+        vertices: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 2.0]],
+        faces: vec![[0, 1, 2]],
+        materials: vec![7],
+        // A PWK's normals are zero and its plane distances arbitrary bits.
+        normals: vec![[0.0; 3]],
+        distances: vec![f32::from_bits(0x7fc0_1234)],
+        zero_empty_offsets: true,
+        ..Build::default()
+    };
+    let bare = Build {
+        zero_empty_offsets: true,
+        ..Build::default()
+    };
+    let empty_room = Build {
+        kind: 1,
+        ..Build::default()
+    };
+    for (what, b) in [
+        ("room", room()),
+        ("placeable", placeable),
+        ("bare", bare),
+        ("empty room", empty_room),
+    ] {
+        let bytes = b.bytes();
+        let w = Walkmesh::parse(&bytes).unwrap();
+        assert_eq!(w.to_bytes().unwrap(), bytes, "{what}");
+        assert!(w.semantic_eq(&w), "{what}");
+    }
+}
+
+#[test]
+fn the_unknown_header_field_and_bytes_after_the_last_array_are_kept() {
+    let mut bytes = room().bytes();
+    bytes[108..112].copy_from_slice(&0xdead_beef_u32.to_le_bytes());
+    bytes.extend_from_slice(b"left by another tool");
+    let w = Walkmesh::parse(&bytes).unwrap();
+    assert_eq!(w.unknown, 0xdead_beef);
+    assert_eq!(w.trailer, b"left by another tool");
+    assert_eq!(w.to_bytes().unwrap(), bytes);
+
+    let clean = Walkmesh {
+        trailer: &[],
+        ..w.clone()
+    };
+    assert!(!clean.semantic_eq(&w));
+    assert!(w.semantic_eq(&Walkmesh::parse(&bytes).unwrap()));
+}
+
+#[test]
+fn a_walkmesh_built_in_memory_writes_and_reads_back_the_same() {
+    let vertex_bytes: Vec<u8> = [[0.0f32, 0.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0]]
+        .iter()
+        .flatten()
+        .flat_map(|c| c.to_le_bytes())
+        .collect();
+    let vertices = Vertices::from_bytes(&vertex_bytes).unwrap();
+    assert!(Vertices::from_bytes(&vertex_bytes[..11]).is_none());
+    let leaf = AabbNode {
+        min: [-0.01, -0.01, -0.01],
+        max: [2.01, 2.01, 0.01],
+        face: Some(0),
+        unknown: 4,
+        plane: 0,
+        left: None,
+        right: None,
+    };
+    let edge = |e| EdgeRef { face: 0, edge: e };
+    let w = Walkmesh {
+        kind: Kind::Area,
+        relative_points: [[0.0; 3]; 2],
+        absolute_points: [[0.0; 3]; 2],
+        position: [1.0, -0.0, 0.5],
+        vertices,
+        faces: vec![Face {
+            vertices: [0, 1, 2],
+            material: 4,
+            normal: [0.0, 0.0, 1.0],
+            distance: -0.0,
+        }],
+        adjacency: vec![[None; 3]],
+        perimeter_edges: (0..3)
+            .map(|e| PerimeterEdge {
+                edge: edge(e),
+                transition: (e == 1).then_some(3),
+            })
+            .collect(),
+        perimeters: vec![3],
+        aabb: vec![leaf],
+        unknown: 0,
+        trailer: &[],
+    };
+    let bytes = w.to_bytes().unwrap();
+    assert_eq!(&bytes[..8], b"BWM V1.0");
+    // The header, three vertices, one face's five arrays, one node, one
+    // adjacency row, three edges and one perimeter.
+    assert_eq!(bytes.len(), HEADER_LEN + 36 + 32 + 44 + 12 + 24 + 4);
+    let again = Walkmesh::parse(&bytes).unwrap();
+    assert!(again.semantic_eq(&w));
+    assert_eq!(again, w);
+    assert_eq!(again.to_bytes().unwrap(), bytes);
+    // -0.0 is kept, and compared bit for bit.
+    assert_eq!(again.faces[0].distance.to_bits(), (-0.0f32).to_bits());
+    let mut positive = w.clone();
+    positive.faces[0].distance = 0.0;
+    assert!(!positive.semantic_eq(&w));
+
+    // An object's empty tree, adjacency and perimeter arrays sit at 0.
+    let object = Walkmesh {
+        kind: Kind::Object,
+        adjacency: vec![],
+        perimeter_edges: vec![],
+        perimeters: vec![],
+        aabb: vec![],
+        ..w.clone()
+    };
+    let bytes = object.to_bytes().unwrap();
+    for at in [104, 116, 124, 132] {
+        assert_eq!(bytes[at..at + 4], [0; 4], "offset field at {at}");
+    }
+    assert!(Walkmesh::parse(&bytes).unwrap().semantic_eq(&object));
+}
+
+#[test]
+fn a_value_too_large_for_its_field_is_refused_by_the_writer() {
+    let bytes = room().bytes();
+    let w = Walkmesh::parse(&bytes).unwrap();
+    type Edit = Box<dyn Fn(&mut Walkmesh)>;
+    let cases: Vec<(&str, Edit)> = vec![
+        (
+            "perimeter edge's transition",
+            Box::new(|w| w.perimeter_edges[0].transition = Some(3_000_000_000)),
+        ),
+        (
+            "edge's number within its face",
+            Box::new(|w| w.perimeter_edges[0].edge.edge = 3),
+        ),
+        (
+            "perimeter edge's face",
+            Box::new(|w| w.perimeter_edges[0].edge.face = u32::MAX),
+        ),
+        (
+            "adjacent edge",
+            Box::new(|w| {
+                w.adjacency[0][0] = Some(EdgeRef {
+                    face: 1 << 30,
+                    edge: 0,
+                })
+            }),
+        ),
+        (
+            "AABB node's left child",
+            Box::new(|w| w.aabb[0].left = Some(u32::MAX)),
+        ),
+    ];
+    for (what, edit) in cases {
+        let mut w = w.clone();
+        edit(&mut w);
+        match w.to_bytes().unwrap_err() {
+            e @ Error::TooLarge { what: got, .. } => {
+                assert_eq!(got, what, "{e}");
+                assert_eq!(e.code(), codes::TOO_LARGE);
             }
             e => panic!("{what}: {e}"),
         }

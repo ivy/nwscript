@@ -1,6 +1,6 @@
 [package]
 name = "rakata-walkmesh"
-description = "The walkmeshes of Aurora-family games: an area room's WOK and a placeable's PWK or a door's DWK, read to vertices, faces with their surface material, adjacency, perimeter edges with their room transitions, and the AABB tree; walkability through surfacemat.2da."
+description = "The walkmeshes of Aurora-family games: an area room's WOK and a placeable's PWK or a door's DWK, read to vertices, faces with their surface material, adjacency, perimeter edges with their room transitions, and the AABB tree, read and written byte for byte; walkability through surfacemat.2da."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

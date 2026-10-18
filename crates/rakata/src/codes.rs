@@ -203,6 +203,7 @@ nwscript_diag::codes! {
     RE2503 Error "a walkmesh type that is neither an object's nor an area room's";
     RE2504 Error "a walkmesh index naming no element of the array it points into";
     RE2505 Error "a surface material table without a walk column, or with a walk cell not a number";
+    RE2506 Error "a walkmesh count, offset or index too large for the field it is written to";
     RE2401 Error "not a binary model: the MDL's first word is not zero";
     RE2402 Error "a structure of the MDL past the end of its model data";
     RE2403 Error "a mesh's vertices past the end of the MDX";
