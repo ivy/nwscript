@@ -9,9 +9,11 @@
 //! intact. A reader that trusted the field once read every cell of such a
 //! table as empty and wrote it back empty.
 //!
-//! The writer emits BioWare's layout: each distinct string once, in the
-//! order the cells first meet it walking the rows, and the size field equal
-//! to the strings' length, so every vanilla table writes back byte for byte.
+//! The writer emits BioWare's layout: names and labels ended by the tab or
+//! the NUL the table was read with ([`Terminator`]; a tab for a table built
+//! here), each distinct string once, in the order the cells first meet it
+//! walking the rows, and the size field equal to the strings' length, so
+//! every vanilla table writes back byte for byte.
 //! Editing is by row label or index and column name
 //! ([`TwoDa::get`], [`TwoDa::set`], [`TwoDa::add_row`],
 //! [`TwoDa::add_row_copying`], [`TwoDa::add_column`]), and [`TwoDa::diff`]
@@ -54,11 +56,37 @@ pub struct Row {
 }
 
 /// A table: the column names in file order and the rows in file order.
-/// The row label is not a column.
+/// The row label is not a column. `terminator` is how the file ends its
+/// names and labels, kept so a table writes back as it was read; it is
+/// layout, not data, so [`TwoDa::semantic_eq`] and [`TwoDa::diff`] ignore
+/// it.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TwoDa {
     pub columns: Vec<String>,
     pub rows: Vec<Row>,
+    pub terminator: Terminator,
+}
+
+/// The byte ending each column name and each row label. The two sections
+/// share it: no table measured mixes them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Terminator {
+    /// 0x09, as every member of `data/2da.bif` has it; what a table built
+    /// with the API takes.
+    #[default]
+    Tab,
+    /// 0x00, as the tables inside `global.rim` and `miniglobal.rim` have
+    /// it. The column list still closes with one more NUL.
+    Nul,
+}
+
+impl Terminator {
+    fn byte(self) -> u8 {
+        match self {
+            Terminator::Tab => b'\t',
+            Terminator::Nul => 0,
+        }
+    }
 }
 
 /// How a caller names a row: by position, or by label (the first row that
@@ -285,6 +313,7 @@ impl TwoDa {
         TwoDa {
             columns: columns.into_iter().map(Into::into).collect(),
             rows: Vec::new(),
+            terminator: Terminator::Tab,
         }
     }
 
@@ -313,21 +342,32 @@ impl TwoDa {
                 cells,
             });
         }
-        Ok(TwoDa { columns, rows })
+        let terminator = if h.terminator == 0 {
+            Terminator::Nul
+        } else {
+            Terminator::Tab
+        };
+        Ok(TwoDa {
+            columns,
+            rows,
+            terminator,
+        })
     }
 
-    /// The table in BioWare's layout: one copy of each distinct string in
-    /// first-occurrence row-major order, the size field equal to the
-    /// strings' length. Fails when a row's cell count is not the column
-    /// count, a string holds its terminator or a character outside the code
-    /// page, or the strings exceed the 16-bit offsets.
+    /// The table in BioWare's layout: names and labels ended by the table's
+    /// [`Terminator`], one copy of each distinct string in first-occurrence
+    /// row-major order, the size field equal to the strings' length. Fails
+    /// when a row's cell count is not the column count, a string holds a
+    /// terminator or a character outside the code page, or the strings
+    /// exceed the 16-bit offsets.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        let end = self.terminator.byte();
         let mut out = Vec::with_capacity(64 + self.rows.len() * self.columns.len() * 4);
         out.extend_from_slice(SIGNATURE);
         for name in &self.columns {
             let bytes = encode(name, || format!("column `{name}`"), &[b'\t', 0])?;
             out.extend_from_slice(&bytes);
-            out.push(b'\t');
+            out.push(end);
         }
         out.push(0);
         let rows = u32::try_from(self.rows.len()).map_err(|_| Error::TooLarge {
@@ -346,7 +386,7 @@ impl TwoDa {
             }
             let bytes = encode(&row.label, || format!("the label of row {r}"), &[b'\t', 0])?;
             out.extend_from_slice(&bytes);
-            out.push(b'\t');
+            out.push(end);
         }
         let mut strings: Vec<u8> = Vec::new();
         let mut offsets: HashMap<Vec<u8>, u16> = HashMap::new();
@@ -496,9 +536,10 @@ impl TwoDa {
     }
 
     /// Whether two tables hold the same columns, labels and cells in the
-    /// same order: the comparison the round-trip suite makes.
+    /// same order, whatever their terminators: the comparison the
+    /// round-trip suite makes.
     pub fn semantic_eq(&self, other: &TwoDa) -> bool {
-        self == other
+        self.columns == other.columns && self.rows == other.rows
     }
 
     /// How `other` differs from this table, by row label and column name.
@@ -918,15 +959,24 @@ mod tests {
     }
 
     #[test]
-    fn nul_ended_names_and_labels_read_to_the_same_table_and_write_back_tab_ended() {
+    fn nul_ended_names_and_labels_are_kept_and_written_back_as_read() {
         let t = worked_example();
+        assert_eq!(t.terminator, Terminator::Tab);
         let tabbed = t.to_bytes().unwrap();
         let mut bytes = b"2DA V2.b\nlabel\0name_strref\0description_strref\0aistate\0\0".to_vec();
         bytes.extend_from_slice(&3u32.to_le_bytes());
         bytes.extend_from_slice(b"0\x001\x002\0");
         let tail = tabbed.len() - 57 - 2 - 24;
         bytes.extend_from_slice(&tabbed[tail..]);
-        assert_eq!(TwoDa::parse(&bytes).unwrap(), t);
+        let read = TwoDa::parse(&bytes).unwrap();
+        assert_eq!(read.terminator, Terminator::Nul);
+        assert!(read.semantic_eq(&t));
+        assert!(read.diff(&t).is_empty());
+        assert_ne!(read, t, "the terminator is part of the model");
+        assert_eq!(read.to_bytes().unwrap(), bytes);
+        let mut retabbed = read.clone();
+        retabbed.terminator = Terminator::Tab;
+        assert_eq!(retabbed.to_bytes().unwrap(), tabbed);
         let layout = inspect(&bytes).unwrap();
         assert!(layout.nul_terminated);
         assert!(

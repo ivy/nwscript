@@ -3,9 +3,9 @@
 //! table a size-trusting reader once blanked (modshop's
 //! `games/kotor/patches/README.md`, item 3). BioWare's own table carries
 //! three placeholder rows with an empty label (rows 0, 23 and 59 in KotOR
-//! 1, measured), so the check is that no other row's label is empty and,
-//! when `$RAKATA_GAME_K1` is set too, that the loaded vanilla table has the
-//! same blank-label rows. Reads `$RAKATA_BUILD` (the folder holding
+//! 1, measured), so the check is that the rows with an empty label are
+//! exactly those three and, when `$RAKATA_GAME_K1` is set too, that the
+//! loaded vanilla table has the same blank-label rows. Reads `$RAKATA_BUILD` (the folder holding
 //! `chitin.key`) and skips, naming the variable, when it is unset. No game
 //! bytes are committed.
 
@@ -71,12 +71,10 @@ fn the_loaded_feat_table_keeps_its_labels() {
         labelled > 0,
         "every label is empty: the cells were not read"
     );
-    for label in &blank {
-        assert!(
-            PLACEHOLDERS.contains(label),
-            "row `{label}` has an empty label and is not one of BioWare's placeholder rows {PLACEHOLDERS:?}"
-        );
-    }
+    assert_eq!(
+        blank, PLACEHOLDERS,
+        "the rows with an empty label are exactly BioWare's placeholder rows"
+    );
     if let Ok(vanilla) = std::env::var(GAME_VAR) {
         let (_, v) = loaded_feat(&PathBuf::from(vanilla));
         assert_eq!(
