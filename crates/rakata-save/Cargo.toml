@@ -1,0 +1,16 @@
+[package]
+name = "rakata-save"
+description = "KotOR saved games by name: globals, the party, each module's creatures with their flags, effects and action queues, and the pending events, every GFF read without loss."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rakata-archive = { workspace = true }
+rakata-gff = { workspace = true }
+rakata-res = { workspace = true }
+
+[lints]
+workspace = true
