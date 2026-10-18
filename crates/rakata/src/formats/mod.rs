@@ -5,7 +5,9 @@
 mod archive;
 mod lip;
 mod tlk;
+mod twoda;
 
 pub use archive::Archive;
 pub use lip::Lip;
 pub use tlk::Tlk;
+pub use twoda::TwoDa;

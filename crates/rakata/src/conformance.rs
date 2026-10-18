@@ -260,6 +260,7 @@ impl Registry {
         r.register(Box::new(crate::formats::Archive));
         r.register(Box::new(crate::formats::Tlk));
         r.register(Box::new(crate::formats::Lip));
+        r.register(Box::new(crate::formats::TwoDa));
         r
     }
 

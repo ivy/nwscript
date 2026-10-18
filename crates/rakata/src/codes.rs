@@ -8,8 +8,8 @@
 //! (`rakata-res`), `RE02xx` archives (`rakata-archive`), `RE03xx` and
 //! `RW03xx` the installer's change files (`rakata-patch`), `RE04xx` the
 //! install (`rakata-game`), `RE05xx` the round-trip suite
-//! ([`crate::conformance`]), `RE08xx` the talk table (`rakata-tlk`),
-//! `RE09xx` lip-sync files (`rakata-lip`). Each
+//! ([`crate::conformance`]), `RE07xx` tables (`rakata-2da`), `RE08xx` the
+//! talk table (`rakata-tlk`), `RE09xx` lip-sync files (`rakata-lip`). Each
 //! format crate takes a range of its own as it lands.
 
 pub use nwscript_diag::codes::Code;
@@ -44,6 +44,15 @@ nwscript_diag::codes! {
     RW0401 Warning "Override files that differ only in case";
     RE0501 Error "a directory that is not a game install";
     RE0502 Error "a round trip wrote bytes the format's own reader rejects";
+    RE0701 Error "not a 2DA V2.b table";
+    RE0702 Error "a 2DA header running past the end of the file";
+    RE0703 Error "a 2DA cell whose string lies past the end of the file";
+    RE0704 Error "a 2DA too large for its 16-bit string offsets or 32-bit row count";
+    RE0705 Error "a 2DA row the table does not have";
+    RE0706 Error "a 2DA column the table does not have";
+    RE0707 Error "a 2DA column added under a name the table already has";
+    RE0708 Error "a 2DA string the layout cannot hold";
+    RE0709 Error "a 2DA row with more or fewer cells than the table has columns";
     RE0801 Error "not a `TLK V3.0` talk table";
     RE0802 Error "a talk table truncated before its header, entry table or a string ends";
     RE0803 Error "a talk table string holding a character Windows-1252 cannot encode";

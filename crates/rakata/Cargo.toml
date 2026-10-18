@@ -11,6 +11,7 @@ build = "build.rs"
 [dependencies]
 nwscript-diag = { workspace = true }
 rakata-archive = { workspace = true }
+rakata-2da = { workspace = true }
 rakata-game = { workspace = true }
 rakata-lip = { workspace = true }
 rakata-res = { workspace = true }
