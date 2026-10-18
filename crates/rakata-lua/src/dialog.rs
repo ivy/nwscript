@@ -285,6 +285,7 @@ impl UserData for LSession {
                 let o = Opts::new(opts, "Session:transcript", &["scripts"])?;
                 let options = TranscriptOptions {
                     scripts: o.get::<bool>("scripts")?.unwrap_or(false),
+                    ..TranscriptOptions::default()
                 };
                 let tr = this.0.transcript(&d.0, options);
                 let data = serde_json::to_value(&tr)

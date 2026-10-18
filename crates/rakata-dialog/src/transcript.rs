@@ -129,6 +129,10 @@ impl Lookup for Embedded {
 pub struct Options {
     /// Decompile the nodes' action scripts as well as the conditions.
     pub scripts: bool,
+    /// Each node's speaker and text, and the names of its conditions and
+    /// script, nothing else: no script is decompiled, and
+    /// [`Options::scripts`] is ignored.
+    pub brief: bool,
 }
 
 /// A link as the transcript shows it.
@@ -153,6 +157,10 @@ pub struct VoiceView {
     pub resref: String,
     /// The file, when one was found.
     pub file: Option<Voice>,
+    /// Whether the line is voiced, so a file is expected: an entry whose
+    /// `SoundExists` is not `0` and that names no `Sound` ([`Node::voiced`]).
+    /// A player reply never is; KotOR's protagonist is unvoiced.
+    pub expected: bool,
 }
 
 /// One node as the transcript shows it.
@@ -233,6 +241,10 @@ pub struct Transcript {
     pub scripts: Vec<Script>,
     pub tree: Vec<Row>,
     pub warnings: Vec<Warning>,
+    /// Built with [`Options::brief`]: the text leaves out all but the
+    /// speakers, the lines and the scripts' names.
+    #[serde(skip)]
+    pub brief: bool,
 }
 
 struct Builder<'l> {
@@ -246,9 +258,10 @@ struct Builder<'l> {
 }
 
 impl Builder<'_> {
-    /// Look a script up once per name; a condition is always decompiled.
+    /// Look a script up once per name; a condition is always decompiled,
+    /// unless the transcript is brief.
     fn script(&mut self, name: &ResRef, decompile: bool) -> String {
-        let decompile = decompile || self.options.scripts;
+        let decompile = (decompile || self.options.scripts) && !self.options.brief;
         let redo = match self.by_name.get(name) {
             Some(&i) => decompile && self.scripts[i].status == ScriptStatus::Found,
             None => true,
@@ -299,9 +312,11 @@ impl Builder<'_> {
         let key = NodeKey::of(dialog, n.at);
         let text = n.text();
         let shown = self.lookup.text(&text);
+        let voiced = n.at.kind == Kind::Entry && n.voiced().is_some();
         let voice = n.voice().map(|vo| VoiceView {
             resref: vo.to_string(),
             file: self.lookup.voice(&vo),
+            expected: voiced,
         });
         let speaker = n.speaker();
         let speaker_role = match (n.at.kind, speaker.as_deref()) {
@@ -465,6 +480,7 @@ impl Transcript {
             scripts: b.scripts,
             tree,
             warnings: b.warnings,
+            brief: options.brief,
         }
     }
 
@@ -586,11 +602,12 @@ impl Text<'_> {
             let _ = writeln!(self.out, "  (none)");
         }
         for (n, s) in t.starts.iter().enumerate() {
-            let cond = match &s.condition {
-                Some(c) => format!(" if {c} [{}]", self.status(c)),
-                None => " always".into(),
-            };
-            let _ = writeln!(self.out, "  {}. {}{cond}", n + 1, s.target);
+            match &s.condition {
+                Some(c) => self.script_block("  ", &format!("{}. {} if ", n + 1, s.target), c),
+                None => {
+                    let _ = writeln!(self.out, "  {}. {} always", n + 1, s.target);
+                }
+            }
         }
 
         let mut unreached = false;
@@ -622,8 +639,13 @@ impl Text<'_> {
         }
     }
 
-    /// A script's name and status, then its source the first time.
+    /// A script's name and status, then its source the first time; in a
+    /// brief transcript, its name alone.
     fn script_block(&mut self, pad: &str, lead: &str, name: &str) {
+        if self.t.brief {
+            let _ = writeln!(self.out, "{pad}{lead}{name}");
+            return;
+        }
         let status = self.status(name);
         let s = self.t.script(name);
         let source = s.and_then(|s| s.source.as_deref());
@@ -688,10 +710,17 @@ impl Text<'_> {
             n.id, n.key
         );
         let pad = format!("{pad}     ");
+        if self.t.brief {
+            if let Some(s) = &n.script {
+                self.script_block(&pad, "script ", s);
+            }
+            return;
+        }
         if let Some(s) = n.strref {
             let _ = writeln!(self.out, "{pad}strref {s}");
         }
-        if let Some(v) = &n.voice {
+        // A line nobody voiced names a placeholder; say nothing of it.
+        if let Some(v) = n.voice.as_ref().filter(|v| v.file.is_some() || v.expected) {
             let file = match &v.file {
                 Some(Voice {
                     audio: Some(a),

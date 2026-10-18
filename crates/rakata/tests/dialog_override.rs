@@ -93,9 +93,6 @@ fn juhanis_override_dialogue_in_the_build_resolves_its_module_scripts() {
     let loaded = session.load("dan14_juhani.dlg").unwrap();
     assert_eq!(loaded.location, "Override/dan14_juhani.dlg");
     assert_eq!(loaded.module.as_deref(), Some("danm14ac"));
-    let t = session.transcript(
-        &loaded.dialog,
-        rakata::dialog::TranscriptOptions { scripts: false },
-    );
+    let t = session.transcript(&loaded.dialog, rakata::dialog::TranscriptOptions::default());
     assert!(!t.text().contains("[missing]"), "{}", t.text());
 }

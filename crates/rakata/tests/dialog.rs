@@ -1,7 +1,8 @@
 //! Transcripts over the user's own installs: every vanilla dialogue
-//! rendered with its conditions decompiled, timed, and `banter.dlg` in the
-//! modded build showing the prone script and the get-up animation on
-//! consecutive nodes.
+//! rendered with its conditions decompiled, timed; `kor37_freedonnad.dlg`'s
+//! conditions with `k_inc_utility`'s constants by name; and `banter.dlg`
+//! in the modded build showing the prone script and the get-up animation
+//! on consecutive nodes.
 //!
 //! Reads `$RAKATA_GAME_K1` (a vanilla KotOR 1 install) and `$RAKATA_BUILD`
 //! (a modded build), and skips, naming the variable, when one is unset. No
@@ -113,7 +114,13 @@ fn banter_shows_the_prone_script_then_the_get_up_animation() {
     };
     let mut session = Session::open(&root, Profile::K1).unwrap();
     let loaded = session.load("banter.dlg").unwrap();
-    let t = session.transcript(&loaded.dialog, TranscriptOptions { scripts: true });
+    let t = session.transcript(
+        &loaded.dialog,
+        TranscriptOptions {
+            scripts: true,
+            ..TranscriptOptions::default()
+        },
+    );
     // The node whose script knocks Mission down, and the next entry shown,
     // through its one reply, where she gets up.
     let at = t
@@ -142,4 +149,43 @@ fn banter_shows_the_prone_script_then_the_get_up_animation() {
         t.nodes[at].id,
         entry.id
     );
+}
+
+#[test]
+fn freedon_nadd_s_conditions_name_k_inc_utility_s_constants() {
+    let Some(root) = tree("RAKATA_GAME_K1") else {
+        return;
+    };
+    let mut session = Session::open(&root, Profile::K1).unwrap();
+    session.set_module(Some(ModuleName::new("korr_m37aa")));
+    let loaded = session.load("kor37_freedonnad.dlg").unwrap();
+    let t = session.transcript(&loaded.dialog, TranscriptOptions::default());
+    // The three starts' conditions are StartingConditionals that embed
+    // k_inc_utility's functions; folded, its globals go with them.
+    for name in ["k37_frd_wrongswd", "k37_frd_rightswo", "k_pkor_ajufirst"] {
+        let s = t.script(name).unwrap();
+        assert_eq!(s.verified, s.functions, "{name}");
+        let source = s.source.as_deref().unwrap();
+        assert!(source.contains("#include \"k_inc_utility\""), "{source}");
+        assert!(
+            source.contains("UT_GetTalkedToBooleanFlag(OBJECT_SELF)"),
+            "{source}"
+        );
+        assert!(!source.contains("nGlobal1 "), "{source}");
+        assert!(!source.contains("// verified"), "{source}");
+    }
+    let wrong = t.script("k37_frd_wrongswd").unwrap();
+    assert!(
+        wrong
+            .source
+            .as_deref()
+            .unwrap()
+            .contains("UT_GetPlotBooleanFlag(oLocal1, SW_PLOT_BOOLEAN_01)")
+    );
+    let text = t.text();
+    // The starts list carries the source; the player's unvoiced replies
+    // carry no voice line.
+    let starts = text.split("\n\n").nth(1).unwrap();
+    assert!(starts.contains("| int StartingConditional()"), "{starts}");
+    assert!(!text.contains("voice _m37aafree04001_"), "{text}");
 }

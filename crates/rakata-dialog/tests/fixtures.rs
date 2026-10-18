@@ -1,7 +1,10 @@
 //! Hand-made dialogues built with `rakata-gff`: the model's reading, the
 //! keys and their refusals, and the transcript's shape. No game bytes.
 
-use rakata_dialog::{Dialog, Embedded, Error, Kind, NodeKey, NodeRef, Options, Transcript, codes};
+use rakata_dialog::{
+    Dialog, Embedded, Error, Kind, Lookup, NodeKey, NodeRef, Options, Script, ScriptStatus,
+    Transcript, Voice, codes,
+};
 use rakata_gff::{Gff, Label, LocString, Struct, Value};
 use rakata_res::ResRef;
 
@@ -353,4 +356,105 @@ fn a_link_past_the_end_is_a_warning_and_a_row() {
     assert!(t.warnings[0].message.contains("R7"));
     assert!(t.tree[1].missing);
     assert!(t.text().contains("-> R7 (no such node)"));
+}
+
+/// A lookup with no voice files and every script it is asked to decompile
+/// decompiled to a one-line source naming it.
+#[derive(Default)]
+struct Scripts {
+    decompiled: Vec<String>,
+}
+
+impl Lookup for Scripts {
+    fn text(&mut self, s: &rakata_res::LocalizedString) -> Option<String> {
+        Embedded.text(s)
+    }
+
+    fn voice(&mut self, _: &ResRef) -> Option<Voice> {
+        None
+    }
+
+    fn script(&mut self, name: &ResRef, decompile: bool) -> Script {
+        if !decompile {
+            return Script::named(name, ScriptStatus::Found);
+        }
+        self.decompiled.push(name.to_string());
+        let mut s = Script::named(name, ScriptStatus::Verified);
+        s.functions = 1;
+        s.verified = 1;
+        s.source = Some(format!(
+            "int StartingConditional() {{ return 1; }} // {name}"
+        ));
+        s
+    }
+}
+
+fn list<'g>(g: &'g mut Gff, name: &str) -> &'g mut Vec<Struct> {
+    match g.root.get_mut(name) {
+        Some(Value::List(l)) => l,
+        _ => panic!("{name} is a list"),
+    }
+}
+
+#[test]
+fn a_voice_with_no_file_is_noted_only_where_the_line_is_voiced() {
+    let mut g = fixture().into_gff();
+    // E2 names a voice-over with SoundExists 0: nobody recorded it. R0, a
+    // reply, names a placeholder.
+    list(&mut g, "EntryList")[2].set(label("SoundExists"), Value::Byte(0));
+    list(&mut g, "ReplyList")[0].set(
+        label("VO_ResRef"),
+        Value::resref("_m37aafree04001_").unwrap(),
+    );
+    let d = Dialog::new("voices.dlg", g).unwrap();
+    let t = Transcript::build(&d, &mut Scripts::default(), Options::default());
+    let text = t.text();
+    assert!(
+        text.contains("voice oaj_hello, no file under streamwaves/"),
+        "{text}"
+    );
+    assert!(!text.contains("voice nglobebant00089_"), "{text}");
+    assert!(!text.contains("voice _m37aafree04001_"), "{text}");
+    let expected = |id: &str| t.node(id).unwrap().voice.as_ref().unwrap().expected;
+    assert!(expected("E0"));
+    assert!(!expected("E2"));
+    assert!(!expected("R0"));
+}
+
+#[test]
+fn the_starts_show_each_condition_s_source_and_brief_shows_names_only() {
+    let d = fixture();
+    let mut lookup = Scripts::default();
+    let t = Transcript::build(&d, &mut lookup, Options::default());
+    let text = t.text();
+    assert!(
+        text.contains(
+            "  1. E0 if k_con_start [verified, 1 of 1 functions]\n    | int StartingConditional() { return 1; } // k_con_start\n  2. E2 always\n"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains("\nif k_con_start [verified, 1 of 1 functions] (source above)\n"),
+        "{text}"
+    );
+
+    let mut lookup = Scripts::default();
+    let t = Transcript::build(
+        &d,
+        &mut lookup,
+        Options {
+            brief: true,
+            scripts: true,
+        },
+    );
+    assert!(lookup.decompiled.is_empty(), "{:?}", lookup.decompiled);
+    let text = t.text();
+    assert!(text.contains("  1. E0 if k_con_start\n"), "{text}");
+    assert!(
+        text.contains("\nif k_con_start\nE0 [voice:oaj_hello] (owner): \"Hello.\"\n"),
+        "{text}"
+    );
+    assert!(!text.contains("animation"), "{text}");
+    assert!(!text.contains("voice oaj_hello"), "{text}");
+    assert!(!text.contains('|'), "{text}");
 }

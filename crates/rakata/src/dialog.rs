@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use nwscript::MemResolver;
-use nwscript::decompile::ProjectCompiler;
+use nwscript::decompile::{Notes, ProjectCompiler};
 use nwscript::diag::{Diagnostic, SourceMap};
 use rakata_dialog::{Dialog, Lookup, Script, ScriptStatus, Voice, audio};
 use rakata_game::{Install, Location, ModuleName, Profile};
@@ -378,8 +378,12 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// The recovered script as a transcript shows it.
-fn script_of(name: &ResRef, location: String, r: &Recovered<'_>) -> Script {
+/// The recovered script as a transcript shows it: the source without a
+/// header and with a comment only above a function not verified, since the
+/// transcript states the counts beside the name.
+fn script_of(name: &ResRef, location: String, mut r: Recovered<'_>) -> Script {
+    r.decompiled.set_header(Vec::new());
+    r.decompiled.set_notes(Notes::Unverified);
     let d = &r.decompiled;
     let functions = d.functions.len();
     let verified = d.verified();
@@ -390,7 +394,8 @@ fn script_of(name: &ResRef, location: String, r: &Recovered<'_>) -> Script {
             includes,
             ..
         } => Some(format!(
-            "{functions} functions replaced by {}",
+            "{functions} function{} replaced by {}",
+            if *functions == 1 { "" } else { "s" },
             includes
                 .iter()
                 .map(|i| format!("#include \"{i}\""))
@@ -492,7 +497,7 @@ impl Lookup for Session {
                 match nwscript::ncs::decode_named(&display, &bytes, &mut map) {
                     Err(d) => unreadable(name, location, d.message),
                     Ok(program) => match recovery.recover(&display, &bytes, &program, compiler) {
-                        Ok(r) => script_of(name, location, &r),
+                        Ok(r) => script_of(name, location, r),
                         Err(d) => unreadable(name, location, d.message),
                     },
                 }
