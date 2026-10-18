@@ -1,0 +1,17 @@
+[package]
+name = "rakata-patch"
+description = "TSLPatcher's changes.ini and namespaces.ini: the reader, the typed model, and the install plan."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"
+
+[lints]
+workspace = true
