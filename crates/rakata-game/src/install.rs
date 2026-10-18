@@ -95,7 +95,8 @@ pub enum Location {
     Capsule {
         /// The capsule.
         path: PathBuf,
-        /// The member's name and type as the capsule spells it.
+        /// The member's name and type as looked up; the capsule's own
+        /// spelling may differ in case.
         member: ResId,
     },
     /// A member of a BIF.
