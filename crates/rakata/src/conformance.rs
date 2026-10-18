@@ -137,6 +137,9 @@ pub trait Driver: Send + Sync {
     /// Read, write and compare, handing each member the model holds to
     /// `nested` before the comparison.
     fn classify(&self, bytes: &[u8], nested: &mut dyn FnMut(Nested<'_>)) -> Outcome;
+    /// Read and hand each member to `nested` without writing or comparing:
+    /// how a container the run does not score is still walked into.
+    fn descend(&self, bytes: &[u8], nested: &mut dyn FnMut(Nested<'_>)) -> Result<(), Problem>;
 }
 
 impl<F: Format> Driver for F {
@@ -146,6 +149,14 @@ impl<F: Format> Driver for F {
 
     fn extensions(&self) -> &'static [&'static str] {
         Format::extensions(self)
+    }
+
+    fn descend(&self, bytes: &[u8], nested: &mut dyn FnMut(Nested<'_>)) -> Result<(), Problem> {
+        let model = self.read(bytes)?;
+        for member in self.members(&model) {
+            nested(member);
+        }
+        Ok(())
     }
 
     fn classify(&self, bytes: &[u8], nested: &mut dyn FnMut(Nested<'_>)) -> Outcome {
@@ -224,6 +235,10 @@ fn difference(source: &[u8], written: &[u8]) -> String {
 #[derive(Default)]
 pub struct Registry {
     formats: Vec<Box<dyn Driver>>,
+    /// The formats the run scores, when `only` narrowed it; every format
+    /// still reads its files, so a selected format inside an unselected
+    /// container is reached.
+    scored: Option<Vec<String>>,
 }
 
 impl std::fmt::Debug for Registry {
@@ -261,8 +276,10 @@ impl Registry {
         self.formats.push(format);
     }
 
-    /// Keep only the formats named; an unknown name is an error naming
-    /// the formats there are.
+    /// Score only the formats named; the others still read their files
+    /// and are walked into, so `--only gff` reaches the GFFs inside every
+    /// RIM, MOD and BIF. An unknown name is an error naming the formats
+    /// there are.
     pub fn only(mut self, names: &[String]) -> Result<Self, String> {
         for n in names {
             if !self.formats.iter().any(|f| f.name() == n) {
@@ -272,16 +289,28 @@ impl Registry {
                 ));
             }
         }
-        self.formats.retain(|f| names.iter().any(|n| n == f.name()));
+        self.scored = Some(names.to_vec());
         Ok(self)
     }
 
+    /// Every registered format's name, scored or not.
     pub fn names(&self) -> Vec<&'static str> {
         self.formats.iter().map(|f| f.name()).collect()
     }
 
+    /// Whether the run scores this format's files, or only walks them.
+    pub fn is_scored(&self, name: &str) -> bool {
+        self.scored
+            .as_ref()
+            .is_none_or(|s| s.iter().any(|n| n == name))
+    }
+
+    /// The formats the run scores and the report lists.
     pub fn formats(&self) -> impl Iterator<Item = &dyn Driver> {
-        self.formats.iter().map(Box::as_ref)
+        self.formats
+            .iter()
+            .map(Box::as_ref)
+            .filter(|f| self.is_scored(f.name()))
     }
 
     /// The format reading files with this extension, in any case.
@@ -745,7 +774,7 @@ impl Tally {
         let name = format.name();
         let start = Instant::now();
         let mut members: Vec<(String, Vec<u8>)> = Vec::new();
-        let outcome = format.classify(bytes, &mut |m: Nested<'_>| {
+        let mut collect = |m: Nested<'_>| {
             let member_path = format!("{path}!{}", m.name);
             let readable = m
                 .extension
@@ -756,7 +785,17 @@ impl Tally {
             } else {
                 self.no_reader(m.extension.clone());
             }
-        });
+        };
+        if !registry.is_scored(name) {
+            // Walked, not scored: a container holding files of a scored
+            // format, or a file the run was not asked about.
+            let _ = format.descend(bytes, &mut collect);
+            for (member_path, data) in members {
+                self.classify(registry, known, &member_path, &data);
+            }
+            return;
+        }
+        let outcome = format.classify(bytes, &mut collect);
         let slot = self.counts.entry(name).or_default();
         slot.0.add(outcome.class);
         slot.1 += start.elapsed();

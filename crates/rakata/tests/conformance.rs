@@ -361,15 +361,37 @@ fn a_directory_without_chitin_key_is_not_an_install() {
 }
 
 #[test]
-fn only_keeps_the_formats_named_and_refuses_an_unknown_one() {
+fn only_scores_the_formats_named_but_still_walks_into_the_others() {
     let r = registry()
         .only(&["archive".to_string(), "box".to_string()])
         .unwrap();
-    assert_eq!(r.names(), ["archive", "box"]);
+    assert!(r.is_scored("box") && !r.is_scored("reversing"));
     let e = registry().only(&["gff".to_string()]).unwrap_err();
     assert!(
         e.contains("no format `gff`") && e.contains("archive"),
         "{e}"
+    );
+    // Selecting only the member's format reaches it inside the unselected box.
+    let root = tree("only");
+    put(&root, "modules/m.box", &boxed(&[("a.rev", b"abc")]));
+    let registry = registry().only(&["reversing".to_string()]).unwrap();
+    let report = run(&root, &registry, &Known::default(), 1).unwrap();
+    let names: Vec<_> = report.formats.iter().map(|f| f.name.as_str()).collect();
+    assert_eq!(
+        names,
+        ["reversing"],
+        "unscored formats stay out of the report"
+    );
+    let rev = by_name(&report, "reversing");
+    assert_eq!(rev.counts.different, 1);
+    assert!(
+        rev.entries.contains_key("modules/m.box!a.rev"),
+        "{:?}",
+        rev.entries
+    );
+    assert_eq!(
+        report.no_reader.total, 0,
+        "the box and the key are walked, not counted"
     );
 }
 
