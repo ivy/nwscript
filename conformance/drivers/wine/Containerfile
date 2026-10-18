@@ -1,0 +1,6 @@
+# modshop's Wine image plus the tools that drive a GUI installer without a person: xdotool for
+# synthetic input, xwininfo/xprop to find windows, ImageMagick's import for screenshots of the
+# virtual display; openbox because Wine maps and focuses windows reliably only under a window manager.
+FROM localhost/modshop-wine
+LABEL io.modshop.keep=true
+RUN dnf install -y --setopt=install_weak_deps=False xdotool xwininfo xprop ImageMagick openbox && dnf clean all

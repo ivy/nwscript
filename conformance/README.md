@@ -8,7 +8,7 @@ How closely each compiler reproduces BioWare's bytecode for the vanilla KotOR sc
 | `compilers.toml` | the compilers the suite can run, as argv templates |
 | `known.toml` | the established causes of failures no compiler can avoid, and which inferred overlay reproduces which scripts |
 | `overlays/` | declarations inferred from BioWare's bytecode, for `nws --overlay FILE`; each says what it rests on |
-| `drivers/` | small wrappers that give a library compiler a command line |
+| `drivers/` | small wrappers that give a library compiler a command line; `tslpatcher.sh` installs a mod with its own TSLPatcher under Wine, the installer's oracle ([`../docs/research/tslpatcher-oracle.md`](../docs/research/tslpatcher-oracle.md)) |
 | `report.json`, `report.md` | the last full measurement |
 
 ## Running it
