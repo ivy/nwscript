@@ -1,0 +1,22 @@
+[package]
+name = "rakata"
+description = "The façade of the data toolset: one API over the rakata-* crates, and their diagnostic codes."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+build = "build.rs"
+
+[dependencies]
+nwscript-diag = { workspace = true }
+serde_json = "1"
+
+[build-dependencies]
+sha2 = "0.10"
+
+[dev-dependencies]
+sha2 = "0.10"
+
+[lints]
+workspace = true

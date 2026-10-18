@@ -19,9 +19,9 @@ A Rust workspace: a toolset for the data of BioWare's Aurora-family games, KotOR
 | `rakata-save` | save games by name | planned |
 | `rakata-index` | facts, references and full text in SQLite | planned |
 | `rakata-patch` | `changes.ini` reader, plan, executor, report read back from the tree | planned |
-| `rakata` | the façade and the diagnostic codes | planned |
+| `rakata` | the façade and the diagnostic codes | present |
 | `rakata-lua`, `rakata-py` | bindings; the Python module `rakata` carries `rakata.nwscript` | planned |
-| `rakata-cli` | the `rakata` binary | planned |
+| `rakata-cli` | the `rakata` binary | present |
 
 The `nwscript-*` library crates never depend on a `rakata-*` crate; `rakata-game` implements their resolver, and only the `nws` binary may take it.
 
