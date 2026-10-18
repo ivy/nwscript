@@ -65,7 +65,7 @@ written = m.write_override(name, d.to_bytes())
 print(written.path, written.hash, [f.message(name) for f in written.warnings])
 ```
 
-Resrefs (script and file names) are at most 16 bytes (RE0101 at the write; the compiler does not check the name), lower case by convention. Give the mod's scripts and globals a prefix of its own, so they cannot collide with the game's or another mod's.
+Resrefs (script and file names) are at most 16 bytes (`scripts.Source` refuses a longer name with RE0101), lower case by convention. Give the mod's scripts and globals a prefix of its own, so they cannot collide with the game's or another mod's.
 
 ## Dialogue edits
 

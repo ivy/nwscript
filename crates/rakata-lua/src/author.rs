@@ -51,15 +51,11 @@ fn sources(t: Option<Table>) -> mlua::Result<Vec<Source>> {
             (Value::Integer(_), Value::Table(s)) => {
                 let name: String = s.get("name")?;
                 let text: mlua::LuaString = s.get("text")?;
-                out.push(Source {
-                    name,
-                    text: text.as_bytes().to_vec(),
-                });
+                out.push(Source::new(name, text.as_bytes().to_vec()).lift()?);
             }
-            (Value::String(name), Value::String(text)) => out.push(Source {
-                name: name.to_str()?.to_string(),
-                text: text.as_bytes().to_vec(),
-            }),
+            (Value::String(name), Value::String(text)) => {
+                out.push(Source::new(name.to_str()?.to_string(), text.as_bytes().to_vec()).lift()?)
+            }
             _ => {
                 return Err(bad(
                     "sources are {{name = NAME, text = SOURCE}, ...} or {NAME = SOURCE}",
@@ -67,7 +63,7 @@ fn sources(t: Option<Table>) -> mlua::Result<Vec<Source>> {
             }
         }
     }
-    out.sort_by(|a, b| a.name.cmp(&b.name));
+    out.sort_by(|a, b| a.name().cmp(b.name()));
     Ok(out)
 }
 

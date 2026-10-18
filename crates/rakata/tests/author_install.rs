@@ -143,10 +143,11 @@ fn the_juhani_mods_operations_against_vanilla() {
 
     // A decompiled BioWare script compiles in BioWare's mode against the
     // game's own declarations.
-    let src = rakata::author::scripts::Source {
-        name: "k_oaj_probe".into(),
-        text: b"void main() { SetGlobalBoolean(\"OAJ_DONE\", TRUE); }".to_vec(),
-    };
+    let src = rakata::author::scripts::Source::new(
+        "k_oaj_probe",
+        b"void main() { SetGlobalBoolean(\"OAJ_DONE\", TRUE); }".to_vec(),
+    )
+    .unwrap();
     let out =
         rakata::author::scripts::compile(&m, &[src], &[], rakata::author::scripts::Flags::BIOWARE)
             .unwrap();

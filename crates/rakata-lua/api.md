@@ -236,7 +236,7 @@ A new node is a table `{text, speaker, listener, voice, script, animations, ques
 
 ### rakata.author.scripts
 
-- `rakata.author.scripts.compile(m, sources, [{includes = {...}, flags = "default"}])`: compile each source against the install's includes, `nwscript.nss` and includes found first among `sources` and `includes`, then through `m`. `sources` and `includes` are `{{name = "k_x", text = "..."}, ...}` or `{k_x = "..."}`; `flags` is `default` or `bioware` (BioWare's declarations and compatibility, so a decompiled BioWare script compiles to BioWare's bytes). Returns a sequence of `{name, ncs, warnings, inputs}`, `inputs` each `{role, path, sha256}`. Nothing is written; a script that does not compile is `RE1408`.
+- `rakata.author.scripts.compile(m, sources, [{includes = {...}, flags = "default"}])`: compile each source against the install's includes, `nwscript.nss` and includes found first among `sources` and `includes`, then through `m`. `sources` and `includes` are `{{name = "k_x", text = "..."}, ...}` or `{k_x = "..."}`; `flags` is `default` or `bioware` (BioWare's declarations and compatibility, so a decompiled BioWare script compiles to BioWare's bytes). Returns a sequence of `{name, ncs, warnings, inputs}`, `inputs` each `{role, path, sha256}`. Nothing is written; a name over sixteen bytes is `RE0101` before anything compiles, and a script that does not compile is `RE1408`.
 
 ### rakata.author.voice
 

@@ -10,7 +10,7 @@ import pytest
 
 import rakata
 import rakata.nwscript
-from rakata.author import blueprint, dialog, globals, lip, twoda, voice
+from rakata.author import blueprint, dialog, globals, lip, scripts, twoda, voice
 
 
 def test_imports_from_an_isolated_interpreter() -> None:
@@ -128,3 +128,13 @@ def test_dialog_additions_by_key(rakata_bin: Path) -> None:
     assert e.value.code == "RE1104"
     empty = dialog.empty_like(d, "oaj_banter.dlg")
     assert empty.len("entry") == 0 and d.len("entry") == 1
+
+
+def test_a_script_name_over_sixteen_bytes_is_refused_at_construction() -> None:
+    source = scripts.Source("k_oaj_sixteen_01", "void main() { }")
+    assert source.name == "k_oaj_sixteen_01"
+    assert source.text == b"void main() { }"
+    with pytest.raises(rakata.RakataError) as e:
+        scripts.Source("k_oaj_seventeen01", "void main() { }")
+    assert e.value.code == "RE0101"
+    assert e.value.message == "resource name `k_oaj_seventeen01` is 17 bytes; a resref holds at most 16"

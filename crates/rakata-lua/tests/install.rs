@@ -221,3 +221,28 @@ fn a_session_loads_a_dialogue_by_name_and_shows_its_transcript() {
         "k_hcar_dialog.dlg\tk_hcar_dialog.dlg\ttrue\ttrue\nfalse\tRE1801\nnil\n"
     );
 }
+
+#[test]
+fn a_script_name_over_sixteen_bytes_is_refused_before_anything_compiles() {
+    let Some(game) = game() else {
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let o = run_in(
+        dir.path(),
+        r#"
+        local m = rakata.Mod.open(rakata.Install.open())
+        local ok, e = pcall(rakata.author.scripts.compile, m, {k_oaj_seventeen01 = "void main() { }"})
+        print(ok, e.code, e.message)
+        ok, e = pcall(rakata.author.scripts.compile, m, {{name = "k_oaj_seventeen02", text = "not nwscript"}})
+        print(ok, e.code)
+    "#,
+        &[],
+        &game,
+    )
+    .unwrap_or_else(|f| panic!("{}: {}", f.code, f.message));
+    assert_eq!(
+        o.output,
+        "false\tRE0101\tresource name `k_oaj_seventeen01` is 17 bytes; a resref holds at most 16\nfalse\tRE0101\n"
+    );
+}

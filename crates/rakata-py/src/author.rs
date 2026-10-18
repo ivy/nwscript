@@ -541,14 +541,13 @@ mod scripts {
     #[pyclass(name = "Source", module = "rakata.author.scripts", frozen)]
     #[derive(Clone)]
     pub struct PySource {
-        #[pyo3(get)]
-        name: String,
-        text: Vec<u8>,
+        inner: Source,
     }
 
     #[pymethods]
     impl PySource {
-        /// `text` as `bytes`, or `str` encoded as Windows-1252.
+        /// `text` as `bytes`, or `str` encoded as Windows-1252. Raises
+        /// `RE0101` for a name over sixteen bytes.
         #[new]
         fn new(name: String, text: &Bound<'_, PyAny>) -> PyResult<Self> {
             let text = if let Ok(s) = text.extract::<String>() {
@@ -560,12 +559,19 @@ mod scripts {
             } else {
                 text.extract::<Vec<u8>>()?
             };
-            Ok(PySource { name, text })
+            Ok(PySource {
+                inner: Source::new(name, text).map_err(fail)?,
+            })
+        }
+
+        #[getter]
+        fn name(&self) -> &str {
+            self.inner.name()
         }
 
         #[getter]
         fn text<'py>(&self, py: Python<'py>) -> Bound<'py, PyBytes> {
-            PyBytes::new(py, &self.text)
+            PyBytes::new(py, self.inner.text())
         }
     }
 
@@ -650,12 +656,7 @@ mod scripts {
     }
 
     fn sources(s: &[PyRef<'_, PySource>]) -> Vec<Source> {
-        s.iter()
-            .map(|s| Source {
-                name: s.name.clone(),
-                text: s.text.clone(),
-            })
-            .collect()
+        s.iter().map(|s| s.inner.clone()).collect()
     }
 
     /// Compile each of `sources` for the install's game, includes found

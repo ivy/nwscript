@@ -7,7 +7,8 @@ from . import Mod
 
 class Source:
     def __init__(self, name: str, text: bytes | str) -> None:
-        """`name` without `.nss`; `str` text is encoded as Windows-1252."""
+        """`name` without `.nss`; `str` text is encoded as Windows-1252. A name over sixteen bytes
+        raises `RE0101`."""
     @property
     def name(self) -> str: ...
     @property

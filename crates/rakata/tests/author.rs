@@ -539,10 +539,7 @@ fn a_node_whose_script_does_not_resolve_is_refused_and_nothing_is_written() {
     assert!(!m.loaded(id("banter.dlg")).unwrap().written);
 
     // The script compiled and the voice written, the same dialogue lands.
-    let script = Source {
-        name: "k_oaj_missing".into(),
-        text: b"void main() { }".to_vec(),
-    };
+    let script = Source::new("k_oaj_missing", b"void main() { }".to_vec()).unwrap();
     let ncs = scripts::compile(&m, &[script], &[], Flags::default()).unwrap();
     m.write_override("k_oaj_missing.ncs", &ncs[0].ncs).unwrap();
     m.write_streamwaves("oaj_beat01", &voice::streamwave(b"mp3"))
@@ -557,11 +554,8 @@ fn a_node_whose_script_does_not_resolve_is_refused_and_nothing_is_written() {
 fn a_condition_reading_an_undeclared_global_is_refused_until_it_is_declared() {
     let root = make("dialog-global", false);
     let mut m = open(&root);
-    let cond = Source {
-        name: "k_oaj_c_new".into(),
-        text: b"int StartingConditional() { return GetGlobalBoolean(\"OAJ_NEW\") && GetGlobalBoolean(\"OAJ_DONE\"); }"
-            .to_vec(),
-    };
+    let cond = Source::new("k_oaj_c_new", b"int StartingConditional() { return GetGlobalBoolean(\"OAJ_NEW\") && GetGlobalBoolean(\"OAJ_DONE\"); }"
+            .to_vec()).unwrap();
     let ncs = scripts::compile(&m, &[cond], &[], Flags::default()).unwrap();
     m.write_override("k_oaj_c_new.ncs", &ncs[0].ncs).unwrap();
     let mut d = Dialog::parse("banter.dlg", &m.loaded(id("banter.dlg")).unwrap().bytes).unwrap();
@@ -639,15 +633,13 @@ fn reordering_is_its_own_operation_and_rewrites_the_links() {
 fn scripts_compile_against_the_mods_libraries_and_the_installs_includes() {
     let root = make("scripts", false);
     let mut m = open(&root);
-    let lib = Source {
-        name: "k_oaj_inc".into(),
-        text: b"#include \"k_inc_game\"\r\nint ModLibrary() { return GameLibrary(); }\r\n".to_vec(),
-    };
-    let script = Source {
-        name: "k_oaj_fight".into(),
-        text: b"#include \"k_oaj_inc\"\r\nvoid main() { SetGlobalBoolean(\"OAJ_DONE\", ModLibrary()); }\r\n"
-            .to_vec(),
-    };
+    let lib = Source::new(
+        "k_oaj_inc",
+        b"#include \"k_inc_game\"\r\nint ModLibrary() { return GameLibrary(); }\r\n".to_vec(),
+    )
+    .unwrap();
+    let script = Source::new("k_oaj_fight", b"#include \"k_oaj_inc\"\r\nvoid main() { SetGlobalBoolean(\"OAJ_DONE\", ModLibrary()); }\r\n"
+            .to_vec()).unwrap();
     let out = scripts::compile(
         &m,
         std::slice::from_ref(&script),
@@ -671,20 +663,26 @@ fn scripts_compile_against_the_mods_libraries_and_the_installs_includes() {
     let mut r = nwscript::MemResolver::new()
         .with("nwscript.nss", NWSCRIPT)
         .with("k_inc_game.nss", LIBRARY)
-        .with("k_oaj_inc.nss", lib.text.clone());
+        .with("k_oaj_inc.nss", lib.text().to_vec());
     let mut map = nwscript::diag::SourceMap::new();
     let mut c = nwscript::Checker::new();
-    let checked = c.check(&mut r, &mut map, "k_oaj_fight.nss", &script.text);
+    let checked = c.check(&mut r, &mut map, "k_oaj_fight.nss", script.text());
     let program =
         nwscript::compile::compile(&checked.analysis.unwrap().program, nwscript::Game::K1).unwrap();
     assert_eq!(out[0].ncs, nwscript::ncs::encode(&program));
     m.write_override("k_oaj_fight.ncs", &out[0].ncs).unwrap();
     assert_eq!(override_file(&root, "k_oaj_fight.ncs"), out[0].ncs);
 
-    let bad = Source {
-        name: "k_oaj_bad".into(),
-        text: b"void main() { NoSuchRoutine(); }".to_vec(),
-    };
+    // A name the compiled script's resref cannot hold is refused at once.
+    let e = Source::new("k_oaj_seventeen01", "void main() { }").unwrap_err();
+    assert_eq!(e.code(), "RE0101");
+    assert_eq!(
+        e.to_string(),
+        "RE0101: resource name `k_oaj_seventeen01` is 17 bytes; a resref holds at most 16"
+    );
+    assert!(Source::new("k_oaj_sixteen_01", "").is_ok());
+
+    let bad = Source::new("k_oaj_bad", b"void main() { NoSuchRoutine(); }".to_vec()).unwrap();
     let e = scripts::compile(&m, &[bad], &[], Flags::default()).unwrap_err();
     assert_eq!(e.code(), codes::DOES_NOT_COMPILE);
     assert!(e.to_string().contains("NoSuchRoutine"), "{e}");

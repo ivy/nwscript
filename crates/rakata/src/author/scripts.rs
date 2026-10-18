@@ -20,8 +20,31 @@ use super::{Error, Mod, Result};
 /// A script's source: its name without `.nss` and its bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Source {
-    pub name: String,
-    pub text: Vec<u8>,
+    name: String,
+    text: Vec<u8>,
+}
+
+impl Source {
+    /// A source named `name`. Fails with `RE0101` when the name is longer
+    /// than the sixteen bytes the compiled script's resref holds.
+    pub fn new(name: impl Into<String>, text: impl Into<Vec<u8>>) -> Result<Self> {
+        let name = name.into();
+        ResRef::new(&name).map_err(Error::Res)?;
+        Ok(Source {
+            name,
+            text: text.into(),
+        })
+    }
+
+    /// The name, without `.nss`.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// The source's bytes.
+    pub fn text(&self) -> &[u8] {
+        &self.text
+    }
 }
 
 /// How to compile, as `nws`'s flags say it.
