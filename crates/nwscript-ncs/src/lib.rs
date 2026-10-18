@@ -23,6 +23,7 @@
 
 pub mod asm;
 pub mod cfg;
+pub mod facts;
 mod instruction;
 mod opcode;
 
