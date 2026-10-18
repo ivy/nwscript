@@ -140,6 +140,140 @@ pub trait Driver: Send + Sync {
     /// Read and hand each member to `nested` without writing or comparing:
     /// how a container the run does not score is still walked into.
     fn descend(&self, bytes: &[u8], nested: &mut dyn FnMut(Nested<'_>)) -> Result<(), Problem>;
+    /// The format as a pair, for one whose resource is two files of one
+    /// name ([`PairFormat`]); none by default.
+    fn pair(&self) -> Option<&dyn PairDriver> {
+        None
+    }
+}
+
+/// A format whose resource is two files of one name, read and written
+/// together: a model's MDL and MDX. The suite gathers both halves from
+/// across the tree (a BIF member by the name the KEY gives it, a RIM's
+/// companion from its `dx` partner) and scores each half from one round
+/// trip of the pair.
+pub trait PairFormat: Send + Sync {
+    /// What the reader produces.
+    type Model<'a>;
+
+    /// The format's name, as `--only` selects it and the report lists it.
+    fn name(&self) -> &'static str;
+
+    /// The two extensions, lowercase: the first half's and the second's.
+    fn extensions(&self) -> &'static [&'static str];
+
+    fn read<'a>(&self, first: &'a [u8], second: &'a [u8]) -> Result<Self::Model<'a>, Problem>;
+
+    fn write(&self, model: &Self::Model<'_>) -> Result<[Vec<u8>; 2], Problem>;
+
+    /// Whether two readings hold the same data, layout aside.
+    fn semantic_eq(&self, a: &Self::Model<'_>, b: &Self::Model<'_>) -> bool;
+
+    /// The layout facts of each half as written, one line each, for a pair
+    /// whose bytes the writer did not reproduce (see [`Format::layout`]).
+    fn layout(&self, _halves: [&[u8]; 2], _model: &Self::Model<'_>) -> [Option<String>; 2] {
+        [None, None]
+    }
+}
+
+/// A [`PairFormat`] with its model erased.
+pub trait PairDriver: Send + Sync {
+    /// Read, write and compare the pair: the outcome of each half.
+    fn classify_pair(&self, first: &[u8], second: &[u8]) -> [Outcome; 2];
+}
+
+/// A [`PairFormat`] as the [`Registry`] holds it.
+pub struct Paired<P>(pub P);
+
+impl<P: PairFormat> PairDriver for Paired<P> {
+    fn classify_pair(&self, first: &[u8], second: &[u8]) -> [Outcome; 2] {
+        let f = &self.0;
+        let both = |class: Class, detail: String, code: Option<&'static str>| {
+            let o = Outcome {
+                class,
+                detail: Some(detail),
+                code,
+                layout: None,
+            };
+            [o.clone(), o]
+        };
+        let model = match f.read(first, second) {
+            Ok(m) => m,
+            Err(p) => return both(Class::Failed, p.message, Some(p.code)),
+        };
+        let written = match f.write(&model) {
+            Ok(w) => w,
+            Err(p) => {
+                return both(
+                    Class::Different,
+                    format!("the writer failed: {}", p.message),
+                    Some(p.code),
+                );
+            }
+        };
+        let halves = [first, second];
+        if written[0] == first && written[1] == second {
+            return [Outcome::IDENTICAL, Outcome::IDENTICAL];
+        }
+        let layout = f.layout(halves, &model);
+        let again = f.read(&written[0], &written[1]);
+        let mut out = [Outcome::IDENTICAL, Outcome::IDENTICAL];
+        for (i, o) in out.iter_mut().enumerate() {
+            if written[i] == halves[i] {
+                continue;
+            }
+            let shape = difference(halves[i], &written[i]);
+            *o = match &again {
+                Err(p) => Outcome {
+                    class: Class::Different,
+                    detail: Some(format!(
+                        "the written bytes do not re-read: {}: {}; {shape}",
+                        p.code, p.message
+                    )),
+                    code: Some(codes::RE0502.id),
+                    layout: layout[i].clone(),
+                },
+                Ok(a) if f.semantic_eq(&model, a) => Outcome {
+                    class: Class::Equal,
+                    detail: Some(shape),
+                    code: None,
+                    layout: layout[i].clone(),
+                },
+                Ok(_) => Outcome {
+                    class: Class::Different,
+                    detail: Some(shape),
+                    code: None,
+                    layout: layout[i].clone(),
+                },
+            };
+        }
+        out
+    }
+}
+
+impl<P: PairFormat> Driver for Paired<P> {
+    fn name(&self) -> &'static str {
+        self.0.name()
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        self.0.extensions()
+    }
+
+    /// A half met alone is read as the first half with no second; the
+    /// suite pairs halves before it classifies them.
+    fn classify(&self, bytes: &[u8], _nested: &mut dyn FnMut(Nested<'_>)) -> Outcome {
+        let [o, _] = self.classify_pair(bytes, &[]);
+        o
+    }
+
+    fn descend(&self, _bytes: &[u8], _nested: &mut dyn FnMut(Nested<'_>)) -> Result<(), Problem> {
+        Ok(())
+    }
+
+    fn pair(&self) -> Option<&dyn PairDriver> {
+        Some(self)
+    }
 }
 
 impl<F: Format> Driver for F {
@@ -268,6 +402,7 @@ impl Registry {
         r.register(Box::new(crate::formats::Walkmesh));
         r.register(Box::new(crate::formats::TwoDa));
         r.register(Box::new(crate::formats::Gff));
+        r.register(Box::new(Paired(crate::formats::Mdl)));
         r
     }
 
@@ -741,6 +876,77 @@ struct Tally {
     counts: BTreeMap<&'static str, (Counts, Duration)>,
     entries: BTreeMap<&'static str, BTreeMap<String, Entry>>,
     no_reader: NoReader,
+    /// The halves of pair formats' resources, classified once the walk
+    /// has met them all.
+    halves: Vec<Half>,
+}
+
+/// One half of a [`PairFormat`]'s resource, held until the walk ends.
+struct Half {
+    format: &'static str,
+    /// Where its other half is looked for: the container or folder, and
+    /// the resref (see [`pair_key`]).
+    key: (String, String),
+    /// Which extension of the format's it has: 0 the first, 1 the second.
+    role: usize,
+    path: String,
+    bytes: Vec<u8>,
+}
+
+/// The names the KEY gives BIF members: by the BIF's path within the tree
+/// and the member's index, lowercase.
+type BifNames = std::collections::HashMap<(String, usize), String>;
+
+fn bif_names(root: &Path) -> BifNames {
+    let mut out = BifNames::new();
+    let Some(key) = child_ci(root, "chitin.key")
+        .and_then(|p| fs::read(p).ok())
+        .and_then(|b| rakata_archive::Key::parse(&b).ok())
+    else {
+        return out;
+    };
+    let paths: Vec<String> = key
+        .bifs()
+        .iter()
+        .map(|b| {
+            b.components()
+                .collect::<Vec<_>>()
+                .join("/")
+                .to_ascii_lowercase()
+        })
+        .collect();
+    for e in key.entries() {
+        if let Some(p) = paths.get(e.bif as usize) {
+            out.insert(
+                (p.clone(), e.index as usize),
+                e.id.name.to_string().to_ascii_lowercase(),
+            );
+        }
+    }
+    out
+}
+
+/// Where a half's other half lives, as `(container, resref)`, lowercase:
+/// the archive holding it (a RIM's `dx` partner named as the RIM, which
+/// holds the first halves) or the folder of a loose file, and the
+/// resource's name (a BIF member's from the KEY).
+fn pair_key(path: &str, names: &BifNames) -> (String, String) {
+    let lower = path.to_ascii_lowercase();
+    let (container, member) = lower
+        .rsplit_once('!')
+        .or_else(|| lower.rsplit_once('/'))
+        .unwrap_or(("", &lower));
+    let stem = member.rsplit_once('.').map_or(member, |(s, _)| s);
+    let resref = stem
+        .strip_prefix('#')
+        .and_then(|i| i.parse::<usize>().ok())
+        .and_then(|i| names.get(&(container.to_string(), i)))
+        .map_or_else(|| stem.to_string(), String::clone);
+    let container = match container.strip_suffix("dx.rim") {
+        Some(c) => format!("{c}.rim"),
+        None => container.to_string(),
+    };
+    (container, resref)
 }
 
 impl Tally {
@@ -761,6 +967,7 @@ impl Tally {
         for (ext, n) in other.no_reader.by_extension {
             *self.no_reader.by_extension.entry(ext).or_default() += n;
         }
+        self.halves.extend(other.halves);
     }
 
     fn no_reader(&mut self, ext: Option<String>) {
@@ -772,15 +979,69 @@ impl Tally {
             .or_default() += 1;
     }
 
+    /// Count one file's outcome, and list it when it is not identical.
+    fn record(
+        &mut self,
+        known: &Known,
+        name: &'static str,
+        path: &str,
+        outcome: Outcome,
+        busy: Duration,
+    ) {
+        let slot = self.counts.entry(name).or_default();
+        slot.0.add(outcome.class);
+        slot.1 += busy;
+        if outcome.class != Class::Identical {
+            let variant = (outcome.class == Class::Equal)
+                .then(|| known.variant_of(name, path, outcome.layout.as_deref()))
+                .flatten()
+                .map(str::to_string);
+            self.entries.entry(name).or_default().insert(
+                path.to_string(),
+                Entry {
+                    class: outcome.class,
+                    detail: outcome.detail,
+                    code: outcome.code.map(str::to_string),
+                    variant,
+                    layout: outcome.layout,
+                },
+            );
+        }
+    }
+
     /// Classify `bytes` at `path` (within the tree) and every member it
-    /// holds, recursively.
-    fn classify(&mut self, registry: &Registry, known: &Known, path: &str, bytes: &[u8]) {
+    /// holds, recursively; hold a pair format's half for [`pairs`].
+    fn classify(
+        &mut self,
+        registry: &Registry,
+        known: &Known,
+        names: &BifNames,
+        path: &str,
+        bytes: &[u8],
+    ) {
         let ext = extension_of(path);
         let Some(format) = ext.as_deref().and_then(|e| registry.by_extension(e)) else {
             self.no_reader(ext);
             return;
         };
         let name = format.name();
+        if format.pair().is_some() {
+            if registry.is_scored(name) {
+                let role = format
+                    .extensions()
+                    .iter()
+                    .position(|e| Some(*e) == ext.as_deref())
+                    .unwrap_or(0);
+                self.halves.push(Half {
+                    format: name,
+                    key: pair_key(path, names),
+                    role,
+                    path: path.to_string(),
+                    bytes: bytes.to_vec(),
+                });
+            }
+            return;
+        }
         let start = Instant::now();
         let mut members: Vec<(String, Vec<u8>)> = Vec::new();
         let mut collect = |m: Nested<'_>| {
@@ -800,34 +1061,104 @@ impl Tally {
             // format, or a file the run was not asked about.
             let _ = format.descend(bytes, &mut collect);
             for (member_path, data) in members {
-                self.classify(registry, known, &member_path, &data);
+                self.classify(registry, known, names, &member_path, &data);
             }
             return;
         }
         let outcome = format.classify(bytes, &mut collect);
-        let slot = self.counts.entry(name).or_default();
-        slot.0.add(outcome.class);
-        slot.1 += start.elapsed();
-        if outcome.class != Class::Identical {
-            let variant = (outcome.class == Class::Equal)
-                .then(|| known.variant_of(name, path, outcome.layout.as_deref()))
-                .flatten()
-                .map(str::to_string);
-            self.entries.entry(name).or_default().insert(
-                path.to_string(),
-                Entry {
-                    class: outcome.class,
-                    detail: outcome.detail,
-                    code: outcome.code.map(str::to_string),
-                    variant,
-                    layout: outcome.layout,
-                },
-            );
-        }
+        self.record(known, name, path, outcome, start.elapsed());
         for (member_path, data) in members {
-            self.classify(registry, known, &member_path, &data);
+            self.classify(registry, known, names, &member_path, &data);
         }
     }
+}
+
+/// One round trip of a pair: the halves read together, and which of them
+/// the run scores (a half read with a partner from elsewhere in the tree
+/// is not scored again).
+struct Job {
+    format: &'static str,
+    halves: [Option<usize>; 2],
+    scored: [bool; 2],
+}
+
+/// Pair the halves the walk held and classify each pair, on `threads`
+/// threads. Halves pair within their container or folder; a half with no
+/// partner there is read with the partner of its name the tree holds
+/// elsewhere (the engine resolves each half by name), and a first half
+/// with none anywhere with an empty second. A second half no first half
+/// of its name reads counts as having no reader.
+fn pairs(registry: &Registry, known: &Known, halves: &[Half], threads: usize) -> Tally {
+    let mut tally = Tally::default();
+    let mut order: Vec<usize> = (0..halves.len()).collect();
+    order.sort_by(|&a, &b| halves[a].path.cmp(&halves[b].path));
+    type Group = [Vec<usize>; 2];
+    let mut groups: BTreeMap<(&'static str, &(String, String)), Group> = BTreeMap::new();
+    let mut by_name: BTreeMap<(&str, &str, usize), usize> = BTreeMap::new();
+    for &i in &order {
+        let h = &halves[i];
+        groups.entry((h.format, &h.key)).or_default()[h.role].push(i);
+        by_name.entry((h.format, &h.key.1, h.role)).or_insert(i);
+    }
+    let mut jobs = Vec::new();
+    for (&(format, key), [firsts, seconds]) in &groups {
+        let elsewhere = |role: usize| by_name.get(&(format, key.1.as_str(), role)).copied();
+        for i in 0..firsts.len().max(seconds.len()) {
+            match (firsts.get(i), seconds.get(i)) {
+                (Some(&a), Some(&b)) => jobs.push(Job {
+                    format,
+                    halves: [Some(a), Some(b)],
+                    scored: [true, true],
+                }),
+                (Some(&a), None) => jobs.push(Job {
+                    format,
+                    halves: [Some(a), elsewhere(1)],
+                    scored: [true, false],
+                }),
+                (None, Some(&b)) => match elsewhere(0) {
+                    Some(a) => jobs.push(Job {
+                        format,
+                        halves: [Some(a), Some(b)],
+                        scored: [false, true],
+                    }),
+                    None => tally.no_reader(extension_of(&halves[b].path)),
+                },
+                (None, None) => {}
+            }
+        }
+    }
+    let next = AtomicUsize::new(0);
+    let total = Mutex::new(tally);
+    std::thread::scope(|s| {
+        for _ in 0..threads.clamp(1, jobs.len().max(1)) {
+            s.spawn(|| {
+                let mut t = Tally::default();
+                loop {
+                    let i = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(job) = jobs.get(i) else { break };
+                    let Some(driver) = registry
+                        .formats
+                        .iter()
+                        .find(|f| f.name() == job.format)
+                        .and_then(|f| f.pair())
+                    else {
+                        continue;
+                    };
+                    let bytes = |k: usize| job.halves[k].map_or(&[][..], |h| &halves[h].bytes);
+                    let start = Instant::now();
+                    let outcomes = driver.classify_pair(bytes(0), bytes(1));
+                    let busy = start.elapsed() / 2;
+                    for (k, outcome) in outcomes.into_iter().enumerate() {
+                        if let (true, Some(h)) = (job.scored[k], job.halves[k]) {
+                            t.record(known, job.format, &halves[h].path, outcome, busy);
+                        }
+                    }
+                }
+                total.lock().expect("no thread panicked").merge(t);
+            });
+        }
+    });
+    total.into_inner().expect("no thread panicked")
 }
 
 /// Files this large are memory-mapped rather than read whole.
@@ -845,6 +1176,7 @@ pub fn run(
 ) -> Result<Report, Diagnostic> {
     let start = Instant::now();
     let files = walk(root)?;
+    let names = bif_names(root);
     let threads = match threads {
         0 => std::thread::available_parallelism().map_or(1, |n| n.get()),
         n => n,
@@ -875,7 +1207,7 @@ pub fn run(
                         rakata_archive::Source::read(path)
                     };
                     match source {
-                        Ok(src) => tally.classify(registry, known, &rel_path, &src),
+                        Ok(src) => tally.classify(registry, known, &names, &rel_path, &src),
                         Err(e) => {
                             let ext = extension_of(&rel_path);
                             match ext.as_deref().and_then(|x| registry.by_extension(x)) {
@@ -902,7 +1234,9 @@ pub fn run(
             });
         }
     });
-    let tally = total.into_inner().expect("no thread panicked");
+    let mut tally = total.into_inner().expect("no thread panicked");
+    let halves = std::mem::take(&mut tally.halves);
+    tally.merge(pairs(registry, known, &halves, threads));
     let formats = registry
         .formats()
         .map(|f| {

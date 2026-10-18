@@ -35,3 +35,58 @@ format = "gff"
 writer = "a dialogue editor (the file carries no tool signature); measured over one DLG in a build module"
 description = "a WORD field's data dword holds 0xFFFFFFFF, bits above the sixteen the type has (a -1 written at dword width); the engine reads the low sixteen, and the writer emits only those, so the high half of the dword differs"
 recognised = "gff: * V3.2; sections adjacent; data: all used; *; locstring totals: all right; narrow fields: * with wide values"
+
+[variant.mdl-compiler-preorder]
+format = "mdl"
+writer = "a model compiler some of the build's mods were built with (the files carry no tool signature); measured over 62 MDLs in the build's Override/: rooms, placeables, character bodies and heads, and four cameras"
+description = "a node's child array, controllers and controller data follow its own structures and come before its children, where BioWare writes a node's controllers after all its descendants; a mesh's arrays lie faces, index offsets, positions, index counts, then the third index array and the index lists, with a dangly mesh's constraints and positions or an AABB mesh's tree after them, where BioWare writes the kind's arrays first and then faces, index counts, positions, index offsets; and every empty array points at the next structure, controllers, controller data and events among them, where BioWare leaves those at zero. In a model with no mesh and no node with both controllers and children the order is BioWare's and only the empty arrays tell. The writer emits BioWare's layout, so offsets move and the bytes differ"
+recognised = "mdl: *; 0 unreferenced bytes; 0 shared bytes; no empty array at zero that BioWare points on; * empty arrays pointing on that BioWare leaves at zero, first the *; 0 parent offsets wrong; 0 allocated counts unlike used; the MDX length its blocks give"
+
+[variant.mdx-compiler-unpadded]
+format = "mdl"
+writer = "the model compiler of `mdl-compiler-preorder`, whose MDLs these MDXs accompany; measured over 55 MDXs in the build's Override/"
+description = "each mesh's block follows the one before with nothing between, where BioWare follows a block with as many bytes as the MDX's length then lies past a multiple of 16; the blocks are in BioWare's order (every mesh but the skins by node number, then the skins). The writer emits BioWare's padding, so later blocks move"
+recognised = "mdx: blocks in BioWare's order; no padding; ends at its last block"
+
+[variant.mdl-empty-child-arrays-zero]
+format = "mdl"
+writer = "a tool that rewrites BioWare's compiled models keeping their layout (the files carry no tool signature); measured over 58 MDLs in the build's Override/: blasters and other ranged weapons, creature and character models, a room and a camera"
+description = "every structure lies where BioWare's compiler puts it, but an empty child array (a leaf node's) holds offset zero where BioWare points it at the next structure; nine of the weapons (w_BlstrCrbn_001 to 005, w_hvyblstr_002 to 005) also hold, just before a node, 32 bytes no array counts: two controller records, a position (type 8) and an orientation (type 20), left from a controller array since shortened. The writer points empty child arrays on and drops the unreferenced bytes, so offsets after them move"
+recognised = "mdl: structures in BioWare's order; *; * unreferenced bytes; 0 shared bytes; * empty arrays at zero that BioWare points on, first the child array; no empty array pointing on that BioWare leaves at zero; 0 parent offsets wrong; 0 allocated counts unlike used; the MDX length its blocks give"
+
+[variant.mdx-blocks-by-number]
+format = "mdl"
+writer = "the tool behind two creature models of the build's Override/, C_RancorS and DP_AjuntaGhost, whose MDLs are `mdl-empty-child-arrays-zero` (the files carry no tool signature)"
+description = "the MDX's blocks follow node numbers with the skins among the rest, where BioWare puts every skin's block after the others; C_RancorS pads as BioWare does, and DP_AjuntaGhost follows a block with 0 or 8 bytes by no rule the measurements find. The writer emits BioWare's order and padding, so the blocks move"
+recognised = "mdx: blocks by node number, the skins among the rest; *; ends at its last block"
+
+[variant.mdl-mdx-trailing-zeros]
+format = "mdl"
+writer = "the tool behind three models of the build's Override/, m01ab_09a, m41af_09a and n_selkath (the files carry no tool signature)"
+description = "the MDX ends with 8 or 12 zero bytes after its last block's terminator, and the MDL's two MDX length fields (0x08 of the file, 0xB0 of the model header) count them; every other byte is laid out as BioWare lays it. The writer ends the MDX at its last block, so the MDX is shorter and the MDL's two lengths differ"
+recognised = "mdl: structures in BioWare's order; *; 0 unreferenced bytes; 0 shared bytes; no empty array at zero that BioWare points on; no empty array pointing on that BioWare leaves at zero; 0 parent offsets wrong; 0 allocated counts unlike used; an MDX length * bytes past its last block"
+
+[variant.mdx-trailing-zeros]
+format = "mdl"
+writer = "the tool of `mdl-mdx-trailing-zeros`; the MDXs of the same three models"
+description = "8 or 12 zero bytes follow the last block's terminator; the blocks and their padding are BioWare's. The writer ends the MDX at its last block"
+recognised = "mdx: blocks in BioWare's order; BioWare's padding; * bytes after its last block"
+
+[variant.mdl-modshop-repair-08]
+format = "mdl"
+writer = "modshop's repair 08 (`games/kotor/repairs/08-wounded-republic-detonate-controller`), applied to the room `m02ac_02h` of the Diversified Wounded Republic Soldiers mod"
+description = "the repair lowers the controller count of each of the room's seven bubble emitters by one, dropping its last controller (a detonate), and leaves the dropped controller's 16-byte record where it was: 112 bytes no array counts. The writer drops them, so later offsets move"
+recognised = "mdl: structures in BioWare's order; *; 112 unreferenced bytes; 0 shared bytes; no empty array at zero that BioWare points on; no empty array pointing on that BioWare leaves at zero; 0 parent offsets wrong; 0 allocated counts unlike used; the MDX length its blocks give"
+files = ["Override/m02ac_02h.mdl"]
+
+[variant.mdl-unreferenced-before-dangly-positions]
+format = "mdl"
+writer = "the tool behind two models of the build's Override/, the room m36aa_01 and the cutscene model m41ad_c01_char20 (the files carry no tool signature)"
+description = "bytes no structure points to lie just before the positions of a dangly mesh (the array the dangly header's word at 24 points to): 192 bytes in m41ad_c01_char20, 4,616 and 2,560 before two meshes in m36aa_01; every other structure lies where BioWare's compiler puts it. The writer drops them, so later offsets move"
+recognised = "mdl: structures in BioWare's order; *; * unreferenced bytes; 0 shared bytes; no empty array at zero that BioWare points on; no empty array pointing on that BioWare leaves at zero; 0 parent offsets wrong; 0 allocated counts unlike used; the MDX length its blocks give"
+
+[variant.mdl-animation-root-own-parent]
+format = "mdl"
+writer = "the tool behind the placeable PLC_Kiosk3 of the build's Override/ (the file carries no tool signature)"
+description = "the root node of the model's one animation has flags 0 and holds its own offset as its parent's, where BioWare's animation roots are dummies (flags 1) with parent zero; the word at 8 of that node's header holds the animation header's offset. Flags and that word are kept; the writer gives an animation's root the parent offset zero, so four bytes differ"
+recognised = "mdl: structures in BioWare's order; *; 0 unreferenced bytes; 0 shared bytes; no empty array at zero that BioWare points on; no empty array pointing on that BioWare leaves at zero; 1 parent offsets wrong; 0 allocated counts unlike used; the MDX length its blocks give"

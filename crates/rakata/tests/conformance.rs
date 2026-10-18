@@ -515,3 +515,115 @@ fn the_build_has_nothing_different_and_every_variant_is_named() {
     }
     assert_eq!(report.exit(), Exit::Ok);
 }
+
+/// A model of a root and one trimesh with a three-vertex MDX block, as
+/// its MDL and MDX.
+fn small_model(name: &str) -> (Vec<u8>, Vec<u8>) {
+    use rakata::mdl::{Body, MdxBlock, MeshFile, MeshKind, ModelFile, NodeFile, NodePointer};
+    let node = |flags: u16, number: u16, body: Body| {
+        let mut header = [0u8; 80];
+        header[..2].copy_from_slice(&flags.to_le_bytes());
+        header[2..4].copy_from_slice(&number.to_le_bytes());
+        header[4..6].copy_from_slice(&number.to_le_bytes());
+        NodeFile {
+            header,
+            body,
+            children: Vec::new(),
+            controllers: Vec::new(),
+            controller_data: Vec::new(),
+        }
+    };
+    let mut mesh = [0u8; 332];
+    mesh[252..256].copy_from_slice(&12u32.to_le_bytes());
+    mesh[256..260].copy_from_slice(&1u32.to_le_bytes());
+    mesh[264..304].fill(0xFF);
+    mesh[304..306].copy_from_slice(&3u16.to_le_bytes());
+    let floats = |v: &[f32]| -> Vec<u8> { v.iter().flat_map(|x| x.to_le_bytes()).collect() };
+    let positions = floats(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
+    let mut root = node(0x001, 0, Body::Dummy);
+    root.children.push(node(
+        0x021,
+        1,
+        Body::Mesh(Box::new(MeshFile {
+            header: mesh,
+            kind: MeshKind::Trimesh,
+            faces: Vec::new(),
+            index_counts: Vec::new(),
+            index_lists: Vec::new(),
+            index_unknown: Vec::new(),
+            positions: positions.clone(),
+            mdx: Some(MdxBlock {
+                vertices: positions,
+                terminator: floats(&[1e7, 1e7, 1e7]),
+                padding: Vec::new(),
+            }),
+        })),
+    ));
+    let mut header = [0u8; 0xC4];
+    header[8..8 + name.len()].copy_from_slice(name.as_bytes());
+    ModelFile {
+        header,
+        head_node: NodePointer::Node(0),
+        names: vec![name.as_bytes().to_vec(), b"tri".to_vec()],
+        animations: Vec::new(),
+        root,
+    }
+    .to_bytes()
+    .unwrap()
+}
+
+/// A model's MDL and MDX are scored as one pair, each half on its own
+/// bytes: beside each other in a folder, across a RIM and its `dx`
+/// partner, or, for a half alone, with the other half of its name from
+/// elsewhere in the tree. An MDX no MDL of its name reads has no reader.
+#[test]
+fn a_model_pairs_its_mdl_and_mdx_wherever_the_tree_holds_them() {
+    let root = tree("mdl-pairs");
+    let (a_mdl, a_mdx) = small_model("a");
+    put(&root, "Override/a.mdl", &a_mdl);
+    put(&root, "Override/a.mdx", &a_mdx);
+    let (b_mdl, b_mdx) = small_model("b");
+    let mut rim = Rim::new();
+    rim.add(ResId::parse("b.mdl").unwrap(), b_mdl).unwrap();
+    put(&root, "rims/r.rim", &rim.to_bytes().unwrap());
+    let mut dx = Rim::new();
+    dx.add(ResId::parse("b.mdx").unwrap(), b_mdx.clone())
+        .unwrap();
+    put(&root, "rims/rdx.rim", &dx.to_bytes().unwrap());
+    // An MDX whose MDL is in the RIM, and one whose MDL is nowhere.
+    put(&root, "Override/b.mdx", &b_mdx);
+    put(&root, "Override/c.mdx", &a_mdx);
+    // A pair whose MDX is cut short: both halves fail to read.
+    let (e_mdl, e_mdx) = small_model("e");
+    put(&root, "Override/e.mdl", &e_mdl);
+    put(&root, "Override/e.mdx", &e_mdx[..10]);
+
+    let registry = Registry::builtin().only(&["mdl".to_string()]).unwrap();
+    let report = run(&root, &registry, &Known::default(), 2).unwrap();
+    let m = by_name(&report, "mdl");
+    assert_eq!(m.counts.files, 7, "{:?}", m.entries);
+    assert_eq!(m.counts.identical, 5, "{:?}", m.entries);
+    assert_eq!(m.counts.failed, 2, "{:?}", m.entries);
+    assert_eq!(m.entries["Override/e.mdx"].code.as_deref(), Some("RE2403"));
+    assert_eq!(report.no_reader.by_extension.get("mdx"), Some(&1));
+}
+
+/// The vanilla install: every model's MDL and MDX identical.
+#[test]
+fn every_vanilla_model_is_identical() {
+    let Some(root) = game_tree("RAKATA_GAME_K1") else {
+        return;
+    };
+    let registry = Registry::builtin().only(&["mdl".to_string()]).unwrap();
+    let report = run(&root, &registry, &repository_known(), 4).unwrap();
+    let m = by_name(&report, "mdl");
+    println!(
+        "{} MDLs and MDXs, {} identical; {:?} MDXs without a reader",
+        m.counts.files,
+        m.counts.identical,
+        report.no_reader.by_extension.get("mdx")
+    );
+    assert_eq!(m.counts.files, 6157, "{:?}", m.entries);
+    assert_eq!(m.counts.identical, 6157, "{:?}", m.entries);
+    assert_eq!(report.exit(), Exit::Ok);
+}
