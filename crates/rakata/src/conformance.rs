@@ -259,6 +259,7 @@ impl Registry {
         let mut r = Self::empty();
         r.register(Box::new(crate::formats::Archive));
         r.register(Box::new(crate::formats::Tlk));
+        r.register(Box::new(crate::formats::Lip));
         r
     }
 

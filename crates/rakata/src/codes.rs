@@ -8,7 +8,8 @@
 //! (`rakata-res`), `RE02xx` archives (`rakata-archive`), `RE03xx` and
 //! `RW03xx` the installer's change files (`rakata-patch`), `RE04xx` the
 //! install (`rakata-game`), `RE05xx` the round-trip suite
-//! ([`crate::conformance`]), `RE08xx` the talk table (`rakata-tlk`). Each
+//! ([`crate::conformance`]), `RE08xx` the talk table (`rakata-tlk`),
+//! `RE09xx` lip-sync files (`rakata-lip`). Each
 //! format crate takes a range of its own as it lands.
 
 pub use nwscript_diag::codes::Code;
@@ -48,6 +49,11 @@ nwscript_diag::codes! {
     RE0803 Error "a talk table string holding a character Windows-1252 cannot encode";
     RE0804 Error "a talk table entry with text but without the text-present flag";
     RE0805 Error "a talk table too large for its 32-bit fields";
+    RE0901 Error "not a LIP V1.0 file";
+    RE0902 Error "a lip-sync file truncated before its header or keyframes end";
+    RE0903 Error "a lip-sync keyframe with a shape above 15";
+    RE0904 Error "bytes after the last keyframe of a lip-sync file";
+    RE0905 Error "more keyframes than a lip-sync file's 32-bit count holds";
 }
 
 /// The rakata code with this id, if registered; case does not matter.

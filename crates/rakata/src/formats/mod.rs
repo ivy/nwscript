@@ -3,7 +3,9 @@
 //! to [`crate::conformance::Format`].
 
 mod archive;
+mod lip;
 mod tlk;
 
 pub use archive::Archive;
+pub use lip::Lip;
 pub use tlk::Tlk;

@@ -327,7 +327,16 @@ fn archives_built_in_memory_are_identical_and_their_members_listed() {
         "TexturePacks/swpc_tex_gui.erf",
         &Erf::new(ErfKind::Erf).to_bytes().unwrap(),
     );
-    put(&root, "streamwaves/m03af/a.lip", b"LIP V1.0");
+    put(
+        &root,
+        "streamwaves/m03af/a.lip",
+        &[
+            b"LIP V1.0".as_slice(),
+            &0.0f32.to_le_bytes(),
+            &0u32.to_le_bytes(),
+        ]
+        .concat(),
+    );
     put(
         &root,
         "dialog.tlk",
@@ -341,7 +350,13 @@ fn archives_built_in_memory_are_identical_and_their_members_listed() {
         "seven files and the RIM inside the .mod"
     );
     assert_eq!(report.no_reader.by_extension["utc"], 2);
-    assert_eq!(report.no_reader.by_extension["lip"], 1);
+    let l = by_name(&report, "lip");
+    assert_eq!(
+        (l.counts.files, l.counts.identical),
+        (1, 1),
+        "{:?}",
+        l.entries
+    );
     assert_eq!(by_name(&report, "tlk").counts.identical, 1);
     assert_eq!(report.exit(), Exit::Ok);
     let md = report.markdown_table();

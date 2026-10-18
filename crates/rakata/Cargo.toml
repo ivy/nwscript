@@ -12,6 +12,7 @@ build = "build.rs"
 nwscript-diag = { workspace = true }
 rakata-archive = { workspace = true }
 rakata-game = { workspace = true }
+rakata-lip = { workspace = true }
 rakata-res = { workspace = true }
 rakata-patch = { workspace = true }
 rakata-tlk = { workspace = true }

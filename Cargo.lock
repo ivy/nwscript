@@ -1047,6 +1047,7 @@ dependencies = [
  "nwscript-diag",
  "rakata-archive",
  "rakata-game",
+ "rakata-lip",
  "rakata-patch",
  "rakata-res",
  "rakata-tlk",
@@ -1086,6 +1087,13 @@ dependencies = [
  "nwscript",
  "rakata-archive",
  "rakata-res",
+]
+
+[[package]]
+name = "rakata-lip"
+version = "0.0.0"
+dependencies = [
+ "rakata-archive",
 ]
 
 [[package]]

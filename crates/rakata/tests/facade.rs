@@ -80,6 +80,12 @@ fn every_code_a_data_crate_reports_is_registered() {
         rakata::patch::codes::UNKNOWN_KEY,
         rakata::patch::codes::DUPLICATE,
         rakata::patch::codes::TOKEN_UNSET,
+        rakata_lip::codes::IO,
+        rakata_lip::codes::NOT_A_LIP,
+        rakata_lip::codes::TRUNCATED,
+        rakata_lip::codes::BAD_SHAPE,
+        rakata_lip::codes::TRAILING_BYTES,
+        rakata_lip::codes::TOO_MANY_KEYS,
     ] {
         assert!(codes::lookup(id).is_some(), "{id} is not registered");
     }
