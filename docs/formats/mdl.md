@@ -2,7 +2,7 @@
 
 A KotOR model is two resources of the same resref: the MDL (resource type 2002), which holds the model's header, its tree of nodes and everything about them but the per-vertex data of its meshes, and the MDX (resource type 3008), which holds that per-vertex data, one interleaved block per mesh. KotOR 1 ships 3,072 binary models: 2,445 in `data/models.bif`, 305 in `items.bif`, 63 in `player.bif`, 19 in `party.bif`, 168 in `rims/global.rim`, 40 in `miniglobal.rim`, 30 in `chargen.rim`, one in `mainmenu.rim` and one in `patch.erf`. A RIM's MDX lives in its `dx` partner (`globaldx.rim` beside `global.rim`); a BIF or ERF holds both. Every MDL has its MDX. No module capsule holds a model.
 
-This document covers what a renderer needs for static geometry: the headers, the node tree, and the trimesh part of every mesh node. Skin weights, dangly constraints, AABB trees, emitters, lights, saber blades and animations are located but not decoded.
+This document covers what a renderer needs to draw and animate a model: the headers, the node tree, the trimesh part of every mesh node, controllers and their keys, skin nodes, animations, and supermodels. Dangly constraints, AABB trees, emitters, lights and saber blades are located but not decoded beyond their controllers.
 
 All integers are little-endian; floats are IEEE 754 single precision. Coordinates are metres, Z up.
 
@@ -82,7 +82,7 @@ The tree is reached from the root offset at 0x28: each node lists its children's
 | 0x38 | 12 | Array of controllers, 16 bytes each. |
 | 0x44 | 12 | Array of controller data, floats. |
 
-The position and orientation repeat the node's position (type 8) and orientation (type 20) controllers: in all 114,874 nodes with each, the position controller's value equals the header's, and the orientation controller's `x, y, z, w` equals the header's `w, x, y, z` reordered (in 129 the negation, the same rotation). The 3,057 nodes with neither, roots mostly, have position zero and the identity orientation. A controller is a u32 type, a u16 that is 0xFFFF in all 838,334, a u16 row count, a u16 index of its first time key and a u16 index of its first value (both counted in floats of the data array, not bytes), a u8 column count and three bytes of padding.
+The position and orientation repeat the node's position (type 8) and orientation (type 20) controllers: in all 114,874 nodes with each, the position controller's value equals the header's, and the orientation controller's `x, y, z, w` equals the header's `w, x, y, z` reordered (in 129 the negation, the same rotation, to within 0.00001). The 3,057 nodes with neither, roots mostly, have position zero and the identity orientation. Controllers are described under [Controllers](#controllers).
 
 ### Flags
 
@@ -162,6 +162,29 @@ A face is 32 bytes: the plane normal (three floats; a unit vector in all but 816
 
 The u16 list the index-offset array points to holds three times the face count indices, and in all 78,338 meshes that have one it is the faces' vertex indices in face order. It lies in the model data (the torlack document places NWN's in the raw data). The 83 meshes without the arrays are the 68 saber nodes and 15 trimeshes with no vertices.
 
+## Skin header
+
+A skin node's mesh header is followed by a 100-byte skin header. That length is confirmed by the bone map, which begins exactly 100 bytes after the mesh header ends in every one of the 1,033 skin nodes. Offsets below are from the start of the skin header.
+
+| Offset | Size | Content |
+| --- | --- | --- |
+| 0 | 12 | An array, empty in every skin. |
+| 12 | 4 | Offset within each MDX vertex of the four bone weights: 32 in 957 skins (stride 64), 68 in 76 (stride 100). |
+| 16 | 4 | Offset within each MDX vertex of the four bone indices: the weights' offset plus 16. |
+| 20 | 4 | Offset of the bone map. |
+| 24 | 4 | Its count: the model's name count in all skins but one. |
+| 28 | 12 | Array of qbones: one quaternion `w, x, y, z` per bone map entry. |
+| 40 | 12 | Array of tbones: three floats per bone map entry. |
+| 52 | 12 | Array of one u32 per bone map entry; values like memory addresses, not zero in any skin; not established. |
+| 64 | 34 | Seventeen u16s: the node numbers of the skin's bones by local index, as far as the skin has bones; after them, bytes of no evident meaning. |
+| 98 | 2 | Not established. |
+
+The bone map holds one float per node number: the node's local bone index, or -1 when the node is no bone of this skin. In every skin the indices that occur are 0 to one less than the bone count, each once, and the u16s at 64 are the node numbers in local-index order (as many as the skin has bones, up to 17). Skins have 1 to 17 bones: 205 have 16, 247 have 14, 22 have the most.
+
+A vertex's four bone indices are floats in the MDX, each a local bone index or -1 for an empty slot; its four weights sum to one in every vertex of every skin, and every index that is not -1 names a bone of the bone map.
+
+The qbone and tbone of a bone are the bind transform: the rotation and then the translation that take the skin node's coordinates to the bone's at the rest pose the geometry stores. With `(Qb, Tb)` the bone's transform to the model's coordinates and `(Qs, Ts)` the skin node's, the qbone is `Qb⁻¹·Qs` and the tbone `Qb⁻¹(Ts − Tb)`, to 0.001, in 11,848 of the 11,955 bones of all skins. The other 107: the 75 of `mainmenu_model`, whose rest pose is posed away from its bind; and eight bones in each of `pfbcl`, `pfbcm` and `pfbcs` (the mesh `LArm`) and `p_bastilabb` (the mesh `torso`), five of each eight holding the transform that fits another bone of the same mesh.
+
 ## MDX
 
 A mesh's MDX block is `vertex count × stride` bytes at the offset at 324, one vertex after another, each vertex the attributes the flags name at the offsets the header gives. After each block comes one more vertex's worth of bytes whose first float is 10,000,000 (1,000,000 after each of the 1,033 skin meshes' blocks), a terminator. The positions in the block equal the positions at offset 328 of the mesh header in all 78,338 meshes with a block.
@@ -189,11 +212,75 @@ The bits and the offsets agree in every mesh: an offset is -1 exactly when its b
 | 0xA7 | 76 | position 0, normal 12, UV1 24, UV2 32, tangent space 40 | 4,529 |
 | 0 | 0 or -1 | none: the 68 saber nodes (stride 0), whose positions are only those at offset 328, with further arrays in the saber header, and 15 meshes with no vertices (stride -1) | 83 |
 
-Every skin mesh's stride exceeds its attributes by 32 bytes; where in the skin header those 32 bytes are described is not covered here.
+Every skin mesh's stride exceeds its attributes by 32 bytes: the four weights and then the four bone indices, at the offsets the skin header gives (above).
+
+## Controllers
+
+A node's controllers are two arrays of the node header: at 0x38 the controller records, 16 bytes each, and at 0x44 the controller data, floats. A controller record:
+
+| Offset | Size | Content |
+| --- | --- | --- |
+| 0 | 4 | Type (below). |
+| 4 | 2 | 0xFFFF in all 838,334 controllers of the models' geometry; in an animation, 16 on every position controller and 28 on every orientation controller (the offsets of those fields in the node header), 0xFFFF on the rest. |
+| 6 | 2 | Row count: the number of keys. |
+| 8 | 2 | Index of the first time key, counted in floats of the data array. |
+| 10 | 2 | Index of the first value, counted in floats of the data array. |
+| 12 | 1 | Column count: the floats of one value, with 0x10 set when the controller is bezier keyed. |
+| 13 | 3 | Padding; not zero in most. |
+
+The time keys are `rows` consecutive floats; the values follow them directly in every controller of every model. A row of values holds as many floats as the columns say, except in two cases: a bezier-keyed controller (columns with 0x10) holds three values' worth per row, the value and then two control values (taken as the value because it is the triple that equals the node's rest position most often and moves least from row to row), and an orientation controller with two columns holds one 32-bit word per row, a compressed quaternion (below). In a model's geometry every controller has one row at time zero; no key of any animation lies past its animation's length.
+
+The types are those the torlack document lists for NWN, meaning by the kind of node that carries them (88 is a light's radius and an emitter's birth rate). By where they occur, with counts across all models:
+
+| Type | Columns | Geometry | Animations | What |
+| --- | --- | --- | --- | --- |
+| 8 | 3 | 114,874 | 95,343 | position |
+| 8 | 19 | | 1,441 | position, bezier |
+| 20 | 4 | 114,874 | 101,755 | orientation, `x, y, z, w` |
+| 20 | 2 | | 104,083 | orientation, compressed |
+| 36 | 1 | 75,056 | 751 | scale |
+| 100 | 3 | 74,969 | 459 | a mesh's self-illumination colour |
+| 100 | 19 | | 51 | the same, bezier |
+| 132 | 1 | 84,410 | 1,395 | on meshes; on emitters one of their own |
+| others | 1, 3 or 19 | on lights and emitters | 7,652 in all | lights' and emitters' own |
+
+### Compressed orientation
+
+An orientation controller of two columns stores each key's rotation in one u32: `x` in bits 0 to 10, `y` in bits 11 to 21, `z` in bits 22 to 31, each read as `field / max × 2 − 1` with `max` 2047 for the 11-bit fields and 1023 for `z`; `w` is not stored, and is the non-negative `√(1 − x² − y² − z²)`. There are 581,376 such keys in 104,083 controllers, all in animations.
+
+The files establish it four ways:
+
+- The partition. Taking three fields of 8 to 13 bits from the low bits of every key of 3,000 controllers chosen at random, and reading them as above, the widths 11, 11, 10 put `x² + y² + z²` within the unit sphere for 99.7% of keys and give the smallest steps between consecutive keys; the next best partition (12, 10, 10) puts 91.6% within it, with steps nearly eight times as large.
+- Uncompressed copies. Where another model holds an animation of the same name with a node of the same name, the same key times and four-column keys, the decoded compressed keys agree with the stored `x, y, z, w` (or their negation, as `w` is never negative when decoded): in the 2,980 such controllers that agree to 0.01 (17,758 keys), the median difference is 0.00049 in `x` and `y` and 0.00098 in `z`, one step of each field's scale.
+- The scale. Against those copies the stored field is `⌊(v + 1) / 2 × max⌋` for nearly all components, the difference between the exact and the stored field falling between 0 and 1.25; with `max` taken as 2048 and 1024 instead it spreads from 0 to 2.25.
+- The rest pose. The first key of 38,923 of the 104,068 compressed controllers whose node the model has agrees to 0.003 with that node's rest orientation, as an animation that begins at rest would.
+
+Decoded, 3,573 keys have `x² + y² + z²` slightly over one (at most 1.0024), within a step of the fields; `w` is zero for them.
 
 ## Animations
 
-Each animation header begins with the same 80-byte geometry part as the model's: the two u32s 0x004134F0 and 0x0043ECE0, the animation's name at 0x08 (32 bytes), the root node offset, the node count, and 5 at 0x4C; 7,143 in all. Their contents are not covered here.
+The model header's array at 0x58 points to the animation headers: 7,143 animations in 1,209 models. An animation header is 0x88 bytes:
+
+| Offset | Size | Content |
+| --- | --- | --- |
+| 0x00 | 8 | Two u32s, 0x004134F0 and 0x0043ECE0. |
+| 0x08 | 32 | The animation's name. |
+| 0x28 | 4 | Offset of the animation's root node. |
+| 0x2C | 4 | A node count; not the number of nodes the animation's tree reaches in most. |
+| 0x30 | 28 | Zero, but for 5 at 0x4C and the three bytes after it (uninitialised, as in the model header). |
+| 0x50 | 4 | Length in seconds. |
+| 0x54 | 4 | Transition time in seconds. |
+| 0x58 | 32 | The animation root's name: the model's own name in 7,077 of the 7,143. |
+| 0x78 | 12 | Array of events, 36 bytes each: a float time, then a 32-byte name. |
+| 0x84 | 4 | Zero. |
+
+An animation's nodes are a tree like the geometry's, reached from its root, with the same 80-byte node header; every one of the 232,309 is a dummy (flags 0x001) whose number indexes the model's own name array, and whose controllers hold the keys. The animation's root node is named as the model in all 7,143; 146 nodes name no node of their own model's geometry. There are 3,884 events of 21 names, `snd_footstep` (1,228) and `detonate` (1,050) the most.
+
+An animation's position keys do not read as the node's position: of the 92,996 position controllers in animations whose node rests away from the origin (by more than 0.01 on an axis), the first key lies nearer the origin than the rest position in 90,351, as offsets from the rest position would. Its orientation keys do read as the orientation itself (above).
+
+## Supermodels
+
+A model names its supermodel at 0x88 of the model header; 413 do. The chains, followed through the install's resolution of each name, pass up to seven supermodels (`s_female02` names `S_Female01`, which names `S_Male02`, which names `S_Male01`, which names none). Three models name a supermodel the game does not ship: `h_m_hi01` (`CSpar2`), `n_djedi_h` and `p_carthbbh` (both `S_Male02H`). A supermodel holds animations its descendants play: `s_male02` holds 166, `walk` among them, and a body such as `pmbam`, whose chain is `S_Female02`, `S_Female01`, `S_Male02`, `S_Male01`, has none of its own. An animation's nodes act on the playing model's nodes of the same names; a body model lacks the head's bones, which its head model has.
 
 ## In the Endar Spire
 
@@ -210,10 +297,13 @@ The xoreos-docs `kotor_mdl.html` gives the headers' shape; the files say more, a
 - The model header's first byte is the classification, and the KotOR values 16 and 32 are not in the torlack NWN list. The bounding box there is the default in all but one model.
 - The "names array header" field the document calls the root node's location is a different node in the head models.
 - Neither document describes the MDX: the per-mesh blocks, the flags word's bits, or the terminator rows.
+- Neither describes compressed orientation keys (two columns, one word per key).
+- The controller's u16 at 4 is not always unknown: in animations it is the node header offset of the field the controller drives.
+- In the skin header, the words at 12 and 16 are the MDX offsets of the weights and bone indices; the bone map's count follows its offset directly (no allocated count); the arrays at 28 and 40 are the qbones and tbones; the node list at 64 is seventeen u16s, not fifteen; and the bone map's entries are floats, local bone indices by node number, as the example in `kotor_mdl.html` has it.
 
 ## What could not be established
 
-The meaning of the model header's byte 0x51, the mesh header's arrays at 200 and fields at 212 to 248 and 314 to 320, and the classification value 64; whether byte 0x53 is the fog flag. Each needs the engine's behaviour, not the files alone.
+The meaning of the model header's byte 0x51, the mesh header's arrays at 200 and fields at 212 to 248 and 314 to 320, and the classification value 64; whether byte 0x53 is the fog flag; the skin header's array at 52 and bytes 98 to 100; which of a bezier key's two control values is which; whether the engine adds an animation's position keys to the rest position or puts them in its place, and whether it uses the stored qbones and tbones or the rest pose's (the files differ in the five models above). Each needs the engine's behaviour, not the files alone.
 
 ## Provenance
 
@@ -221,7 +311,7 @@ Public documents read: xoreos-docs `specs/kotor_mdl.html` (KotOR's binary MDL), 
 
 Reference projects read: none.
 
-Measured: on 2026-10-18, every count above comes from the vanilla KotOR 1 install under `$RAKATA_GAME_K1`, first with short Python scripts reading the headers, nodes, mesh headers, faces, index lists, controllers and MDX blocks of every model the KEY's BIFs, `rims/`, `modules/` and `patch.erf` hold, then with `crates/rakata-mdl/tests/vanilla.rs`, which parses every one of them, prints the node kinds, classifications, MDX layouts and flag counts, and reads every model `end_m01aa` uses (`RAKATA_GAME_K1=… cargo test -p rakata-mdl --test vanilla -- --nocapture`).
+Measured: on 2026-10-18, every count above comes from the vanilla KotOR 1 install under `$RAKATA_GAME_K1`, first with short Python scripts reading the headers, nodes, mesh headers, faces, index lists, controllers, skin headers, animation headers and MDX blocks of every model the KEY's BIFs, `rims/`, `modules/` and `patch.erf` hold, then with `crates/rakata-mdl/tests/vanilla.rs`, which parses every one of them, prints the node kinds, classifications, MDX layouts, flag counts, controllers by type, compressed keys, skins and their bind transforms, resolves every supermodel chain, and reads every model `end_m01aa` uses (`RAKATA_GAME_K1=… cargo test -p rakata-mdl --test vanilla -- --nocapture`). The compressed orientation's partition, its agreement with uncompressed copies and its scale were measured by the Python scripts over the 2,832 models of distinct names (one copy of each name the BIFs and RIMs hold).
 
 Date: 2026-10-18.
 
