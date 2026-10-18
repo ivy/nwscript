@@ -6,10 +6,10 @@
 //!
 //! Ranges: `RE00xx` inputs and invocation, `RE01xx` resource identity
 //! (`rakata-res`), `RE02xx` archives (`rakata-archive`), `RE03xx` and
-//! `RW03xx` the installer's change files (`rakata-patch`). Each format crate
-//! takes a range of its own as it lands.
-//! (`rakata-res`), `RE02xx` and `RW02xx` the installer's change files
-//! (`rakata-patch`). Each format crate takes a range of its own as it lands.
+//! `RW03xx` the installer's change files (`rakata-patch`), `RE04xx` the
+//! install (`rakata-game`), `RE05xx` the round-trip suite
+//! ([`crate::conformance`]). Each format crate takes a range of its own as
+//! it lands.
 
 pub use nwscript_diag::codes::Code;
 
@@ -36,6 +36,8 @@ nwscript_diag::codes! {
     RW0302 Warning "a key the section does not take";
     RW0303 Warning "a section or key written twice";
     RW0304 Warning "a memory token read before anything sets it";
+    RE0501 Error "a directory that is not a game install";
+    RE0502 Error "a round trip wrote bytes the format's own reader rejects";
 }
 
 /// The rakata code with this id, if registered; case does not matter.

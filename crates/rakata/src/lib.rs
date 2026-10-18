@@ -1,5 +1,6 @@
 //! The façade of the data toolset: one API over the `rakata-*` crates, the
-//! diagnostic codes they report under, and the build identity the `rakata`
+//! diagnostic codes they report under, the round-trip suite every format
+//! registers with ([`conformance`]), and the build identity the `rakata`
 //! binary and the Python module print.
 //!
 //! The agent surface, the JSON [`Envelope`] and the [`Exit`] codes, is the
@@ -8,6 +9,8 @@
 
 pub mod codes;
 pub mod patch;
+pub mod conformance;
+pub mod formats;
 
 pub use nwscript_diag as diag;
 pub use nwscript_diag::{Exit, InputRecord, OutputRecord};

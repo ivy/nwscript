@@ -1,0 +1,14 @@
+# Layouts other writers choose, named for the files `rakata conformance`
+# classifies as equal after re-read: the bytes differ from what the writer
+# emits (BioWare's layout), and the data read back is the same. Each
+# variant names its format and writer, says how its layout differs, and is
+# recognised by a glob over the layout line the format reports for the file
+# (`recognised`), or by globs over paths within the tree (`files`) where the
+# layout line alone cannot tell. No game bytes: the description cites the
+# header words a reader can check against any such file.
+
+[variant.erf-unset-string-offset]
+format = "archive"
+writer = "the installer modshop's build runs over its mods (HoloPatcher); measured over the .mod files of that build, which hold every module a mod rewrote"
+description = "the ERF header's offset to the localized string list (0x14) is 0 where BioWare writes 160 (the header's length, the list being empty), the build year and day (0x20, 0x24) are 0 where BioWare writes 103 and the day, and the description strref (0x28) is 0xFFFFFFFF where BioWare's files carry uninitialised memory; keys, resources and members are laid out as BioWare lays them"
+recognised = "erf: strings at 0, keys at 160, resources at *, build 0/0, strref 0xffffffff"
