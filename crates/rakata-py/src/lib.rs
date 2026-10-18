@@ -22,7 +22,11 @@ mod author;
 mod dialog;
 mod formats;
 mod game;
+mod layout;
+mod model;
+mod texture;
 mod value;
+mod walkmesh;
 
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
@@ -81,6 +85,10 @@ fn rakata_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("RakataError", py.get_type::<RakataError>())?;
     game::register(m)?;
     formats::register(m)?;
+    texture::register(m)?;
+    layout::register(m)?;
+    walkmesh::register(m)?;
+    model::register(m)?;
     dialog::register(m)?;
     let nws = submodule(m, "rakata.nwscript", "nwscript")?;
     nwscript_py::register(&nws)?;

@@ -1,10 +1,11 @@
 //! `rakata::game`: the install and which copy of a resource it loads.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 use rakata::game::{
     Candidate, Install, Location, ModuleName, Profile, Resolution, TexturePack, Verdict,
 };
@@ -36,6 +37,35 @@ pub(crate) fn res_id(name: &str, ext: Option<&str>) -> PyResult<ResId> {
         None => name.to_string(),
     };
     ResId::parse(&text).map_err(fail)
+}
+
+/// The bytes of the copy of `name` the install loads, in `module`'s
+/// capsules too when it names one; `ext` is the extension `name` takes when
+/// it has none of its own. Raises `RE0404` when no layer holds it.
+pub(crate) fn load(
+    install: &Install,
+    name: &str,
+    ext: Option<&str>,
+    module: Option<&str>,
+) -> PyResult<Vec<u8>> {
+    let id = match ext {
+        Some(e) if !name.contains('.') => res_id(name, Some(e))?,
+        _ => res_id(name, None)?,
+    };
+    let module = module.map(ModuleName::new);
+    match install.read(id, module.as_ref()).map_err(fail)? {
+        Some((_, bytes)) => Ok(bytes),
+        None => Err(fail(rakata::game::Error::NotFound {
+            id,
+            module: module.as_ref().map(ToString::to_string),
+        })),
+    }
+}
+
+/// A file's bytes; one that cannot be read raises `RE0001`.
+pub(crate) fn read_file(path: &Path) -> PyResult<Vec<u8>> {
+    std::fs::read(path)
+        .map_err(|e| crate::raise("RE0001", format!("cannot read `{}`: {e}", path.display())))
 }
 
 /// A game install: the folder holding `chitin.key`, opened once.
@@ -108,6 +138,22 @@ impl PyInstall {
             return Err(fail(e));
         }
         Ok(PyResolution::from(&r))
+    }
+
+    /// The bytes of the copy the engine loads: `read("m01aa", "lyt")` or
+    /// `read("m01aa.lyt")`, in a module's capsules too when `module` names
+    /// one. Raises `RE0404` when no layer holds it.
+    #[pyo3(signature = (name, ext = None, module = None))]
+    fn read<'py>(
+        &self,
+        py: Python<'py>,
+        name: &str,
+        ext: Option<&str>,
+        module: Option<&str>,
+    ) -> PyResult<Bound<'py, PyBytes>> {
+        let id = res_id(name, ext)?;
+        let b = load(&self.inner, &id.to_string(), None, module)?;
+        Ok(PyBytes::new(py, &b))
     }
 
     fn __repr__(&self) -> String {

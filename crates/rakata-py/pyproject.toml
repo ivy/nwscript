@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "rakata"
-description = "The data of BioWare's Aurora games (KotOR 1 and 2) from Rust: the install, GFF, 2DA, TLK, LIP, dialogues, authoring, and rakata.nwscript"
+description = "The data of BioWare's Aurora games (KotOR 1 and 2) from Rust: the install, GFF, 2DA, TLK, LIP, textures, layouts, walkmeshes, models, dialogues, authoring, and rakata.nwscript"
 requires-python = ">=3.10"
 license = "ISC"
 dynamic = ["version"]

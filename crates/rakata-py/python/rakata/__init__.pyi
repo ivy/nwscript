@@ -1,5 +1,6 @@
 """The data of BioWare's Aurora games (KotOR 1 and 2), from Rust: the install, GFF, 2DA, TLK, LIP,
-dialogues, the authoring API (`rakata.author`) and the scripts toolchain (`rakata.nwscript`).
+textures (TPC, TXI, TGA), layouts (LYT, VIS), walkmeshes, models (MDL and MDX), dialogues, the
+authoring API (`rakata.author`) and the scripts toolchain (`rakata.nwscript`).
 
 Every refusal raises `RakataError` with the registered code the `rakata` binary prints."""
 
@@ -54,6 +55,8 @@ class Install:
     def which(self, name: str, ext: str | None = None, module: str | None = None) -> Resolution:
         """`which("globalcat", "2da")` or `which("globalcat.2da")`; raises RE0404 when no layer
         holds it."""
+    def read(self, name: str, ext: str | None = None, module: str | None = None) -> bytes:
+        """The bytes of the copy the engine loads; RE0404 when no layer holds it."""
 
 class Candidate:
     """One copy of a resource the install holds."""
@@ -160,6 +163,467 @@ class Lip:
     def keys(self) -> list[tuple[float, str]]: ...
     def to_bytes(self) -> bytes: ...
     def write(self, path: StrPath) -> None: ...
+
+Vec3: TypeAlias = tuple[float, float, float]
+Quat: TypeAlias = tuple[float, float, float, float]
+"""A rotation as `(w, x, y, z)`."""
+Box: TypeAlias = tuple[Vec3, Vec3]
+"""A bounding box as `(min, max)`."""
+
+class Txi:
+    """A texture's instructions, from a `.txi` or a TPC: keywords, their values and the numeric
+    rows after them, in file order."""
+
+    @staticmethod
+    def parse(data: bytes) -> Txi:
+        """Never fails: bytes are read as Latin-1."""
+    @staticmethod
+    def read(path: StrPath) -> Txi: ...
+    @staticmethod
+    def load(install: Install, name: str, module: str | None = None) -> Txi:
+        """The `.txi` the install loads by `name`; RE0404 when no layer holds it."""
+    @staticmethod
+    def new() -> Txi: ...
+    @property
+    def preamble(self) -> list[str]: ...
+    @property
+    def entries(self) -> list[tuple[str, str, list[str]]]:
+        """`(keyword, value, rows)`, in file order."""
+    def get(self, key: str) -> str | None:
+        """The first value of `key`, in any case."""
+    def int(self, key: str) -> int | None: ...
+    def set(self, key: str, value: str) -> str | None:
+        """Set the first instruction with `key`, or append one; returns the value it had."""
+    def to_bytes(self) -> bytes:
+        """RE2208 for text that would not read back as itself."""
+    def __len__(self) -> int: ...
+
+class TpcLevel:
+    """One mip level of a TPC image."""
+
+    @property
+    def width(self) -> int: ...
+    @property
+    def height(self) -> int: ...
+    @property
+    def offset(self) -> int:
+        """Where the level begins in the TPC's bytes."""
+    @property
+    def data(self) -> bytes:
+        """The level as stored: DXT1 or DXT5 blocks, or grey, RGB or RGBA pixels."""
+
+class Tpc:
+    """A TPC texture: the header, its images and their mip levels with the pixel format kept as
+    stored, and its TXI."""
+
+    @staticmethod
+    def parse(data: bytes) -> Tpc:
+        """RE2201, RE2202, RE2203."""
+    @staticmethod
+    def read(path: StrPath) -> Tpc: ...
+    @staticmethod
+    def load(install: Install, name: str, module: str | None = None) -> Tpc:
+        """The `.tpc` the install loads by `name`, through its texture pack; RE0404."""
+    @property
+    def width(self) -> int: ...
+    @property
+    def height(self) -> int:
+        """For a cube map, six faces' worth."""
+    @property
+    def format(self) -> Literal["grey", "rgb", "rgba", "dxt1", "dxt5"]: ...
+    @property
+    def mip_count(self) -> int:
+        """The header's count; an animation sheet says 1."""
+    @property
+    def data_size(self) -> int: ...
+    @property
+    def alpha_mean(self) -> float: ...
+    @property
+    def layout(self) -> Literal["single", "cube", "flipbook"]: ...
+    @property
+    def frames(self) -> tuple[int, int] | None:
+        """A flipbook's `(numx, numy)`."""
+    @property
+    def has_alpha(self) -> bool: ...
+    @property
+    def image_size(self) -> tuple[int, int]: ...
+    @property
+    def level_count(self) -> int: ...
+    @property
+    def images(self) -> list[list[TpcLevel]]:
+        """One image, six cube faces or the frames in row order, each its levels largest first."""
+    @property
+    def pixels(self) -> bytes: ...
+    @property
+    def txi(self) -> Txi | None:
+        """A copy; setting it replaces the TXI `to_bytes` writes."""
+    @txi.setter
+    def txi(self, value: Txi | None) -> None: ...
+    def to_bytes(self) -> bytes:
+        """RE2207, RE2208."""
+
+class Tga:
+    """A TARGA image decoded to RGBA8, rows top first."""
+
+    @staticmethod
+    def parse(data: bytes) -> Tga:
+        """RE2204, RE2205, RE2206."""
+    @staticmethod
+    def read(path: StrPath) -> Tga: ...
+    @staticmethod
+    def load(install: Install, name: str, module: str | None = None) -> Tga: ...
+    @property
+    def width(self) -> int: ...
+    @property
+    def height(self) -> int: ...
+    @property
+    def image_type(self) -> Literal["truecolor", "grey", "truecolor_rle", "grey_rle"]: ...
+    @property
+    def bits(self) -> int: ...
+    @property
+    def alpha_bits(self) -> int: ...
+    @property
+    def origin(self) -> Literal["bottom_left", "bottom_right", "top_left", "top_right"]: ...
+    @property
+    def rgba(self) -> bytes:
+        """Four bytes a pixel, rows top first; setting it takes `width * height * 4` bytes
+        (`ValueError` otherwise)."""
+    @rgba.setter
+    def rgba(self, value: bytes) -> None: ...
+    def to_bytes(self) -> bytes:
+        """In the stored depth, order and packing; RE2209."""
+
+class Placement:
+    """A room, swoop track or obstacle of a layout."""
+
+    @property
+    def model(self) -> str: ...
+    @property
+    def position(self) -> Vec3: ...
+
+class DoorHook:
+    @property
+    def room(self) -> str: ...
+    @property
+    def name(self) -> str: ...
+    @property
+    def unknown(self) -> int: ...
+    @property
+    def position(self) -> Vec3: ...
+    @property
+    def orientation(self) -> Quat: ...
+
+class Lyt:
+    """An area's room layout."""
+
+    @staticmethod
+    def parse(data: bytes) -> Lyt:
+        """RE2301 to RE2306."""
+    @staticmethod
+    def read(path: StrPath) -> Lyt: ...
+    @staticmethod
+    def load(install: Install, name: str, module: str | None = None) -> Lyt:
+        """The `.lyt` by the area's name (`"m01aa"`); RE0404."""
+    @property
+    def file_dependency(self) -> str | None: ...
+    @property
+    def rooms(self) -> list[Placement]: ...
+    @property
+    def tracks(self) -> list[Placement]: ...
+    @property
+    def obstacles(self) -> list[Placement]: ...
+    @property
+    def door_hooks(self) -> list[DoorHook]: ...
+    def room(self, model: str) -> Placement | None: ...
+    def semantic_eq(self, other: Lyt) -> bool: ...
+    def to_bytes(self) -> bytes:
+        """RE2307."""
+
+class Vis:
+    """An area's room visibility."""
+
+    @staticmethod
+    def parse(data: bytes) -> Vis:
+        """RE2311, RE2312."""
+    @staticmethod
+    def read(path: StrPath) -> Vis: ...
+    @staticmethod
+    def load(install: Install, name: str, module: str | None = None) -> Vis: ...
+    @property
+    def rooms(self) -> list[tuple[str, list[str]]]:
+        """`(room, visible rooms)`, in file order."""
+    def visible(self, room: str) -> list[str] | None: ...
+    def semantic_eq(self, other: Vis) -> bool: ...
+    def to_bytes(self) -> bytes: ...
+    def __len__(self) -> int: ...
+
+Edge: TypeAlias = tuple[int, int]
+"""A walkmesh edge as `(face, edge)`: edge `e` runs from the face's vertex `e` to `(e + 1) % 3`."""
+
+class WalkmeshFace:
+    @property
+    def vertices(self) -> tuple[int, int, int]: ...
+    @property
+    def material(self) -> int:
+        """The face's row of `surfacemat.2da`."""
+    @property
+    def normal(self) -> Vec3: ...
+    @property
+    def distance(self) -> float: ...
+
+class AabbNode:
+    @property
+    def min(self) -> Vec3: ...
+    @property
+    def max(self) -> Vec3: ...
+    @property
+    def face(self) -> int | None: ...
+    @property
+    def unknown(self) -> int: ...
+    @property
+    def plane(self) -> int: ...
+    @property
+    def left(self) -> int | None: ...
+    @property
+    def right(self) -> int | None: ...
+
+class Walkmesh:
+    """A room's WOK, a placeable's PWK or a door's DWK."""
+
+    @staticmethod
+    def parse(data: bytes) -> Walkmesh:
+        """RE2501 to RE2504."""
+    @staticmethod
+    def read(path: StrPath) -> Walkmesh: ...
+    @staticmethod
+    def load(install: Install, name: str, module: str | None = None) -> Walkmesh:
+        """A bare name is the room's `.wok`; name a `.pwk` or `.dwk` with its extension."""
+    @property
+    def kind(self) -> Literal["area", "object"]: ...
+    @property
+    def relative_points(self) -> tuple[Vec3, Vec3]: ...
+    @property
+    def absolute_points(self) -> tuple[Vec3, Vec3]: ...
+    @property
+    def position(self) -> Vec3: ...
+    @property
+    def unknown(self) -> int: ...
+    @property
+    def vertices(self) -> list[Vec3]: ...
+    @property
+    def vertex_bytes(self) -> bytes:
+        """Twelve bytes a vertex, three little-endian floats."""
+    @property
+    def faces(self) -> list[WalkmeshFace]: ...
+    @property
+    def adjacency(self) -> list[tuple[Edge | None, Edge | None, Edge | None]]: ...
+    @property
+    def perimeter_edges(self) -> list[tuple[Edge, int | None]]:
+        """`(edge, transition)`: the LYT room index the edge leads into, or None."""
+    @property
+    def perimeters(self) -> list[int]: ...
+    @property
+    def aabb(self) -> list[AabbNode]: ...
+    def walkable_faces(self, surfacemat: TwoDa) -> list[int]:
+        """RE2505 for a table without a `Walk` column."""
+    def set_material(self, face: int, material: int) -> int:
+        """Returns the material the face had; `IndexError` past the last face."""
+    def semantic_eq(self, other: Walkmesh) -> bool: ...
+    def to_bytes(self) -> bytes:
+        """RE2506."""
+
+class MeshFace:
+    @property
+    def normal(self) -> Vec3: ...
+    @property
+    def distance(self) -> float: ...
+    @property
+    def surface(self) -> int: ...
+    @property
+    def adjacent(self) -> tuple[int, int, int]:
+        """The faces across each edge, or -1."""
+    @property
+    def vertices(self) -> tuple[int, int, int]: ...
+
+class Mesh:
+    @property
+    def texture(self) -> str | None: ...
+    @property
+    def lightmap(self) -> str | None: ...
+    @property
+    def texture_count(self) -> int: ...
+    @property
+    def lightmapped(self) -> bool: ...
+    @property
+    def render(self) -> bool: ...
+    @property
+    def shadow(self) -> bool: ...
+    @property
+    def transparency_hint(self) -> int: ...
+    @property
+    def diffuse(self) -> Vec3: ...
+    @property
+    def ambient(self) -> Vec3: ...
+    @property
+    def bounding_box(self) -> Box: ...
+    @property
+    def radius(self) -> float: ...
+    @property
+    def average(self) -> Vec3: ...
+    @property
+    def vertex_count(self) -> int: ...
+    @property
+    def mdx_flags(self) -> int: ...
+    @property
+    def stride(self) -> int: ...
+    @property
+    def vertex_buffer(self) -> bytes:
+        """The MDX block as stored, `vertex_count * stride` bytes."""
+    @property
+    def offsets(self) -> dict[str, int]:
+        """Each attribute read from `vertex_buffer` (`position`, `normal`, `uv1`, `uv2`) and its
+        offset within the stride."""
+    @property
+    def positions(self) -> list[Vec3]: ...
+    @property
+    def normals(self) -> list[Vec3] | None: ...
+    @property
+    def uv1(self) -> list[tuple[float, float]] | None: ...
+    @property
+    def uv2(self) -> list[tuple[float, float]] | None: ...
+    @property
+    def faces(self) -> list[MeshFace]: ...
+    @property
+    def indices(self) -> list[int] | None: ...
+
+class Skin:
+    @property
+    def bones(self) -> list[int]:
+        """The bones' node numbers, by local bone index."""
+    @property
+    def weights(self) -> list[Quat]:
+        """Each vertex's four weights."""
+    @property
+    def bone_indices(self) -> list[Quat]:
+        """Each vertex's four local bone indices, -1 for none."""
+    def bone_index(self, node: int) -> int | None: ...
+    def qbone(self, node: int) -> Quat | None: ...
+    def tbone(self, node: int) -> Vec3 | None: ...
+
+class Controller:
+    @property
+    def kind(self) -> int:
+        """8 position, 20 orientation, 36 scale, ..."""
+    @property
+    def field(self) -> int: ...
+    @property
+    def columns(self) -> int: ...
+    @property
+    def is_bezier(self) -> bool: ...
+    @property
+    def is_compressed(self) -> bool: ...
+    @property
+    def keys(self) -> list[tuple[float, list[float]]]:
+        """`(time, values)`: an orientation as `(w, x, y, z)`, compressed ones decoded; any other
+        controller's row of floats as stored."""
+
+class ModelNode:
+    @property
+    def name(self) -> str: ...
+    @property
+    def kind(
+        self,
+    ) -> Literal[
+        "dummy",
+        "light",
+        "emitter",
+        "reference",
+        "trimesh",
+        "skin",
+        "animmesh",
+        "dangly",
+        "aabb",
+        "saber",
+        "other",
+    ]: ...
+    @property
+    def flags(self) -> int: ...
+    @property
+    def number(self) -> int: ...
+    @property
+    def supernode(self) -> int: ...
+    @property
+    def parent(self) -> int | None:
+        """The parent's index in the list the node is in."""
+    @property
+    def children(self) -> list[int]: ...
+    @property
+    def position(self) -> Vec3: ...
+    @property
+    def orientation(self) -> Quat: ...
+    @property
+    def mesh(self) -> Mesh | None: ...
+    @property
+    def skin(self) -> Skin | None: ...
+    @property
+    def controllers(self) -> list[Controller]: ...
+
+class Animation:
+    @property
+    def name(self) -> str: ...
+    @property
+    def length(self) -> float: ...
+    @property
+    def transition(self) -> float: ...
+    @property
+    def root(self) -> str: ...
+    @property
+    def events(self) -> list[tuple[float, str]]: ...
+    @property
+    def nodes(self) -> list[ModelNode]: ...
+    def node(self, name: str) -> ModelNode | None: ...
+
+class Model:
+    """A binary model: its MDL's header and node tree, and its MDX's vertices."""
+
+    @staticmethod
+    def parse(mdl: bytes, mdx: bytes = b"") -> Model:
+        """RE2401 to RE2409."""
+    @staticmethod
+    def read(mdl: StrPath, mdx: StrPath | None = None) -> Model:
+        """`mdx` defaults to the `.mdx` beside `mdl`."""
+    @staticmethod
+    def load(install: Install, name: str, module: str | None = None) -> Model:
+        """The `.mdl` and `.mdx` the install loads by `name`; RE0404."""
+    @property
+    def name(self) -> str: ...
+    @property
+    def classification(
+        self,
+    ) -> Literal[
+        "other", "effect", "tile", "character", "door", "lightsaber", "placeable", "unknown"
+    ]: ...
+    @property
+    def subclassification(self) -> int: ...
+    @property
+    def fog(self) -> bool: ...
+    @property
+    def supermodel(self) -> str | None: ...
+    @property
+    def bounding_box(self) -> Box: ...
+    @property
+    def radius(self) -> float: ...
+    @property
+    def animation_scale(self) -> float: ...
+    @property
+    def nodes(self) -> list[ModelNode]:
+        """Every node of the geometry, the root first."""
+    @property
+    def animations(self) -> list[Animation]: ...
+    def node(self, name: str) -> ModelNode | None: ...
+    def animation(self, name: str) -> Animation | None: ...
+    def to_bytes(self) -> tuple[bytes, bytes]:
+        """`(mdl, mdx)`, laid out as BioWare's compiler lays them out; RE2414 to RE2416."""
 
 class NodeRef:
     """`E3` is `EntryList[3]`, `R0` `ReplyList[0]`."""
