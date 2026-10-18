@@ -14,6 +14,7 @@ pub mod corpus;
 pub mod dialog;
 pub mod diff;
 pub mod formats;
+pub mod index;
 pub mod inspect;
 pub mod patch;
 pub mod save;

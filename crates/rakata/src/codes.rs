@@ -130,6 +130,15 @@ nwscript_diag::codes! {
     RE1412 Error "a transcript or a set of mouth cues that does not read";
     RE1413 Error "a voice-over for streamwaves/ that is not a RIFF WAVE file";
     RE1414 Error "bytes written as NCS that do not decode";
+    RE1501 Error "the index database could not be read or written";
+    RE1502 Error "an index database of another schema version";
+    RE1503 Error "a tree the index database does not hold";
+    RE1504 Error "an index query SQLite rejects";
+    RE1505 Error "a changed-paths file that could not be read";
+    RW1501 Warning "a changed path the tree does not hold";
+    RW1502 Warning "a file of the tree that could not be read";
+    RW1503 Warning "a tree without nwscript.nss: calls name routines by number";
+    RW1504 Warning "files new to the tree that the changed list does not name";
 }
 
 /// The rakata code with this id, if registered; case does not matter.
