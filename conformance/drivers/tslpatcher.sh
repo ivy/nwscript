@@ -95,7 +95,13 @@ if [ -n "${ns:-}" ]; then
   xdotool key alt+s
   sleep 1
 fi
-for i in $(seq 1 40); do main=$(other_win); [ -n "$main" ] && break; sleep 0.5; done
+# a message box before the main window (a missing info.rtf is a "Warning") takes Enter
+for i in $(seq 1 40); do
+  b=$(find_win '^(Information|Warning|Error)$')
+  if [ -n "$b" ]; then echo "box before main: $(xdotool getwindowname "$b")"; shot "2-box-$i"; xdotool windowactivate --sync "$b"; xdotool key Return; sleep 0.5; continue; fi
+  main=$(other_win); [ -n "$main" ] && break
+  sleep 0.5
+done
 [ -n "${main:-}" ] || { echo "no main window"; wins; shot fail; exit 1; }
 echo "main: $(xdotool getwindowname "$main")"
 sleep 1
@@ -132,7 +138,8 @@ start=$(date +%s)
 fin=""
 while [ $(( $(date +%s) - start )) -lt "${TSLPATCH_TIMEOUT:-600}" ]; do
   fin=$(find_win '^(Information|Warning|Error)$'); [ -n "$fin" ] && break
-  d=$(wins | awk -F'\t' -v m="$main" '$1 != m && $2 !~ /Browse for Folder/ {print $1; exit}')
+  # a box that appeared after the check above is the finish box, for the next pass to find
+  d=$(wins | awk -F'\t' -v m="$main" '$1 != m && $2 !~ /Browse for Folder/ && $2 !~ /^(Information|Warning|Error)$/ {print $1; exit}')
   if [ -n "$d" ]; then echo "dialog during install: $(xdotool getwindowname "$d")"; shot "6-dialog-$(date +%s)"; xdotool windowactivate --sync "$d"; xdotool key Return; fi
   kill -0 $wpid 2>/dev/null || { echo "TSLPatcher exited early"; shot fail; exit 1; }
   sleep 0.5
@@ -150,6 +157,7 @@ kill -0 $wpid 2>/dev/null && { echo "still running after Exit; killing"; kill $w
 wineserver --wait
 ls -la /mod >/out/mod-after.txt
 [ -f /mod/installlog.rtf ] && cp /mod/installlog.rtf /out/installlog.rtf
+[ -f /mod/installlog.txt ] && cp /mod/installlog.txt /out/installlog.txt  # PlaintextLog=1
 [ -d /mod/backup ] && cp -a /mod/backup /out/backup
 exit 0
 EOF
