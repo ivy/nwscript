@@ -123,7 +123,7 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
     let top = rakata().arg("--help").output().unwrap();
     let text = String::from_utf8_lossy(&top.stdout);
     assert!(text.contains("Examples:"));
-    let commands: Vec<&str> = text
+    let mut commands: Vec<&str> = text
         .lines()
         .skip_while(|l| !l.starts_with("Commands:"))
         .skip(1)
@@ -131,12 +131,13 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
         .filter_map(|l| l.split_whitespace().next())
         .filter(|c| *c != "help")
         .collect();
+    commands.sort_unstable();
     assert_eq!(
         commands,
-        ["install", "explain", "conformance"],
+        ["conformance", "explain", "install", "which"],
         "--help lists commands not yet built"
     );
-    for cmd in ["install", "explain", "conformance"] {
+    for cmd in ["conformance", "explain", "install", "which"] {
         let out = rakata().args([cmd, "--help"]).output().unwrap();
         assert!(
             String::from_utf8_lossy(&out.stdout).contains("Example"),

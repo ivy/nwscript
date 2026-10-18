@@ -15,6 +15,9 @@ Examples:
   rakata explain RE0001                    explain a diagnostic code
   rakata --format json explain RE0001      the same, as one JSON document
   rakata conformance --game DIR            round-trip every file of an install
+  rakata which appearance.2da --game DIR   which copy the engine loads, and every other
+  rakata which dan14_juhani.utc --module danm14ac --game DIR
+  rakata which --duplicates --game DIR     Override files that differ only in case
 
 Exit codes: 0 success, 1 errors reported, 2 bad invocation,
 3 a comparison found a difference, 101 internal error.";
@@ -60,6 +63,12 @@ pub enum ColorArg {
     Never,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum ProfileArg {
+    K1,
+    K2,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Command {
     /// Install a TSLPatcher mod into the game, or with --dry-run print the plan.
@@ -81,6 +90,24 @@ pub enum Command {
         /// Print the plan and change nothing.
         #[arg(long)]
         dry_run: bool,
+    },
+    /// Which copy of a resource the engine loads: the winner, every other copy the install holds, and why each lost.
+    #[command(
+        after_help = "Examples:\n  rakata which appearance.2da --game DIR\n  rakata which k_pdan_juhani31.ncs --module danm14ac --game DIR\n  rakata --format json which dan14_juhani.utc --module danm14ac --game DIR\n  rakata which --duplicates --game DIR\n\nThe search order is the engine's: Override/, then the module's capsules (.mod over .rim over _s.rim, then lips/STEM_loc.mod), then patch.erf (KotOR 1), then the BIFs chitin.key indexes. Names compare without regard to case."
+    )]
+    Which {
+        /// The resource, as name.ext; case does not matter.
+        #[arg(value_name = "NAME.EXT", required_unless_present = "duplicates")]
+        name: Option<String>,
+        /// The module whose capsules to search: the stem of modules/STEM.mod, STEM.rim and STEM_s.rim.
+        #[arg(long, short, value_name = "STEM")]
+        module: Option<String>,
+        /// The game the install belongs to.
+        #[arg(long, value_enum, default_value_t = ProfileArg::K1)]
+        profile: ProfileArg,
+        /// List every group of Override files whose names differ only in case, instead of resolving a name.
+        #[arg(long)]
+        duplicates: bool,
     },
     /// Print the full explanation of a diagnostic code.
     #[command(

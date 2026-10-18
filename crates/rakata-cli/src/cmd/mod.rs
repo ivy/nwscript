@@ -4,6 +4,7 @@ mod conformance;
 pub use conformance::ConformanceArgs;
 mod explain;
 mod install;
+mod which;
 
 use crate::Exit;
 use crate::cli::{Cli, Command};
@@ -69,6 +70,20 @@ pub fn run(cli: Cli) -> Exit {
             dry_run,
         } => install::run(&ctx, &tslpatchdata, option, dry_run),
         Command::Conformance(args) => conformance::run(&ctx, &args),
+        Command::Which {
+            name,
+            module,
+            profile,
+            duplicates,
+        } => which::run(
+            &ctx,
+            which::Args {
+                name: name.as_deref(),
+                module: module.as_deref(),
+                profile,
+                duplicates,
+            },
+        ),
     }
 }
 
