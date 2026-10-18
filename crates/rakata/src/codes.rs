@@ -200,6 +200,13 @@ nwscript_diag::codes! {
     RE2503 Error "a walkmesh type that is neither an object's nor an area room's";
     RE2504 Error "a walkmesh index naming no element of the array it points into";
     RE2505 Error "a surface material table without a walk column, or with a walk cell not a number";
+    RE2401 Error "not a binary model: the MDL's first word is not zero";
+    RE2402 Error "a structure of the MDL past the end of its model data";
+    RE2403 Error "a mesh's vertices past the end of the MDX";
+    RE2404 Error "a model's node tree reaching a node twice, or a node number naming no name";
+    RE2405 Error "a model's name or texture field that is not ASCII ended by a NUL";
+    RE2406 Error "a mesh's vertex layout that does not fit its stride";
+    RE2407 Error "a face or triangle list entry naming a vertex the mesh lacks";
 }
 
 /// The rakata code with this id, if registered; case does not matter.

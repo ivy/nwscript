@@ -1118,6 +1118,7 @@ dependencies = [
  "rakata-index",
  "rakata-lip",
  "rakata-lyt",
+ "rakata-mdl",
  "rakata-patch",
  "rakata-res",
  "rakata-save",
@@ -1239,6 +1240,18 @@ version = "0.0.0"
 dependencies = [
  "rakata-game",
  "rakata-gff",
+ "rakata-res",
+]
+
+[[package]]
+name = "rakata-mdl"
+version = "0.0.0"
+dependencies = [
+ "rakata-2da",
+ "rakata-archive",
+ "rakata-game",
+ "rakata-gff",
+ "rakata-lyt",
  "rakata-res",
 ]
 
