@@ -45,7 +45,7 @@ That is one `mdl show` per room and one `which` per name, hundreds of calls for 
    ```
 
    `lies_at` empty is a name nothing holds. A room with no textures has no rows, so compare the rooms listed with the layout's.
-3. **A script walks the formats.** `rakata lua SCRIPT --game DIR` runs Lua with the bindings and needs nothing installed beyond `rakata`:
+3. **A script walks the formats.** `rakata lua SCRIPT --game DIR` runs Lua with the bindings and needs nothing installed beyond `rakata`; `rakata.Install.open()` opens the install `--game` names, and `print` writes a tab-separated line to stdout, so redirect it to keep the report (the shell's `>`; `rakata lint` has no output option either):
 
    ```lua
    local install = rakata.Install.open()
