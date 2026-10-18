@@ -457,10 +457,10 @@ impl Changes {
 
 /// `PREFIX<digits>` as the prefix and the number.
 pub fn split_numbered(key: &str) -> Option<(&str, u32)> {
-    let digits = key.trim_end_matches(|c: char| !c.is_ascii_digit()).len();
-    let start = key[..digits]
-        .rfind(|c: char| !c.is_ascii_digit())
-        .map_or(0, |i| i + 1);
+    let head = key.trim_end_matches(|c: char| !c.is_ascii_digit());
+    // The digits are ASCII, a byte each, so `start` is a char boundary
+    // whatever precedes them.
+    let start = head.len() - head.bytes().rev().take_while(u8::is_ascii_digit).count();
     if start == key.len() {
         return None;
     }

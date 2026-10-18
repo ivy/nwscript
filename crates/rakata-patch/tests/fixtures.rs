@@ -6,6 +6,20 @@ use rakata_patch::plan::{Operation, Phase};
 use rakata_patch::{Changes, Ini, Issue, Plan, Value, codes, load};
 use std::path::{Path, PathBuf};
 
+/// `bytes`, kept as a seed for the fuzz targets in the directory
+/// `$RAKATA_FUZZ_SEEDS` names, when it is set.
+fn seed(bytes: &[u8]) -> &[u8] {
+    if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        bytes.hash(&mut h);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+    }
+    bytes
+}
+
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
 }
@@ -13,7 +27,7 @@ fn fixtures() -> PathBuf {
 fn parse(name: &str) -> (Changes, Vec<Issue>) {
     let bytes = std::fs::read(fixtures().join(name)).unwrap();
     let mut issues = Vec::new();
-    let ini = Ini::parse(&bytes, 0, &mut issues);
+    let ini = Ini::parse(seed(&bytes), 0, &mut issues);
     let changes = Changes::parse(&ini, 0, &mut issues);
     (changes, issues)
 }
@@ -438,8 +452,8 @@ fn the_plan_runs_the_phases_in_the_patchers_order_whatever_the_files_order() {
 #[test]
 fn a_token_read_before_it_is_set_is_a_warning_at_the_read() {
     let mut issues = Vec::new();
-    let ini = Ini::parse(
-        b"[GFFList]\nFile0=a.utc\n[a.utc]\nAppearance_Type=2DAMEMORY9\n[2DAList]\nTable0=x.2da\n[x.2da]\nAddRow0=r\n[r]\nlabel=x\n2DAMEMORY9=RowIndex\n",
+    let ini = Ini::parse(seed(
+        b"[GFFList]\nFile0=a.utc\n[a.utc]\nAppearance_Type=2DAMEMORY9\n[2DAList]\nTable0=x.2da\n[x.2da]\nAddRow0=r\n[r]\nlabel=x\n2DAMEMORY9=RowIndex\n"),
         0,
         &mut issues,
     );
@@ -450,7 +464,7 @@ fn a_token_read_before_it_is_set_is_a_warning_at_the_read() {
         "2DA runs before GFF, so the token is set: {issues:?}"
     );
     let ini = Ini::parse(
-        b"[GFFList]\nFile0=a.utc\n[a.utc]\nAppearance_Type=2DAMEMORY9\n",
+        seed(b"[GFFList]\nFile0=a.utc\n[a.utc]\nAppearance_Type=2DAMEMORY9\n"),
         0,
         &mut issues,
     );
@@ -514,4 +528,16 @@ fn a_folder_without_namespaces_loads_changes_ini_directly() {
         loaded.changes.settings.window_caption.as_deref(),
         Some("Fixture: full")
     );
+}
+
+#[test]
+fn a_numbered_key_with_a_wide_character_before_its_digits_splits_there() {
+    assert_eq!(split_numbered("File12"), Some(("File", 12)));
+    assert_eq!(split_numbered("File\u{2014}7"), Some(("File\u{2014}", 7)));
+    assert_eq!(split_numbered("\u{2014}"), None);
+    // Found by fuzzing: 0x97 is an em dash in Windows-1252, three bytes in
+    // UTF-8, and the split once fell inside it.
+    let mut issues = Vec::new();
+    let ini = Ini::parse(seed(b"[Settings]\nFileE\x97\x970\x97x=1\n"), 0, &mut issues);
+    let _ = Changes::parse(&ini, 0, &mut issues);
 }
