@@ -11,6 +11,7 @@
 //! equal. The layout the writer chooses is BioWare's, as measured over the
 //! vanilla files (`docs/formats/mdl.md`).
 
+use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 
 use crate::animation::{ANIMATION_HEADER_LEN, EVENT_LEN};
@@ -39,6 +40,10 @@ pub const AABB_HEADER_LEN: usize = 4;
 pub const AABB_ENTRY_LEN: usize = 40;
 /// The saber header's length, following the mesh header.
 pub const SABER_HEADER_LEN: usize = 20;
+
+/// The flag bits that name a structure after the node header: light,
+/// emitter, reference and mesh.
+const HAS_STRUCTURE: u16 = 0x002 | 0x004 | 0x010 | NODE_HAS_MESH;
 
 /// The deepest node tree read; deeper is taken for a damaged file.
 const MAX_DEPTH: usize = 1024;
@@ -119,7 +124,7 @@ pub struct NodeFile {
 /// What follows a node's header, by its flags.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Body {
-    /// A dummy (0x001): nothing.
+    /// A dummy (0x001), or a node whose flags name no structure: nothing.
     Dummy,
     /// A light (0x003).
     Light(Box<LightFile>),
@@ -349,6 +354,58 @@ struct Reader<'a> {
     geometry: Vec<usize>,
     /// The MDX blocks' starts and ends, for the padding after each.
     blocks: Vec<(usize, usize)>,
+    /// The node number of each block's mesh.
+    block_numbers: Vec<u16>,
+    /// Every structure read, in the order read.
+    trace: RefCell<Vec<Region>>,
+    /// Nodes whose parent offset is not their parent's.
+    odd_parents: Cell<usize>,
+    /// Arrays whose allocated count is not their used count.
+    odd_counts: Cell<usize>,
+}
+
+/// One structure of the model data as read: what it is, its offset as
+/// stored and its length (zero for an empty array, at whatever offset its
+/// array header holds).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Region {
+    pub(crate) what: &'static str,
+    pub(crate) at: usize,
+    pub(crate) len: usize,
+}
+
+/// What reading a model saw of its layout: every structure of the model
+/// data, and every MDX block's start and end, in the order read.
+pub(crate) struct Trace {
+    pub(crate) regions: Vec<Region>,
+    pub(crate) blocks: Vec<(usize, usize)>,
+    /// The node number of each block's mesh.
+    pub(crate) block_numbers: Vec<u16>,
+    pub(crate) data_len: usize,
+    pub(crate) mdx_len: usize,
+    /// Nodes whose parent offset is not their parent's.
+    pub(crate) odd_parents: usize,
+    /// Arrays whose allocated count is not their used count.
+    pub(crate) odd_counts: usize,
+}
+
+/// Read a model, keeping its trace.
+pub(crate) fn parse_traced(mdl: &[u8], mdx: &[u8]) -> Result<(ModelFile, Trace)> {
+    let r = Reader::new(mdl, mdx)?;
+    let data_len = r.d.b.len();
+    let (model, r) = r.model_keep()?;
+    Ok((
+        model,
+        Trace {
+            regions: r.trace.into_inner(),
+            blocks: r.blocks,
+            block_numbers: r.block_numbers,
+            data_len,
+            mdx_len: mdx.len(),
+            odd_parents: r.odd_parents.get(),
+            odd_counts: r.odd_counts.get(),
+        },
+    ))
 }
 
 impl<'a> Reader<'a> {
@@ -373,22 +430,41 @@ impl<'a> Reader<'a> {
             seen: HashSet::new(),
             geometry: Vec::new(),
             blocks: Vec::new(),
+            block_numbers: Vec::new(),
+            trace: RefCell::new(Vec::new()),
+            odd_parents: Cell::new(0),
+            odd_counts: Cell::new(0),
         })
     }
 
+    /// Count an array whose allocated count (after its used count) differs.
+    fn allocated(&self, at: usize, used: usize) -> Result<()> {
+        if self.d.u32(at + 8, "array")? as usize != used {
+            self.odd_counts.set(self.odd_counts.get() + 1);
+        }
+        Ok(())
+    }
+
+    fn note(&self, what: &'static str, at: usize, len: usize) {
+        self.trace.borrow_mut().push(Region { what, at, len });
+    }
+
     fn fixed<const N: usize>(&self, at: usize, what: &'static str) -> Result<[u8; N]> {
+        self.note(what, at, N);
         Ok(self.d.slice(at, N, what)?.try_into().expect("N bytes"))
     }
 
     /// An array's elements of `size` bytes each, copied.
     fn array(&self, at: usize, size: usize, what: &'static str) -> Result<(usize, Vec<u8>)> {
         let (off, n) = self.d.array(at, what)?;
+        self.allocated(at, n)?;
         let len = n.checked_mul(size).ok_or(Error::Truncated {
             what,
             offset: off,
             needed: usize::MAX,
             available: self.d.b.len(),
         })?;
+        self.note(what, off, len);
         Ok((n, self.d.slice(off, len, what)?.to_vec()))
     }
 
@@ -413,23 +489,30 @@ impl<'a> Reader<'a> {
             .iter()
             .position(|&c| c == 0)
             .ok_or(Error::BadName { what, offset: at })?;
+        self.note(what, at, end + 1);
         Ok(s[..end].to_vec())
     }
 
     /// `n` bytes at the offset stored at `at`, or none when `n` is zero.
     fn pointed(&self, at: usize, n: usize, what: &'static str) -> Result<Vec<u8>> {
+        let off = self.d.u32(at, what)? as usize;
+        self.note(what, off, n);
         if n == 0 {
             return Ok(Vec::new());
         }
-        let off = self.d.u32(at, what)? as usize;
         Ok(self.d.slice(off, n, what)?.to_vec())
     }
 
-    fn model(mut self) -> Result<ModelFile> {
+    fn model(self) -> Result<ModelFile> {
+        Ok(self.model_keep()?.0)
+    }
+
+    fn model_keep(mut self) -> Result<(ModelFile, Self)> {
         let header: [u8; MODEL_HEADER_LEN] = self.fixed(0, "model header")?;
         let (names_off, names_n) = self.d.array(0xB8, "name array")?;
         self.d
             .slice(names_off, names_n.saturating_mul(4), "name array")?;
+        self.note("name array", names_off, 4 * names_n);
         let names = (0..names_n)
             .map(|i| {
                 let p = self.d.u32(names_off + 4 * i, "name pointer")? as usize;
@@ -440,6 +523,7 @@ impl<'a> Reader<'a> {
         let (anim_off, anim_n) = self.d.array(0x58, "animation array")?;
         self.d
             .slice(anim_off, anim_n.saturating_mul(4), "animation array")?;
+        self.note("animation array", anim_off, 4 * anim_n);
         let mut animations = Vec::with_capacity(anim_n.min(4096));
         for i in 0..anim_n {
             let a = self.d.u32(anim_off + 4 * i, "animation pointer")? as usize;
@@ -447,7 +531,7 @@ impl<'a> Reader<'a> {
             let (_, ev) = self.array(a + 0x78, EVENT_LEN, "event array")?;
             let events = ev.as_chunks::<EVENT_LEN>().0.to_vec();
             let root_at = self.d.u32(a + GEOM_ROOT, "animation root node")? as usize;
-            let root = self.node(root_at, 0, false)?;
+            let root = self.node(root_at, 0, 0, false)?;
             animations.push(AnimationFile {
                 header: mask(header, ANIMATION_LAYOUT),
                 events,
@@ -456,7 +540,7 @@ impl<'a> Reader<'a> {
         }
 
         let root_at = self.d.u32(GEOM_ROOT, "root")? as usize;
-        let root = self.node(root_at, 0, true)?;
+        let root = self.node(root_at, 0, 0, true)?;
         let head = self.d.u32(0xA8, "head node")?;
         let head_node = self
             .geometry
@@ -472,10 +556,10 @@ impl<'a> Reader<'a> {
             root,
         };
         self.padding(&mut model);
-        Ok(model)
+        Ok((model, self))
     }
 
-    fn node(&mut self, at: usize, depth: usize, geometry: bool) -> Result<NodeFile> {
+    fn node(&mut self, at: usize, parent: usize, depth: usize, geometry: bool) -> Result<NodeFile> {
         if depth > MAX_DEPTH {
             return Err(Error::BadTree {
                 reason: format!("the tree is deeper than {MAX_DEPTH} nodes"),
@@ -490,14 +574,20 @@ impl<'a> Reader<'a> {
             self.geometry.push(at);
         }
         let header: [u8; NODE_HEADER_LEN] = self.fixed(at, "node header")?;
+        if self.d.u32(at + 12, "parent")? as usize != parent {
+            self.odd_parents.set(self.odd_parents.get() + 1);
+        }
         let flags = u16::from_le_bytes([header[0], header[1]]);
         let h = at + NODE_HEADER_LEN;
         let body = match flags {
-            0x001 => Body::Dummy,
             0x003 => Body::Light(Box::new(self.light(h)?)),
             0x005 => Body::Emitter(Box::new(self.fixed(h, "emitter header")?)),
             0x011 => Body::Reference(Box::new(self.fixed(h, "reference header")?)),
             f if f & NODE_HAS_MESH != 0 => Body::Mesh(Box::new(self.mesh(at, flags, geometry)?)),
+            // A flags word naming none of the light, emitter, reference
+            // and mesh bits names nothing after the node header: the
+            // dummy, 0x001, and a word of 0 another tool writes.
+            f if f & HAS_STRUCTURE == 0 => Body::Dummy,
             _ => {
                 return Err(Error::Unsupported {
                     what: format!("node flags {flags:#05x} at model offset {at}"),
@@ -510,7 +600,7 @@ impl<'a> Reader<'a> {
         let kids = self.words(at + 44, "child array")?;
         let mut children = Vec::with_capacity(kids.len());
         for k in kids {
-            children.push(self.node(k as usize, depth + 1, geometry)?);
+            children.push(self.node(k as usize, at, depth + 1, geometry)?);
         }
         Ok(NodeFile {
             header: mask(header, NODE_LAYOUT),
@@ -594,6 +684,7 @@ impl<'a> Reader<'a> {
                     index_counts.len()
                 ),
             })? as usize;
+            self.note("index list", p as usize, 2 * n);
             index_lists.push(
                 self.d
                     .slice(p as usize, n.saturating_mul(2), "index list")?
@@ -603,6 +694,7 @@ impl<'a> Reader<'a> {
         let index_unknown = self.words(h + 200, "mesh array")?;
         let pos_at = self.d.u32(h + 328, "vertex array pointer")?;
         let positions = if nv > 0 && pos_at != 0 && pos_at != u32::MAX {
+            self.note("vertex array", pos_at as usize, 12 * nv);
             self.d
                 .slice(pos_at as usize, 12 * nv, "vertex array")?
                 .to_vec()
@@ -624,6 +716,8 @@ impl<'a> Reader<'a> {
                     available: self.mdx.len(),
                 })?;
             self.blocks.push((off, off + len));
+            self.block_numbers
+                .push(u16::from_le_bytes([self.d.b[at + 4], self.d.b[at + 5]]));
             let (vertices, terminator) = block.split_at(nv * stride);
             Some(MdxBlock {
                 vertices: vertices.to_vec(),
@@ -649,6 +743,7 @@ impl<'a> Reader<'a> {
     /// pre-order, left before right.
     fn aabb(&mut self, e: usize) -> Result<Vec<AabbEntry>> {
         let root = self.d.u32(e, "AABB root")? as usize;
+        self.note("AABB header", e, AABB_HEADER_LEN);
         let mut out: Vec<AabbEntry> = Vec::new();
         if root == 0 {
             return Ok(out);

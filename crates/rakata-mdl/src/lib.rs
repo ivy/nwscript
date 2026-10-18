@@ -30,6 +30,13 @@
 //! stored: metres, Z up, each node's position and orientation relative to
 //! its parent.
 //!
+//! [`ModelFile`] is the model as stored, owned: every structure of the
+//! MDL with every field it holds (the offsets and counts the layout sets
+//! aside), and every MDX block. [`ModelFile::to_bytes`] lays it out as
+//! BioWare's compiler does and writes every vanilla model back byte for
+//! byte; [`layout`] says how a model another tool wrote departs from that
+//! layout.
+//!
 //! The layout is `docs/formats/mdl.md` of this repository, measured from
 //! the game's files; this crate was written without sight of any other
 //! implementation.
@@ -38,6 +45,7 @@ mod animation;
 mod controller;
 mod error;
 mod file;
+mod layout;
 mod lineage;
 mod model;
 mod skin;
@@ -55,6 +63,7 @@ pub use file::{
     MeshKind, ModelFile, NodeFile, NodePointer, REFERENCE_HEADER_LEN, SABER_HEADER_LEN, SaberFile,
     SkinFile,
 };
+pub use layout::{BlockOrder, Layout, Padding, layout};
 pub use lineage::{Chain, Lineage, ModelFiles, supermodel_name};
 pub use model::{
     BoundingBox, Classification, FILE_HEADER_LEN, MESH_HEADER_LEN, Mesh, Model, NODE_HAS_MESH,

@@ -2,7 +2,7 @@
 
 A KotOR model is two resources of the same resref: the MDL (resource type 2002), which holds the model's header, its tree of nodes and everything about them but the per-vertex data of its meshes, and the MDX (resource type 3008), which holds that per-vertex data, one interleaved block per mesh. KotOR 1 ships 3,072 binary models: 2,445 in `data/models.bif`, 305 in `items.bif`, 63 in `player.bif`, 19 in `party.bif`, 168 in `rims/global.rim`, 40 in `miniglobal.rim`, 30 in `chargen.rim`, one in `mainmenu.rim` and one in `patch.erf`. A RIM's MDX lives in its `dx` partner (`globaldx.rim` beside `global.rim`); a BIF or ERF holds both. Every MDL has its MDX. No module capsule holds a model.
 
-This document covers what a renderer needs to draw and animate a model: the headers, the node tree, the trimesh part of every mesh node, controllers and their keys, skin nodes, animations, and supermodels. Dangly constraints, AABB trees, emitters, lights and saber blades are located but not decoded beyond their controllers.
+This document covers what a renderer needs to draw and animate a model: the headers, the node tree, the trimesh part of every mesh node, controllers and their keys, skin nodes, animations, and supermodels. Dangly constraints, AABB trees, emitters, lights and saber blades are located but not decoded beyond their controllers. [Layout](#layout) gives the order in which BioWare's compiler lays every structure out, which a writer follows to reproduce the files byte for byte.
 
 All integers are little-endian; floats are IEEE 754 single precision. Coordinates are metres, Z up.
 
@@ -282,6 +282,28 @@ An animation's position keys do not read as the node's position: of the 92,996 p
 
 A model names its supermodel at 0x88 of the model header; 413 do. The chains, followed through the install's resolution of each name, pass up to seven supermodels (`s_female02` names `S_Female01`, which names `S_Male02`, which names `S_Male01`, which names none). Three models name a supermodel the game does not ship: `h_m_hi01` (`CSpar2`), `n_djedi_h` and `p_carthbbh` (both `S_Male02H`). A supermodel holds animations its descendants play: `s_male02` holds 166, `walk` among them, and a body such as `pmbam`, whose chain is `S_Female02`, `S_Female01`, `S_Male02`, `S_Male01`, has none of its own. An animation's nodes act on the playing model's nodes of the same names; a body model lacks the head's bones, which its head model has.
 
+## Layout
+
+Every byte of the model data of all 3,072 vanilla models belongs to a structure the headers reach: no gaps, no structure shared. The structures beyond those above, as the writer holds them:
+
+- A light's header is 92 bytes: a float, five arrays (at 4, four bytes per element, empty in every vanilla light; at 16, the flare sizes, four bytes; at 28, the flare positions, four bytes; at 40, the flare colour shifts, twelve bytes; at 52, offsets of NUL-ended flare texture names), then seven words.
+- An emitter's header is 224 bytes and a reference's 36 (a model name and a word); neither points anywhere.
+- A dangly header is 28 bytes: an array of four-byte constraints (one per vertex), three floats, and at 24 the offset of twelve bytes per vertex.
+- An AABB header is the offset of the tree's root; each entry is 40 bytes, a box, the offsets of its two children at 24 and 28 (zero for none), and two words.
+- A saber header is 20 bytes: the offsets of three per-vertex arrays (twelve bytes per vertex at 0, eight at 4, twelve at 8) and two words.
+
+BioWare's compiler lays the model data out in one order, the same in all 3,072 models, so a writer that follows it reproduces every offset:
+
+1. The model header, the name array, the names back to back, the animation array.
+2. Each animation in turn: its header, its events, its tree.
+3. The geometry's tree.
+
+A node is written as its header; the header of its kind; that kind's arrays (a skin's bone map, qbones, tbones and the array at 52; a dangly mesh's constraints and positions; an AABB tree in pre-order, left before right; a saber's arrays at 0, 8 and 4, in that order; a light's array at 4, its texture name offsets and the names, its sizes, positions and colours); then a mesh's faces, index counts, positions (the offset at 328), index offsets, the array at 200 and the index lists; then its child array; then each child, recursively; and last its controllers and their data, so a node's controllers come after all its descendants. An empty array points where the next structure begins, except the controllers, the controller data, the events, the faces and a light's arrays, which hold offset zero, and a mesh's index offset array and array at 200, which hold zero in a mesh with no vertices and point on in one with vertices (the sabers). Array counts are used and allocated alike.
+
+The MDX holds the geometry's blocks in node number order, every mesh but the skins first and then the skins: in 271 models this differs from the order the tree reaches the meshes. After each block's terminator but the last come as many bytes as the MDX's length then lies past a multiple of 16 (8 bytes after a block ending at 8 past a multiple of 16, 4 after one at 4, 12 after one at 12, none after one on the multiple); these bytes are often not zero, uninitialised memory like the model header's bytes at 0x4D. Nothing follows the last block. Thirteen MDXs in `rims/globaldx.rim` and `rims/mainmenudx.rim` (`fxc_droid01` and ten more, `fxmuzzle`, `cgmain_light`) have no MDL in their partner RIM; the MDL of each name is in `models.bif`, and the RIM's copy equals the BIF's.
+
+Other tools lay models out otherwise; `conformance/rakata-known.toml` names the layouts the modded build's models show.
+
 ## In the Endar Spire
 
 The first area of the demo module, `end_m01aa` (area `m01aa`), draws 15 room models from its layout (`m01aa_01a` to `m01aa_10`, all class 0 but `m01aa_07b`, class 1), two door models through `genericdoors.2da` (`dor_lhr01`, `dor_lhr02`) and 12 placeable models through `placeables.2da` (one of them, `plc_invis`, has no rendered mesh). Two of their meshes name a lightmap the install does not ship: `M01aa_04a_a0002t` in `m01aa_04a` and `DOR_LHR02_a00004` in `dor_lhr02`.
@@ -311,7 +333,7 @@ Public documents read: xoreos-docs `specs/kotor_mdl.html` (KotOR's binary MDL), 
 
 Reference projects read: none.
 
-Measured: on 2026-10-18, every count above comes from the vanilla KotOR 1 install under `$RAKATA_GAME_K1`, first with short Python scripts reading the headers, nodes, mesh headers, faces, index lists, controllers, skin headers, animation headers and MDX blocks of every model the KEY's BIFs, `rims/`, `modules/` and `patch.erf` hold, then with `crates/rakata-mdl/tests/vanilla.rs`, which parses every one of them, prints the node kinds, classifications, MDX layouts, flag counts, controllers by type, compressed keys, skins and their bind transforms, resolves every supermodel chain, and reads every model `end_m01aa` uses (`RAKATA_GAME_K1=… cargo test -p rakata-mdl --test vanilla -- --nocapture`). The compressed orientation's partition, its agreement with uncompressed copies and its scale were measured by the Python scripts over the 2,832 models of distinct names (one copy of each name the BIFs and RIMs hold).
+Measured: on 2026-10-18, every count above comes from the vanilla KotOR 1 install under `$RAKATA_GAME_K1`, first with short Python scripts reading the headers, nodes, mesh headers, faces, index lists, controllers, skin headers, animation headers and MDX blocks of every model the KEY's BIFs, `rims/`, `modules/` and `patch.erf` hold, then with `crates/rakata-mdl/tests/vanilla.rs`, which parses every one of them, prints the node kinds, classifications, MDX layouts, flag counts, controllers by type, compressed keys, skins and their bind transforms, resolves every supermodel chain, and reads every model `end_m01aa` uses (`RAKATA_GAME_K1=… cargo test -p rakata-mdl --test vanilla -- --nocapture`). The compressed orientation's partition, its agreement with uncompressed copies and its scale were measured by the Python scripts over the 2,832 models of distinct names (one copy of each name the BIFs and RIMs hold). The layout was measured by Python scripts that list every structure each model's headers reach and check that they tile the model data and fall in the order above, and is confirmed by `crates/rakata-mdl/tests/vanilla.rs`, which writes every vanilla model back from `rakata_mdl::ModelFile` and compares bytes, and by `rakata conformance --only mdl`.
 
 Observed in a renderer: the winding and the undrawn AABB nodes, from the OdysseyUE runtime drawing the Endar Spire (`end_m01aa`) from these structures and comparing with the game.
 
