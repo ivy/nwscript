@@ -11,7 +11,13 @@
 //! - [`Tga`], a Truevision TARGA image (the game's lightmaps), decoded to
 //!   RGBA8 with rows top first.
 //!
-//! Each has a `parse(&[u8])` entry point and nothing else to call.
+//! Each has a `parse(&[u8])` entry point and a `to_bytes()` writer that
+//! gives back the bytes it read: a [`Tpc`] keeps its header's unused bytes
+//! and writes its [`Txi`]; a [`Txi`] keeps the spelling of its lines in a
+//! [`TxiLayout`]; a [`Tga`] keeps what its decoded pixels do not carry
+//! (image ID, colour map, run-length packets, the bytes after the pixels)
+//! in a [`TgaLayout`], and encodes its pixels back to the stored depth and
+//! order.
 //!
 //! A [`Tpc`] borrows: each [`Level`]'s `data` and the TXI bytes are slices
 //! of the input, so a caller can hand a level to a GPU without a copy, and
@@ -30,9 +36,9 @@ mod tpc;
 mod txi;
 
 pub use error::{Error, Result, codes};
-pub use tga::{ImageType, Origin, Tga};
+pub use tga::{ImageType, Origin, Tga, TgaLayout};
 pub use tpc::{Image, Layout, Level, PixelFormat, Tpc};
-pub use txi::{Txi, TxiEntry};
+pub use txi::{Txi, TxiEntry, TxiLayout};
 
 /// The TPC header's length; the pixel data begins at this offset.
 pub const TPC_HEADER_LEN: usize = tpc::HEADER_LEN;

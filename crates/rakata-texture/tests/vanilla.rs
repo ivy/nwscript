@@ -2,7 +2,8 @@
 //! KotOR 1 install (the BIFs the KEY names, `TexturePacks/*.erf`,
 //! `patch.erf`, the capsules under `modules/` and `rims/`, and loose files
 //! in `Override/`) is parsed, and what the layout leaves open is counted:
-//! formats, layouts, mip counts, TXI keywords, TGA variants. Run with
+//! formats, layouts, mip counts, TXI keywords, TGA variants. Each is also
+//! written again and must be the bytes it was read from. Run with
 //! `--nocapture` to see the counts.
 //!
 //! Reads the user's own install from `$RAKATA_GAME_K1` (the folder holding
@@ -134,6 +135,7 @@ struct Census {
     txi: usize,
     tga: usize,
     failed: Vec<String>,
+    rewritten: Vec<String>,
     by_where: BTreeMap<(String, &'static str), usize>,
     formats: BTreeMap<String, usize>,
     mips: BTreeMap<usize, usize>,
@@ -163,6 +165,19 @@ impl Census {
         }
     }
 
+    /// Note a file the writer does not give back byte for byte.
+    fn rewrite(&mut self, name: &str, written: rakata_texture::Result<Vec<u8>>, data: &[u8]) {
+        match written {
+            Ok(w) if w == data => {}
+            Ok(w) => self.rewritten.push(format!(
+                "{name}: {} bytes written for {}",
+                w.len(),
+                data.len()
+            )),
+            Err(e) => self.rewritten.push(format!("{name}: {e}")),
+        }
+    }
+
     fn add(&mut self, name: &str, ty: ResType, data: &[u8]) {
         let place = name.split('/').next().unwrap().to_string();
         let kind = match ty {
@@ -178,6 +193,7 @@ impl Census {
                     Ok(t) => t,
                     Err(e) => return self.failed.push(format!("{name}: {e}")),
                 };
+                self.rewrite(name, t.to_bytes(), data);
                 let layout = match t.layout {
                     Layout::Single => "single".to_string(),
                     Layout::Cube => "cube".to_string(),
@@ -220,12 +236,15 @@ impl Census {
             }
             ResType::Txi => {
                 self.txi += 1;
-                self.txi(name, &Txi::parse(data));
+                let t = Txi::parse(data);
+                self.rewrite(name, t.to_bytes(), data);
+                self.txi(name, &t);
             }
             _ => {
                 self.tga += 1;
                 match Tga::parse(data) {
                     Ok(t) => {
+                        self.rewrite(name, t.to_bytes(), data);
                         *self
                             .tga_variants
                             .entry(format!(
@@ -294,9 +313,15 @@ fn every_vanilla_texture_parses() {
         &c.data_size_rule_broken,
     );
     show("failed", &c.failed);
+    show("written back other than read", &c.rewritten);
 
     assert!(c.tpc > 0 && c.txi > 0 && c.tga > 0, "no textures found");
     assert!(c.failed.is_empty(), "files refused: {:#?}", c.failed);
+    assert!(
+        c.rewritten.is_empty(),
+        "not written back: {:#?}",
+        c.rewritten
+    );
     assert!(c.cube_without_txi_cube.is_empty());
     assert!(c.data_size_rule_broken.is_empty());
 }

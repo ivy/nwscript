@@ -7,6 +7,9 @@ use crate::{Error, Result};
 /// The header's length; the pixel data begins here.
 pub const HEADER_LEN: usize = 128;
 
+/// Where the header's unused bytes begin.
+const RESERVED_AT: usize = 14;
+
 /// How a level's pixels are stored. The bytes are never converted: a DXT
 /// level is the 4×4 blocks as stored, an uncompressed level the pixels in
 /// the channel order the file holds, rows in file order.
@@ -135,6 +138,9 @@ pub struct Tpc<'a> {
     pub alpha_mean: f32,
     /// How the pixel data divides into images.
     pub layout: Layout,
+    /// The rest of the header, from offset 14 to 128: 114 bytes, zero in
+    /// every file measured, kept so a file that sets them writes back.
+    pub reserved: &'a [u8],
     /// One image, six faces, or `numx` × `numy` frames in row order.
     pub images: Vec<Image<'a>>,
     /// The pixel data whole: every image's levels, back to back.
@@ -142,6 +148,7 @@ pub struct Tpc<'a> {
     /// The bytes after the pixel data: the TXI text, often empty.
     pub txi_bytes: &'a [u8],
     /// The TXI parsed, or `None` when there are no bytes after the pixels.
+    /// This, not [`Tpc::txi_bytes`], is what [`Tpc::to_bytes`] writes.
     pub txi: Option<Txi>,
 }
 
@@ -318,11 +325,50 @@ impl<'a> Tpc<'a> {
             data_size,
             alpha_mean,
             layout,
+            reserved: &bytes[RESERVED_AT..HEADER_LEN],
             images,
             pixels: &bytes[HEADER_LEN..HEADER_LEN + pixel_len],
             txi_bytes,
             txi,
         })
+    }
+
+    /// Write the TPC: the header from its fields, [`Tpc::pixels`] as they
+    /// are, and the [`Tpc::txi`] through [`Txi::to_bytes`] (nothing when
+    /// it is `None`). The header's fields are written as given, so the
+    /// caller keeps them consistent with the pixels: `data_size` as
+    /// `docs/formats/tpc.md` describes it, `mip_count` the levels of one
+    /// image (1 for an animation sheet).
+    ///
+    /// Refuses (`RE2207`) reserved bytes longer than the header has room
+    /// for (114), and passes on the TXI writer's refusal (`RE2208`). Fewer
+    /// reserved bytes are padded with zeros.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        let room = HEADER_LEN - RESERVED_AT;
+        if self.reserved.len() > room {
+            return Err(Error::TpcUnwritable {
+                reason: format!(
+                    "{} reserved header bytes where the header has room for {room}",
+                    self.reserved.len()
+                ),
+            });
+        }
+        let txi = match &self.txi {
+            Some(t) => t.to_bytes()?,
+            None => Vec::new(),
+        };
+        let mut out = Vec::with_capacity(HEADER_LEN + self.pixels.len() + txi.len());
+        out.extend_from_slice(&self.data_size.to_le_bytes());
+        out.extend_from_slice(&self.alpha_mean.to_le_bytes());
+        out.extend_from_slice(&self.width.to_le_bytes());
+        out.extend_from_slice(&self.height.to_le_bytes());
+        out.push(self.format.encoding());
+        out.push(self.mip_count);
+        out.extend_from_slice(self.reserved);
+        out.resize(HEADER_LEN, 0);
+        out.extend_from_slice(self.pixels);
+        out.extend_from_slice(&txi);
+        Ok(out)
     }
 
     /// Whether the pixel format has an alpha channel.

@@ -186,6 +186,9 @@ nwscript_diag::codes! {
     RE2204 Error "a TGA truncated before its header or pixels end";
     RE2205 Error "a TGA image type or pixel depth that is not decoded";
     RE2206 Error "a TGA run-length packet past the image's last pixel";
+    RE2207 Error "a TPC the writer cannot write as given";
+    RE2208 Error "a TXI line that would not read back as written";
+    RE2209 Error "a TGA the writer cannot write as given";
     RE2301 Error "not a room layout: no beginlayout line";
     RE2302 Error "a room layout line in no form the layout takes where it stands";
     RE2303 Error "a count or coordinate of a layout or visibility file that is not a number";

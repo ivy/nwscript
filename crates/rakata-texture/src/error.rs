@@ -20,9 +20,15 @@ pub mod codes {
     pub const TGA_UNSUPPORTED: &str = "RE2205";
     /// A run-length packet of a TGA runs past the image's last pixel.
     pub const TGA_RLE_OVERRUN: &str = "RE2206";
+    /// A TPC the writer cannot write as given.
+    pub const TPC_UNWRITABLE: &str = "RE2207";
+    /// A TXI line the writer cannot write so that it reads back the same.
+    pub const TXI_UNWRITABLE: &str = "RE2208";
+    /// A TGA the writer cannot write as given.
+    pub const TGA_UNWRITABLE: &str = "RE2209";
 }
 
-/// An error in reading a texture.
+/// An error in reading or writing a texture.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     /// A TPC ends before its header or its pixel data does.
@@ -72,6 +78,23 @@ pub enum Error {
         /// The image's pixel count.
         pixels: usize,
     },
+    /// A TPC the writer cannot write as given.
+    TpcUnwritable {
+        /// Why.
+        reason: String,
+    },
+    /// A TXI line that would not read back as written.
+    TxiUnwritable {
+        /// The keyword, value or row at fault.
+        line: String,
+        /// What is wrong with it.
+        reason: String,
+    },
+    /// A TGA the writer cannot write as given.
+    TgaUnwritable {
+        /// Why.
+        reason: String,
+    },
 }
 
 /// This crate's result type.
@@ -87,6 +110,9 @@ impl Error {
             Error::TgaTruncated { .. } => codes::TGA_TRUNCATED,
             Error::TgaUnsupported { .. } => codes::TGA_UNSUPPORTED,
             Error::TgaRleOverrun { .. } => codes::TGA_RLE_OVERRUN,
+            Error::TpcUnwritable { .. } => codes::TPC_UNWRITABLE,
+            Error::TxiUnwritable { .. } => codes::TXI_UNWRITABLE,
+            Error::TgaUnwritable { .. } => codes::TGA_UNWRITABLE,
         }
     }
 }
@@ -128,6 +154,11 @@ impl fmt::Display for Error {
                 f,
                 "a TGA run of {run} pixels at pixel {pixel} passes the image's {pixels}"
             ),
+            Error::TpcUnwritable { reason } => write!(f, "cannot write the TPC: {reason}"),
+            Error::TxiUnwritable { line, reason } => {
+                write!(f, "cannot write the TXI line `{line}`: {reason}")
+            }
+            Error::TgaUnwritable { reason } => write!(f, "cannot write the TGA: {reason}"),
         }
     }
 }

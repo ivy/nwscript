@@ -1,6 +1,6 @@
 [package]
 name = "rakata-texture"
-description = "The textures of Aurora-family games: TPC with its mip levels and pixel format kept raw (DXT1 and DXT5 blocks untouched), its TXI as key/values, and plain TGA decoded to RGBA8."
+description = "The textures of Aurora-family games: TPC with its mip levels and pixel format kept raw (DXT1 and DXT5 blocks untouched), its TXI as key/values, and plain TGA decoded to RGBA8; each written back byte for byte."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
