@@ -18,3 +18,20 @@ format = "2da"
 writer = "an editor used by some of the build's mods (measured on two loose tables of the build's Override/; modshop's patches README counts five mods shipping the size-0 header)"
 description = "the header's cell-data size field is 0 where BioWare writes the strings' length; each distinct string is stored once, as BioWare stores it, but in an order that is neither the cells' row-major first occurrence nor column-major, so the offsets differ while every cell reads the same; the game reads cells by offset and loads these tables intact"
 recognised = "2da: tab-ended names, size 0 for * bytes of strings, one copy per string, other order, *"
+[variant.gff-data-block-padded]
+format = "gff"
+writer = "a community blueprint editor (the files carry no tool signature); measured over 53 UTC and UTT files in the build's Override/ and module .mod files, all from mods that add creatures"
+description = "the field data block ends with four or eight zero bytes no field's value covers, and the header's FieldDataCount (0x24) counts them; BioWare's writer sizes the block to its last value. The writer emits the block without the tail, so the file is four or eight bytes shorter and every later offset moves"
+recognised = "gff: * V3.2; sections adjacent; data: * unused bytes; field indices: all used; list indices: all used; locstring totals: all right; narrow fields: clean"
+
+[variant.gff-locstring-total-wrong]
+format = "gff"
+writer = "KotOR Tool (the file carries its KTInfoVersion, KTInfoDate and KTGameVerIndex fields); measured over one UTI in the build's Override/"
+description = "a CExoLocString's total-size word (the first dword of its data) disagrees with the substrings that follow it, which the engine reads by count, not by total; the writer emits the total the substrings add up to, so one dword in the data block differs"
+recognised = "gff: * V3.2; sections adjacent; data: all used; *; locstring totals: * wrong; narrow fields: clean"
+
+[variant.gff-wide-value-in-narrow-field]
+format = "gff"
+writer = "a dialogue editor (the file carries no tool signature); measured over one DLG in a build module"
+description = "a WORD field's data dword holds 0xFFFFFFFF, bits above the sixteen the type has (a -1 written at dword width); the engine reads the low sixteen, and the writer emits only those, so the high half of the dword differs"
+recognised = "gff: * V3.2; sections adjacent; data: all used; *; locstring totals: all right; narrow fields: * with wide values"
