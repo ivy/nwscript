@@ -20,6 +20,11 @@ Examples:
   rakata which --duplicates --game DIR     Override files that differ only in case
   rakata corpus extract --game DIR         every script of the install, to the corpus
   rakata corpus decompile --game DIR       every bytecode-only script, recovered to source
+  rakata cat dan14_juhani.utc --module danm14ac --game DIR > dan14_juhani.utc
+  rakata gff show dan14_juhani.utc --module danm14ac --game DIR --path Tag
+  rakata 2da diff globalcat.2da globalcat.2da --game-a VANILLA --game-b BUILD
+  rakata tlk show 42724 --game DIR         the string a strref names
+  rakata lip show ./n_juhani_01.lip        a lip-sync file's keyframes
 
 Exit codes: 0 success, 1 errors reported, 2 bad invocation,
 3 a comparison found a difference, 101 internal error.";
@@ -123,4 +128,15 @@ pub enum Command {
     Conformance(crate::cmd::ConformanceArgs),
     /// The script corpus: extract every script of an install, decompile every bytecode-only script, verify against the manifest.
     Corpus(crate::cmd::CorpusArgs),
+    /// Write a resource's bytes to stdout: the copy the engine loads, a file, or an archive member.
+    Cat(crate::cmd::CatArgs),
+    /// Show a GFF's tree or one field, set fields by path, or diff two GFFs by path.
+    Gff(crate::cmd::GffArgs),
+    /// Show a 2DA table, row, column or cell, or diff two tables by row and column.
+    #[command(name = "2da")]
+    TwoDa(crate::cmd::TwoDaArgs),
+    /// Show a talk table's string by strref or text, or append one and print its strref.
+    Tlk(crate::cmd::TlkArgs),
+    /// Show a lip-sync file's keyframes.
+    Lip(crate::cmd::LipArgs),
 }

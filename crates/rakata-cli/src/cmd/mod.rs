@@ -4,9 +4,20 @@ mod conformance;
 pub use conformance::ConformanceArgs;
 mod corpus;
 pub use corpus::CorpusArgs;
+mod cat;
 mod explain;
 mod install;
 mod which;
+pub use cat::CatArgs;
+mod gff;
+pub use gff::GffArgs;
+mod inspect;
+mod lip;
+pub use lip::LipArgs;
+mod tlk;
+pub use tlk::TlkArgs;
+mod twoda;
+pub use twoda::TwoDaArgs;
 
 use crate::Exit;
 use crate::cli::{Cli, Command};
@@ -73,6 +84,11 @@ pub fn run(cli: Cli) -> Exit {
         } => install::run(&ctx, &tslpatchdata, option, dry_run),
         Command::Conformance(args) => conformance::run(&ctx, &args),
         Command::Corpus(args) => corpus::run(&ctx, &args),
+        Command::Cat(args) => cat::run(&ctx, &args),
+        Command::Gff(args) => gff::run(&ctx, &args),
+        Command::TwoDa(args) => twoda::run(&ctx, &args),
+        Command::Tlk(args) => tlk::run(&ctx, &args),
+        Command::Lip(args) => lip::run(&ctx, &args),
         Command::Which {
             name,
             module,

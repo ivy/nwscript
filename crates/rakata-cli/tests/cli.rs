@@ -160,10 +160,32 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
     commands.sort_unstable();
     assert_eq!(
         commands,
-        ["conformance", "corpus", "explain", "install", "which"],
+        [
+            "2da",
+            "cat",
+            "conformance",
+            "corpus",
+            "explain",
+            "gff",
+            "install",
+            "lip",
+            "tlk",
+            "which"
+        ],
         "--help lists commands not yet built"
     );
-    for cmd in ["conformance", "corpus", "explain", "install", "which"] {
+    for cmd in [
+        "2da",
+        "cat",
+        "conformance",
+        "corpus",
+        "explain",
+        "gff",
+        "install",
+        "lip",
+        "tlk",
+        "which",
+    ] {
         let out = rakata().args([cmd, "--help"]).output().unwrap();
         assert!(
             String::from_utf8_lossy(&out.stdout).contains("Example"),
