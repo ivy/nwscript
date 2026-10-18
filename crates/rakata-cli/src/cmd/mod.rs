@@ -197,6 +197,7 @@ pub fn run(cli: Cli) -> Exit {
             name,
             module,
             profile,
+            texture_pack,
             duplicates,
         } => which::run(
             &ctx,
@@ -204,6 +205,7 @@ pub fn run(cli: Cli) -> Exit {
                 name: name.as_deref(),
                 module: module.as_deref(),
                 profile,
+                texture_pack: texture_pack.into(),
                 duplicates,
             },
         ),

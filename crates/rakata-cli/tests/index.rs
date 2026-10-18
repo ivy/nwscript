@@ -344,6 +344,36 @@ fn acceptance(var: &str) {
     ]);
     assert!(q["result"]["rows"][0][0].as_i64().unwrap() > 0);
 
+    // Textures: the copy `rakata which` names (a texture pack's member in
+    // vanilla) is one the index locates, under the same path and member.
+    for (name, ty) in [
+        ("fnt_d16x16", "tpc"),
+        ("lbl_menudarr", "txi"),
+        ("lhr_flr01", "tpc"),
+    ] {
+        let w = json(&["which", &format!("{name}.{ty}"), "--game", s(&game)]);
+        let winner = &w["result"]["winner"];
+        let path = Path::new(winner["location"]["path"].as_str().unwrap());
+        let rel = path.strip_prefix(&game).unwrap().to_str().unwrap();
+        let q = json(&[
+            "index",
+            "query",
+            "--db",
+            s(&db),
+            &format!(
+                "SELECT path, member, hash FROM locations WHERE name = '{name}' AND type = '{ty}'"
+            ),
+        ]);
+        let rows = q["result"]["rows"].as_array().unwrap();
+        // A loose file (the build's Override) has no member.
+        let member = winner["location"]["member"].as_str().unwrap_or("");
+        assert!(
+            rows.iter()
+                .any(|r| r[0] == rel && r[1] == member && r[2] == winner["sha256"]),
+            "{var}: {name}.{ty} wins at {rel}; the index locates {rows:?}"
+        );
+    }
+
     // Every file of the tree has a coverage row.
     let c = json(&["index", "coverage", "--db", s(&db), "--tree", "t"]);
     let files = c["result"]["trees"][0]["files"].as_u64().unwrap();

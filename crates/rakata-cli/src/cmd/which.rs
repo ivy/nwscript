@@ -6,7 +6,9 @@ use crate::Exit;
 use crate::cli::ProfileArg;
 use rakata::codes;
 use rakata::diag::{Diagnostic, SourceMap, codes::Code};
-use rakata::game::{Candidate, Install, Location, ModuleName, Profile, Resolution, Verdict};
+use rakata::game::{
+    Candidate, Install, Location, ModuleName, Profile, Resolution, TexturePack, Verdict,
+};
 use rakata_res::ResId;
 use serde_json::{Value, json};
 use std::path::Path;
@@ -16,6 +18,7 @@ pub struct Args<'a> {
     pub name: Option<&'a str>,
     pub module: Option<&'a str>,
     pub profile: ProfileArg,
+    pub texture_pack: TexturePack,
     pub duplicates: bool,
 }
 
@@ -42,7 +45,7 @@ pub fn run(ctx: &Ctx, args: Args<'_>) -> Exit {
     let map = SourceMap::new();
     crate::working_on(game.display().to_string());
     let install = match Install::open(game, profile) {
-        Ok(i) => i,
+        Ok(i) => i.with_texture_pack(args.texture_pack),
         Err(e) => return ctx.finish(env, "", vec![error(&e)], &map, Exit::Ok),
     };
 
@@ -91,6 +94,15 @@ pub fn run(ctx: &Ctx, args: Args<'_>) -> Exit {
     };
 
     let mut diags = Vec::new();
+    if let Some(path) = install.missing_texture_pack() {
+        diags.push(Diagnostic::new(
+            code_of(rakata::game::codes::MISSING_TEXTURE_PACK),
+            format!(
+                "the texture pack `{}` is not in the install: the texture layer holds only swpc_tex_gui.erf",
+                path.display()
+            ),
+        ));
+    }
     if let Some(e) = resolution.not_found() {
         diags.push(error(&e));
     }
@@ -103,6 +115,7 @@ pub fn run(ctx: &Ctx, args: Args<'_>) -> Exit {
         diags.push(case_variants(&paths));
     }
     env.result = to_json(&resolution);
+    env.result["texture_pack"] = json!(install.texture_pack().name());
     let text = render(&resolution, game);
     ctx.finish(env, &text, diags, &map, Exit::Ok)
 }

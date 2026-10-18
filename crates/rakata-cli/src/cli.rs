@@ -104,6 +104,24 @@ pub enum ProfileArg {
     K2,
 }
 
+/// A quality pack under `TexturePacks/`, as `--texture-pack` names it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum TexturePackArg {
+    Tpa,
+    Tpb,
+    Tpc,
+}
+
+impl From<TexturePackArg> for rakata::game::TexturePack {
+    fn from(a: TexturePackArg) -> Self {
+        match a {
+            TexturePackArg::Tpa => rakata::game::TexturePack::Tpa,
+            TexturePackArg::Tpb => rakata::game::TexturePack::Tpb,
+            TexturePackArg::Tpc => rakata::game::TexturePack::Tpc,
+        }
+    }
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Command {
     /// Install a TSLPatcher mod into the game, or with --dry-run print the plan.
@@ -137,7 +155,7 @@ pub enum Command {
     },
     /// Which copy of a resource the engine loads: the winner, every other copy the install holds, and why each lost.
     #[command(
-        after_help = "Examples:\n  rakata which appearance.2da --game DIR\n  rakata which k_pdan_juhani31.ncs --module danm14ac --game DIR\n  rakata --format json which dan14_juhani.utc --module danm14ac --game DIR\n  rakata which --duplicates --game DIR\n\nThe search order is the engine's: Override/, then the module's capsules (.mod over .rim over _s.rim, then lips/STEM_loc.mod), then patch.erf (KotOR 1), then the BIFs chitin.key indexes. Names compare without regard to case."
+        after_help = "Examples:\n  rakata which appearance.2da --game DIR\n  rakata which k_pdan_juhani31.ncs --module danm14ac --game DIR\n  rakata --format json which dan14_juhani.utc --module danm14ac --game DIR\n  rakata which --duplicates --game DIR\n\nThe search order is the engine's: Override/, then the module's capsules (.mod over .rim over _s.rim, then lips/STEM_loc.mod), then patch.erf (KotOR 1), then the texture packs (the quality pack --texture-pack selects, then TexturePacks/swpc_tex_gui.erf), then the BIFs chitin.key indexes. Names compare without regard to case."
     )]
     Which {
         /// The resource, as name.ext; case does not matter.
@@ -149,6 +167,9 @@ pub enum Command {
         /// The game the install belongs to.
         #[arg(long, value_enum, default_value_t = ProfileArg::K1)]
         profile: ProfileArg,
+        /// The quality pack the texture layer searches, over swpc_tex_gui.erf. Which pack the game's Texture Quality option selects is not established; tpa, the largest textures, is the default.
+        #[arg(long, value_enum, value_name = "PACK", default_value_t = TexturePackArg::Tpa)]
+        texture_pack: TexturePackArg,
         /// List every group of Override files whose names differ only in case, instead of resolving a name.
         #[arg(long)]
         duplicates: bool,
