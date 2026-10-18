@@ -62,7 +62,7 @@ pub struct ShowArgs {
     /// The GFF: NAME.EXT, PATH or ARCHIVE!MEMBER.
     #[arg(value_name = "NAME.EXT")]
     pub name: String,
-    /// An index of the install, for a .git: list the objects the module's scripts create.
+    /// An index of the install, for a .git: list the objects the module's scripts create. Without --game, the root of its one tree is the install.
     #[arg(long, value_name = "FILE")]
     pub db: Option<PathBuf>,
     #[command(flatten)]

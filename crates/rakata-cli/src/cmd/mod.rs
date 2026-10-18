@@ -135,6 +135,7 @@ fn index_flags(cli: &Cli) -> (Option<PathBuf>, Option<String>) {
     use index::IndexAction as A;
     let (db, tree) = match &cli.command {
         Command::Refs(a) => (a.db.db.clone(), a.tree.clone()),
+        Command::Show(a) => (a.db.clone(), None),
         Command::Index(a) => match &a.action {
             A::Build { db, tree, .. } | A::Digest { db, tree } | A::Coverage { db, tree, .. } => {
                 (db.db.clone(), tree.clone())
