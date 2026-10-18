@@ -128,6 +128,7 @@ The engine table changed while the game was being written, and the scripts carry
 - A local hides a parameter: `GN_GetTargetedForcePower(int nDroid = FALSE)` in `k_inc_gensupport.nss` (lines 2544 and 2547) declares a local `nDroid`, so every test of `nDroid` reads the local, never the argument. Lint W0004 reports it.
 - `k_inc_force.nss` declares `Sp_GetRandomDelay`'s defaults as `(0.0, 0.75)` at line 34 and defines them as `(0.4, 1.1)` at line 266. No call omits them, so there are no reference bytes for which BioWare's compiler used; nwnnsscomp uses the prototype's, and so does `nws`.
 - `k_inc_ebonhawk.nss` repeats the prototype of `EBO_BastilaStartConversation2` (lines 11 and 15) and declares `EBO_PlayTakeOff` and `EBO_PlayLanding` as `void` (lines 19, 21) but defines them as `string` (lines 209, 243). Neither is called.
+- `k_inc_generic.nss` declares `struct tLastRound tPR;` at line 27, a ten-field struct global (lines 14 to 25). Module bytecode reads its fields slot by slot, so `nws decompile` recovers it as ten globals, one per field; `rakata corpus decompile` folds them back as `tPR.FIELD` when the script includes the library. A grep for `^int SW_COMBO_` in `k_inc_gensupport.nss` finds the 29 combo constants twice, at lines 29 to 57 and lines 486 to 514; the second set sits inside the block comment that opens at line 482, so only the first is declared.
 
 ### Encodings the corpus confirms
 

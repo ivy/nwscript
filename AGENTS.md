@@ -40,13 +40,14 @@ No game bytes are committed, ever. Tests that need a game install read the user'
 No game bytes are committed, ever. Tests that need BioWare's scripts read a corpus extracted from the user's own game, from `$NWSCRIPT_CORPUS` (default `~/.cache/nwscript/corpus/k1`), and skip with a message naming the variable when it is absent.
 
 ```bash
-cargo xtask corpus extract --game-dir PATH/TO/swkotor   # writes the corpus
-cargo xtask corpus verify                              # checks it against conformance/k1.toml
+rakata corpus extract --game PATH/TO/swkotor     # writes the corpus (cargo xtask corpus extract --game-dir is the same)
+rakata corpus verify                             # checks it against conformance/k1.toml
+rakata corpus decompile --game PATH/TO/swkotor   # decompiled/: every bytecode-only script, with headers and calls.jsonl
 ```
 
 [`docs/grammar.md`](docs/grammar.md) is the language as the corpus uses it, each construct cited with counts from `cargo xtask grammar-census`. After changing the census or the document, `cargo xtask grammar-census --check docs/grammar-census.txt --doc docs/grammar.md` confirms they agree.
 
-The layout is `nss/`, `ncs/`, `nwscript.nss` as shipped, `oracle/` (the include directory for nwnnsscomp, with BioWare's line-5145 typo fixed), and `modules/STEM/` and `rims/STEM/` for the NCS in each capsule. On the maintainer's build host the vanilla install is modshop's `games/kotor/data/game/vanilla/tree`.
+The layout is `nss/`, `ncs/`, `nwscript.nss` as shipped, `oracle/` (the include directory for nwnnsscomp, with BioWare's line-5145 typo fixed), `modules/STEM/` and `rims/STEM/` for the NCS in each capsule, and `decompiled/CAPSULE/NAME.nss` with `decompiled/calls.jsonl` from `rakata corpus decompile` ([`docs/decompiler.md`](docs/decompiler.md)). On the maintainer's build host the vanilla install is modshop's `games/kotor/data/game/vanilla/tree`.
 
 ## Working here
 
@@ -56,11 +57,7 @@ The layout is `nss/`, `ncs/`, `nwscript.nss` as shipped, `oracle/` (the include 
 - Fuzzing: targets live in `crates/<crate>/fuzz/`, outside the workspace, and need a nightly toolchain: from that directory, `mise x cargo:cargo-fuzz -- cargo +nightly fuzz run decode -- -max_total_time=600`.
 - Tools come from mise (`mise.toml`); do not install with brew, apt or npx.
 - Diagnostics are data (`nwscript-diag`): every error has a registered code with an explanation; never build one from rendered text.
-- Rakata codes come in blocks of a hundred, one per crate or command family, so parallel branches never collide: `rakata-res` RE01xx, `rakata-archive` RE02xx, `rakata-patch` RE03xx/RW03xx, `rakata-game` RE04xx/RW04xx, conformance RE05xx/RW05xx; the next crate takes the next free block and records it here.
-- `rakata-tlk` holds RE08xx and RW08xx.
-- `rakata-lip` holds RE09xx and RW09xx.
-- `rakata-2da` holds RE07xx and RW07xx.
-- Rakata codes come in blocks of a hundred, one per crate or command family, so parallel branches never collide: `rakata-res` RE01xx, `rakata-archive` RE02xx, `rakata-patch` RE03xx/RW03xx, `rakata-game` RE04xx/RW04xx, conformance RE05xx/RW05xx, `rakata-gff` RE06xx/RW06xx; the next crate takes the next free block and records it here.
+- Rakata codes come in blocks of a hundred, one per crate or command family, so parallel branches never collide: `rakata-res` RE01xx, `rakata-archive` RE02xx, `rakata-patch` RE03xx/RW03xx, `rakata-game` RE04xx/RW04xx, conformance RE05xx/RW05xx, `rakata-gff` RE06xx/RW06xx, `rakata-2da` RE07xx/RW07xx, `rakata-tlk` RE08xx/RW08xx, `rakata-lip` RE09xx/RW09xx, `rakata corpus` RE10xx/RW10xx; the next crate takes the next free block and records it here.
 - Markdown: one paragraph per line, no hard wrapping. Documents state current facts, not their history.
 - Commits: small and coherent, conventional-commit subjects, no AI attribution.
 - Prior work is described with respect: what it achieved and the constraints it was built under.

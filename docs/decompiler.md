@@ -14,6 +14,20 @@ target/release/nws --game k1 --declarations bioware -I "$C" decompile "$C" --mar
 
 `--declarations bioware` reads and verifies against the declarations BioWare's scripts were compiled against; with the shipped declarations, 98.42% of module functions verify.
 
+## The decompiled corpus
+
+`rakata corpus decompile --game DIR` writes every bytecode-only script of an install (every NCS in every module capsule, under `rims/` and under `Override/`) to `decompiled/CAPSULE/NAME.nss` in the corpus directory, verified the same way, with a header naming where the copy lies, every other copy the install holds, which copy the engine loads (from `rakata-game`), and how many functions verified. A recovered function that is byte for byte a function of an include library the install holds is replaced by the `#include` line, so a grep hit is in the script's own logic; the engine calls with string arguments that the replaced functions made are listed in the header, so the grep still finds the script. The match is by bytecode shape (`nwscript_decomp::shape`), never by name, and is kept only when the folded source recompiles to the original bytes; a function the script embeds from an older version of its library stays in the script's own source, as do its callers. `decompiled/calls.jsonl` has one line per engine call: `{"script","capsule","routine","args","offset"}`, the arguments as literals where the bytecode pushes constants and `null` where it computes them.
+
+Over the vanilla install (`$RAKATA_GAME_K1`), measured on the maintainer's machine in release:
+
+| Source | Scripts | Functions | Verified | Fraction | Folded into an include | Calls indexed |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `modules` | 10,863 | 44,925 | 44,889 | 99.92% | 25,419 | 315,121 |
+| `rims` | 492 | 1,586 | 1,586 | 100.00% | 664 | 11,694 |
+| **total** | 11,355 | 46,511 | 46,475 | 99.92% | 26,083 | 326,815 |
+
+21 include libraries are indexed: every NSS of the install without an entry point that defines a function, which is the `k_inc_*` files less `k_inc_switch` (constants only) and `e3_scripts` (a Neverwinter Nights leftover that does not compile against KotOR 1's `nwscript.nss`, reported as RW1002). 2,670 scripts fold at least one include, and no fold is refused. Wall time: 2.9 s on 16 threads. The modded build (`$RAKATA_BUILD`, 22,507 scripts, 147 of them under `Override/`) takes 4.6 s and folds 52,264 functions; its `Override/` scripts verify at 88.72%, the rest having been compiled by other tools from other declarations.
+
 | Directory | Scripts | Verified whole | Failed | Functions | Verified | Unverified | Not recovered | Unchecked | Verified fraction |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `modules/danm13_s` | 252 | 251 | 0 | 495 | 488 | 7 | 0 | 0 | 98.59% |
