@@ -6,7 +6,8 @@
 //! ([`Mod::loaded`], which sees the mod's own writes first), guards a
 //! resource the mod replaces ([`Mod::guard_replaced`]), and writes to
 //! `Override/` and `streamwaves/` ([`Mod::write_override`],
-//! [`Mod::write_streamwaves`]). Every write is read back as its type first;
+//! [`Mod::write_streamwaves`]), or into the module's own `.mod` for an edit
+//! that module alone loads ([`Mod::write_module`]). Every write is read back as its type first;
 //! a dialogue is also checked with [`rakata_dialog::check()`] against the
 //! install and the mod's earlier writes, and refused, with the file on disk
 //! unchanged, when a node or link it adds or changes names a script, a
@@ -42,6 +43,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use rakata_archive::{Erf, ErfKind, Rim};
 use rakata_dialog::{Dialog, Finding, NodeKey, NodeRef};
 use rakata_game::{Install, Layer, Location, ModuleName};
 use rakata_res::{ContentHash, ResId, ResRef, ResType};
@@ -84,6 +86,8 @@ pub struct Mod {
     /// What this mod wrote to `Override/`, which the install's listing,
     /// taken when it opened, does not show.
     written: HashMap<ResId, PathBuf>,
+    /// What this mod wrote into a module's `.mod`, by module and resource.
+    in_module: HashMap<(ModuleName, ResId), PathBuf>,
     /// The lowercase stems of voice-overs on disk under `streamwaves/` and
     /// `streamvoice/` and written by this mod; listed on first use.
     voices: Option<HashSet<String>>,
@@ -111,6 +115,7 @@ impl Mod {
             install: install.into(),
             module: None,
             written: HashMap::new(),
+            in_module: HashMap::new(),
             voices: None,
             tlk: None,
             globals: None,
@@ -176,10 +181,36 @@ impl Mod {
     }
 
     /// The copy of `id` the game loads: this mod's own write when it made
-    /// one, else the install's in the engine's order (`Override/`, the
-    /// module's capsules, `patch.erf`, the BIFs). Fails with `RE0404` when
-    /// no layer holds it.
+    /// one (to `Override/`, or into this module's `.mod`), else the
+    /// install's in the engine's order (`Override/`, the module's capsules,
+    /// `patch.erf`, the BIFs). Fails with `RE0404` when no layer holds it.
     pub fn loaded(&self, id: ResId) -> Result<Loaded> {
+        if let Some((module, capsule)) = self.written_here(id) {
+            let bytes = fs::read(capsule).map_err(|source| {
+                Error::Game(rakata_game::Error::Io {
+                    path: capsule.to_path_buf(),
+                    source,
+                })
+            })?;
+            let member = Erf::parse(&bytes)
+                .map_err(|e| unreadable(capsule, e))?
+                .get(id)
+                .map(<[u8]>::to_vec)
+                .ok_or_else(|| {
+                    Error::Game(rakata_game::Error::NotFound {
+                        id,
+                        module: Some(module.to_string()),
+                    })
+                })?;
+            return Ok(Loaded {
+                bytes: member,
+                location: self.relative(&Location::Capsule {
+                    path: capsule.to_path_buf(),
+                    member: id,
+                }),
+                written: true,
+            });
+        }
         if let Some(path) = self.written.get(&id) {
             let bytes = fs::read(path).map_err(|source| {
                 Error::Game(rakata_game::Error::Io {
@@ -204,6 +235,18 @@ impl Mod {
                 module: self.module.as_ref().map(ToString::to_string),
             })),
         }
+    }
+
+    /// The `.mod` this mod wrote `id` into for the module it works in, when
+    /// no write of its own to `Override/` outranks it.
+    pub(crate) fn written_here(&self, id: ResId) -> Option<(&ModuleName, &Path)> {
+        if self.written.contains_key(&id) {
+            return None;
+        }
+        let module = self.module.as_ref()?;
+        self.in_module
+            .get(&(module.clone(), id))
+            .map(|p| (module, p.as_path()))
     }
 
     /// Guard a resource the mod replaces: every copy in the module's
@@ -345,17 +388,133 @@ impl Mod {
         });
         write_file(&path, bytes)?;
         self.written.insert(id, path.clone());
-        match id.ty {
-            ResType::TwoDa if id.name == res("globalcat") => self.globals = None,
-            ResType::Nss if id.name == res("nwscript") => self.routines = None,
-            _ => {}
-        }
+        self.forget(id);
         Ok(Written {
             path,
             hash: ContentHash::of(bytes),
             len: bytes.len(),
             warnings,
         })
+    }
+
+    /// Write `bytes` as `name` into the `.mod` of the module the mod works
+    /// in, for an edit that module alone loads: another module's own copy
+    /// stays as it is, which a write to `Override/` would replace
+    /// (`RE1415`). The engine loads a module's `.mod` in place of its
+    /// `.rim` and `_s.rim`, so a `.mod` the module lacks is made from them
+    /// first, every member kept and the first copy of a name winning, as
+    /// the engine's search over them finds it; a `.mod` already there keeps
+    /// every other member's bytes. The bytes are read back and a dialogue
+    /// checked as [`Mod::write_override`] does. Fails, with the disk
+    /// unchanged, when the mod names no module (`RE1419`) or `Override/`
+    /// holds a copy, the install's or this mod's, that would go on being
+    /// loaded over it (`RE1418`). [`Written::path`] is the `.mod`, and its
+    /// hash and length are the member's.
+    pub fn write_module(&mut self, name: &str, bytes: &[u8]) -> Result<Written> {
+        let id = ResId::parse(name)?;
+        let Some(module) = self.module.clone() else {
+            return Err(Error::NoModule { id });
+        };
+        let shadow = match self.written.get(&id) {
+            Some(p) => Some(p.clone()),
+            None => self
+                .install
+                .resolve(id, Some(&module))?
+                .candidates
+                .into_iter()
+                .find(|c| c.layer == Layer::Override)
+                .map(|c| c.location.path().to_path_buf()),
+        };
+        if let Some(path) = shadow {
+            return Err(Error::OverrideShadows {
+                id,
+                module: module.to_string(),
+                path,
+            });
+        }
+        let warnings = self.validate(id, name, bytes)?;
+        let path = self.module_mod(&module)?;
+        let existing = match fs::read(&path) {
+            Ok(b) => Some(b),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(source) => return Err(Error::Write { path, source }),
+        };
+        let rims;
+        let mut erf = match &existing {
+            Some(b) => Erf::parse(b).map_err(|e| unreadable(&path, e))?,
+            None => {
+                rims = self.module_rims(&module)?;
+                from_rims(&rims)?
+            }
+        };
+        let put = if erf.contains(id) {
+            erf.replace(id, bytes.to_vec())
+        } else {
+            erf.add(id, bytes.to_vec())
+        };
+        let out = put
+            .and_then(|()| erf.to_bytes())
+            .map_err(|e| unreadable(&path, e))?;
+        write_file(&path, &out)?;
+        self.in_module.insert((module, id), path.clone());
+        self.forget(id);
+        Ok(Written {
+            path,
+            hash: ContentHash::of(bytes),
+            len: bytes.len(),
+            warnings,
+        })
+    }
+
+    /// Where the module's `.mod` lies, or would: beside its RIMs, in the
+    /// spelling of one already there.
+    fn module_mod(&self, module: &ModuleName) -> Result<PathBuf> {
+        let capsules = self.install.module_capsules(module)?;
+        let own = format!("{module}.mod");
+        if let Some(p) = capsules.iter().find(|p| file_is(p, &own)) {
+            return Ok(p.to_path_buf());
+        }
+        let dir = capsules
+            .first()
+            .and_then(|p| p.parent())
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| self.install.root().join("modules"));
+        Ok(dir.join(own))
+    }
+
+    /// The module's RIMs (and KotOR 2's `_dlg.erf`) a new `.mod` is made
+    /// from, in the engine's order, with their bytes.
+    fn module_rims(&self, module: &ModuleName) -> Result<Vec<(PathBuf, Vec<u8>)>> {
+        let names: Vec<String> = self
+            .install
+            .profile()
+            .module_suffixes()
+            .iter()
+            .filter(|s| **s != ".mod")
+            .map(|s| format!("{module}{s}"))
+            .collect();
+        let mut out = Vec::new();
+        for p in self.install.module_capsules(module)? {
+            if names.iter().any(|n| file_is(p, n)) {
+                let bytes = fs::read(p).map_err(|source| {
+                    Error::Game(rakata_game::Error::Io {
+                        path: p.to_path_buf(),
+                        source,
+                    })
+                })?;
+                out.push((p.to_path_buf(), bytes));
+            }
+        }
+        Ok(out)
+    }
+
+    /// Drop what was read from a resource the mod has just written.
+    fn forget(&mut self, id: ResId) {
+        match id.ty {
+            ResType::TwoDa if id.name == res("globalcat") => self.globals = None,
+            ResType::Nss if id.name == res("nwscript") => self.routines = None,
+            _ => {}
+        }
     }
 
     /// Write a voice-over to `streamwaves/` as `resref.wav`, onto the
@@ -453,6 +612,46 @@ impl Mod {
             found
         })
     }
+}
+
+/// A `.mod` holding every member of `rims`, the first copy of a name
+/// winning.
+fn from_rims(rims: &[(PathBuf, Vec<u8>)]) -> Result<Erf<'static>> {
+    let mut erf = Erf::new(ErfKind::Mod);
+    for (path, data) in rims {
+        let members: Vec<(ResId, Vec<u8>)> = if data.starts_with(b"RIM ") {
+            let r = Rim::parse(data).map_err(|e| unreadable(path, e))?;
+            r.members()
+                .iter()
+                .map(|m| (m.id, m.data().to_vec()))
+                .collect()
+        } else {
+            let e = Erf::parse(data).map_err(|e| unreadable(path, e))?;
+            e.members()
+                .iter()
+                .map(|m| (m.id, m.data().to_vec()))
+                .collect()
+        };
+        for (member, data) in members {
+            if !erf.contains(member) {
+                erf.add(member, data).map_err(|e| unreadable(path, e))?;
+            }
+        }
+    }
+    Ok(erf)
+}
+
+fn unreadable(path: &Path, source: rakata_archive::Error) -> Error {
+    Error::Game(rakata_game::Error::Archive {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+/// Whether the file at `p` is named `name`, in any case.
+fn file_is(p: &Path, name: &str) -> bool {
+    p.file_name()
+        .is_some_and(|f| f.to_string_lossy().eq_ignore_ascii_case(name))
 }
 
 fn res(name: &str) -> ResRef {

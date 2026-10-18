@@ -48,6 +48,11 @@ pub mod codes {
     pub const SCRIPT_DIFFERS: &str = "RE1416";
     /// A global `globalcat.2da` does not declare.
     pub const GLOBAL_UNDECLARED: &str = "RE1417";
+    /// A copy in `Override/` that a write into a module's capsule would
+    /// stay beneath.
+    pub const OVERRIDE_SHADOWS: &str = "RE1418";
+    /// A write into a module's capsule from a mod that names no module.
+    pub const NO_MODULE: &str = "RE1419";
 }
 
 /// An authoring operation's refusal.
@@ -143,6 +148,15 @@ pub enum Error {
     },
     /// `globalcat.2da` does not declare the global.
     GlobalUndeclared { name: String },
+    /// `Override/` holds the resource, so the module would go on loading
+    /// that copy over the one written into its capsule.
+    OverrideShadows {
+        id: ResId,
+        module: String,
+        path: PathBuf,
+    },
+    /// A write into a module's capsule, and the mod works in no module.
+    NoModule { id: ResId },
 }
 
 /// The authoring API's result type.
@@ -184,6 +198,8 @@ impl Error {
             Error::OtherModuleDiffers { .. } => codes::OTHER_MODULE_DIFFERS,
             Error::ScriptDiffers { .. } => codes::SCRIPT_DIFFERS,
             Error::GlobalUndeclared { .. } => codes::GLOBAL_UNDECLARED,
+            Error::OverrideShadows { .. } => codes::OVERRIDE_SHADOWS,
+            Error::NoModule { .. } => codes::NO_MODULE,
         }
     }
 
@@ -286,6 +302,13 @@ impl Error {
             }
             Error::GlobalUndeclared { name } => format!(
                 "globalcat.2da does not declare {name}; the engine keeps no such global, reading it answers 0 and setting it does nothing"
+            ),
+            Error::OverrideShadows { id, module, path } => format!(
+                "Override holds {id} ({}), which outranks {module}'s capsules; written into {module}.mod, the edit would never be loaded",
+                path.display()
+            ),
+            Error::NoModule { id } => format!(
+                "the mod works in no module, so there is no capsule to write {id} into; name the module first"
             ),
         }
     }

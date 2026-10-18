@@ -53,7 +53,7 @@ impl Mod {
 impl References for Mod {
     fn resolves(&mut self, name: &ResRef, ty: ResType) -> bool {
         let id = ResId::new(*name, ty);
-        if self.written.contains_key(&id) {
+        if self.written.contains_key(&id) || self.written_here(id).is_some() {
             return true;
         }
         if ty == ResType::Wav

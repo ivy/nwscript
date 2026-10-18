@@ -1,6 +1,7 @@
 //! The authoring API over the user's own installs: the Juhani mod's guards,
 //! table rows, globals, clones and dialogue checks against vanilla KotOR 1,
-//! written into a mirror of it whose `Override/` is the test's own, and the
+//! written into a mirror of it whose `Override/` and `modules/` are the
+//! test's own, a dialogue written into one Taris module's `.mod`, and the
 //! checks over the modded build's dialogues read in place.
 //!
 //! Reads `$RAKATA_GAME_K1` (a vanilla KotOR 1 install) and `$RAKATA_BUILD`
@@ -49,9 +50,10 @@ fn id(text: &str) -> ResId {
     ResId::parse(text).unwrap()
 }
 
-/// A mirror of `game`: every entry linked, except `Override/`, whose files
-/// are linked one by one into a folder of the mirror's own, so a write
-/// replaces a link and never touches the install.
+/// A mirror of `game`: every entry linked, except `Override/` and
+/// `modules/`, whose files are linked one by one into folders of the
+/// mirror's own, so a write replaces a link or adds a file and never
+/// touches the install.
 fn mirror(game: &Path, name: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!("rakata-author-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -59,7 +61,10 @@ fn mirror(game: &Path, name: &str) -> PathBuf {
     for e in fs::read_dir(game).unwrap() {
         let e = e.unwrap();
         let n = e.file_name();
-        if n.to_string_lossy().eq_ignore_ascii_case("override") {
+        let own = ["override", "modules"]
+            .iter()
+            .any(|d| n.to_string_lossy().eq_ignore_ascii_case(d));
+        if own {
             let dir = root.join(&n);
             fs::create_dir(&dir).unwrap();
             for f in fs::read_dir(e.path()).unwrap() {
@@ -238,4 +243,81 @@ fn the_build_already_holds_the_juhani_mods_replacements_and_its_dialogues_check_
             .collect();
         assert!(ours.is_empty(), "{ours:#?}");
     }
+}
+
+/// The Calo Nord plan's Scene 6: `tar02_carbast` edited for `tar_m02af`,
+/// whose copy differs from `tar_m02aa`'s, written into `tar_m02af.mod`.
+#[test]
+fn tar02_carbast_is_edited_for_the_hideout_alone() {
+    use rakata::diff::{self, Change, Options};
+    use rakata_game::ModuleName;
+
+    let Some(game) = tree("RAKATA_GAME_K1") else {
+        return;
+    };
+    let root = mirror(&game, "carbast");
+    let name = "tar02_carbast.dlg";
+    let mut m = Mod::open(
+        Install::open(&root, Profile::K1).unwrap(),
+        Some("tar_m02af"),
+    )
+    .unwrap();
+    let e = m.guard_other_modules(id(name)).unwrap_err();
+    assert_eq!(e.code(), codes::OTHER_MODULE_DIFFERS);
+    assert!(e.to_string().contains("tar_m02aa"), "{e}");
+
+    let base = m.loaded(id(name)).unwrap();
+    assert!(
+        base.location.starts_with("modules/tar_m02af"),
+        "{}",
+        base.location
+    );
+    let mut d = Dialog::parse(name, &base.bytes).unwrap();
+    let r = dlg::add_reply(
+        &mut d,
+        &NewNode {
+            text: Text::English("A reply of the test's own.".into()),
+            ..NewNode::default()
+        },
+    )
+    .unwrap();
+    let anchor = NodeKey::Voice(ResRef::new("nm02aacarb01002_").unwrap());
+    dlg::link(&mut d, &anchor, &r.into(), None, Some(0)).unwrap();
+    let ours = d.to_bytes().unwrap();
+    let w = m.write_module(name, &ours).unwrap();
+    assert!(
+        w.path.ends_with("modules/tar_m02af.mod"),
+        "{}",
+        w.path.display()
+    );
+
+    let fresh = Install::open(&root, Profile::K1).unwrap();
+    let vanilla = Install::open(&game, Profile::K1).unwrap();
+    let read = |i: &Install, module: &str| {
+        i.read(id(name), Some(&ModuleName::new(module)))
+            .unwrap()
+            .unwrap()
+            .1
+    };
+    assert_eq!(read(&fresh, "tar_m02af"), ours);
+    assert_eq!(read(&fresh, "tar_m02aa"), read(&vanilla, "tar_m02aa"));
+
+    let options = Options {
+        only: vec!["modules".into()],
+        ..Options::default()
+    };
+    let d = diff::diff_trees(&game, &root, &options).unwrap();
+    let text = d.text();
+    let paths: Vec<&str> = d.entries.iter().map(|e| e.path.as_str()).collect();
+    assert_eq!(
+        paths,
+        [
+            "modules/tar_m02af.mod",
+            "modules/tar_m02af.mod!tar02_carbast.dlg"
+        ],
+        "{text}"
+    );
+    assert_eq!(d.entries[1].change, Change::Added);
+    assert!(text.contains("A reply of the test's own."), "{text}");
+    fs::remove_dir_all(&root).unwrap();
 }

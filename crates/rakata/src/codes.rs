@@ -139,6 +139,8 @@ nwscript_diag::codes! {
     RE1415 Error "another module's own copy of a resource a write to Override would replace, unlike the copy the mod edits";
     RE1416 Error "a dialogue node whose script is not the one an edit replaces";
     RE1417 Error "a global globalcat.2da does not declare";
+    RE1418 Error "a copy in Override that a write into a module's capsule would stay beneath";
+    RE1419 Error "a write into a module's capsule from a mod that names no module";
     RE1501 Error "the index database could not be read or written";
     RE1502 Error "an index database of another schema version";
     RE1503 Error "a tree the index database does not hold";

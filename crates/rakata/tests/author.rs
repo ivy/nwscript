@@ -1015,3 +1015,175 @@ fn a_globals_type_is_its_declared_one_and_an_undeclared_global_is_refused() {
     assert_eq!(e.code(), "RE0706");
     fs::remove_dir_all(root).unwrap();
 }
+
+/// `testmod_s.rim` and `othermod.rim` each with their own `banter.dlg`, the
+/// other module's a line longer; returns the other module's bytes.
+fn two_copies(root: &Path) -> Vec<u8> {
+    let mut rim = Rim::new();
+    rim.add(id("k_replaced.ncs"), REPLACED.to_vec()).unwrap();
+    rim.add(id("banter.dlg"), banter().to_bytes().unwrap())
+        .unwrap();
+    fs::write(root.join("modules/testmod_s.rim"), rim.to_bytes().unwrap()).unwrap();
+    let mut theirs = banter();
+    dlg::add_entry(&mut theirs, &line("Only in othermod.")).unwrap();
+    let theirs = theirs.to_bytes().unwrap();
+    other_module(root, &[("banter.dlg", &theirs)]);
+    theirs
+}
+
+fn files_under(dir: &Path) -> Vec<(String, Vec<u8>)> {
+    let mut out: Vec<(String, Vec<u8>)> = fs::read_dir(dir)
+        .unwrap()
+        .map(|e| {
+            let e = e.unwrap();
+            (
+                e.file_name().to_string_lossy().into_owned(),
+                fs::read(e.path()).unwrap(),
+            )
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+#[test]
+fn a_dialogue_written_into_one_modules_mod_leaves_the_other_modules_copy() {
+    use rakata::diff::{self, Change, Options};
+    use rakata_archive::{Erf, ErfKind};
+    use rakata_game::ModuleName;
+
+    let input = make("one-module-in", false);
+    two_copies(&input);
+    let root = make("one-module", false);
+    let theirs = two_copies(&root);
+    let rims_before = files_under(&root.join("modules"));
+    let mut m = open(&root);
+    // Through Override, the edit would replace othermod's copy too
+    let e = m.guard_other_modules(id("banter.dlg")).unwrap_err();
+    assert_eq!(e.code(), codes::OTHER_MODULE_DIFFERS);
+
+    let base = m.loaded(id("banter.dlg")).unwrap();
+    assert_eq!(base.location, "modules/testmod_s.rim:banter.dlg");
+    let mut d = Dialog::parse("banter.dlg", &base.bytes).unwrap();
+    let e0 = dlg::add_entry(&mut d, &line("Only in testmod.")).unwrap();
+    dlg::start(&mut d, &e0.into(), None, None).unwrap();
+    let ours = d.to_bytes().unwrap();
+    let w = m.write_module("banter.dlg", &ours).unwrap();
+    assert_eq!(w.path, root.join("modules/testmod.mod"));
+    assert_eq!(w.hash, ContentHash::of(&ours));
+    assert!(w.warnings.is_empty(), "{:?}", w.warnings);
+
+    // The .mod holds every member of the RIMs, the edit in place of theirs
+    let made = fs::read(root.join("modules/testmod.mod")).unwrap();
+    let erf = Erf::parse(&made).unwrap();
+    assert_eq!(erf.kind, ErfKind::Mod);
+    assert_eq!(erf.len(), 2);
+    assert_eq!(erf.get(id("k_replaced.ncs")), Some(REPLACED));
+    assert_eq!(erf.get(id("banter.dlg")), Some(&ours[..]));
+    // Nothing else on disk changed, and Override is empty
+    let mut rims_after = files_under(&root.join("modules"));
+    rims_after.retain(|(n, _)| n != "testmod.mod");
+    assert_eq!(rims_after, rims_before);
+    assert!(files_under(&root.join("Override")).is_empty());
+
+    let l = m.loaded(id("banter.dlg")).unwrap();
+    assert!(l.written);
+    assert_eq!(l.location, "modules/testmod.mod:banter.dlg");
+    assert_eq!(l.bytes, ours);
+
+    // Opened afresh, testmod loads the edit and othermod its own copy
+    let install = Install::open(&root, Profile::K1).unwrap();
+    let here = install
+        .read(id("banter.dlg"), Some(&ModuleName::new("testmod")))
+        .unwrap()
+        .unwrap();
+    assert_eq!(here.1, ours);
+    let there = install
+        .read(id("banter.dlg"), Some(&ModuleName::new("othermod")))
+        .unwrap()
+        .unwrap();
+    assert_eq!(there.1, theirs);
+
+    // A second write keeps the first; a resource the module lacked is added
+    let utc = m.loaded(id("dan14_juhani.utc")).unwrap().bytes;
+    m.write_module("dan14_juhani.utc", &utc).unwrap();
+    let erf_bytes = fs::read(root.join("modules/testmod.mod")).unwrap();
+    let erf = Erf::parse(&erf_bytes).unwrap();
+    assert_eq!(erf.len(), 3);
+    assert_eq!(erf.get(id("banter.dlg")), Some(&ours[..]));
+    assert_eq!(erf.get(id("dan14_juhani.utc")), Some(&utc[..]));
+
+    // The diff names the edit in testmod alone, node by node
+    let d = diff::diff_trees(&input, &root, &Options::default()).unwrap();
+    let text = d.text();
+    let paths: Vec<&str> = d.entries.iter().map(|e| e.path.as_str()).collect();
+    assert_eq!(
+        paths,
+        [
+            "modules/testmod.mod",
+            "modules/testmod.mod!banter.dlg",
+            "modules/testmod.mod!dan14_juhani.utc",
+        ],
+        "{text}"
+    );
+    assert_eq!(
+        d.entries[0].against,
+        ["modules/testmod.rim", "modules/testmod_s.rim"]
+    );
+    let edit = &d.entries[1];
+    assert_eq!(edit.change, Change::Added);
+    assert_eq!(edit.against, ["modules/testmod_s.rim!banter.dlg"]);
+    assert!(!edit.sites.is_empty());
+    assert!(text.contains("Only in testmod."), "{text}");
+    assert!(!text.contains("othermod"), "{text}");
+    fs::remove_dir_all(&root).unwrap();
+    fs::remove_dir_all(&input).unwrap();
+}
+
+#[test]
+fn a_module_write_is_refused_beneath_override_or_without_a_module() {
+    let root = make("one-module-refused", false);
+    two_copies(&root);
+    let mut m = open(&root);
+    // A dialogue naming a script the install lacks writes no .mod
+    let mut d = Dialog::parse("banter.dlg", &m.loaded(id("banter.dlg")).unwrap().bytes).unwrap();
+    let mut n = line("A beat.");
+    n.script = Some(ResRef::new("k_oaj_missing").unwrap());
+    dlg::add_entry(&mut d, &n).unwrap();
+    let e = m
+        .write_module("banter.dlg", &d.to_bytes().unwrap())
+        .unwrap_err();
+    assert_eq!(e.code(), codes::DIALOG_REFUSED);
+    assert!(!root.join("modules/testmod.mod").exists());
+
+    // This mod's own Override write would be loaded over it
+    let ncs = scripts::compile(
+        &m,
+        &[Source::new("k_new", b"void main() { }".to_vec()).unwrap()],
+        &[],
+        Flags::default(),
+    )
+    .unwrap();
+    m.write_override("k_new.ncs", &ncs[0].ncs).unwrap();
+    let e = m.write_module("k_new.ncs", &ncs[0].ncs).unwrap_err();
+    assert_eq!(e.code(), codes::OVERRIDE_SHADOWS);
+
+    // As would another mod's
+    fs::write(
+        root.join("Override/banter.dlg"),
+        banter().to_bytes().unwrap(),
+    )
+    .unwrap();
+    let mut m = open(&root);
+    let e = m
+        .write_module("banter.dlg", &banter().to_bytes().unwrap())
+        .unwrap_err();
+    assert_eq!(e.code(), codes::OVERRIDE_SHADOWS);
+    assert!(e.to_string().contains("outranks testmod's capsules"), "{e}");
+    assert!(!root.join("modules/testmod.mod").exists());
+
+    m.set_module(None).unwrap();
+    let e = m.write_module("k_replaced.ncs", REPLACED).unwrap_err();
+    assert_eq!(e.code(), codes::NO_MODULE);
+    fs::remove_dir_all(root).unwrap();
+}
