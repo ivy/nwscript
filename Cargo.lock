@@ -715,6 +715,8 @@ dependencies = [
  "nwscript",
  "nwscript-lua",
  "predicates",
+ "rakata-archive",
+ "rakata-game",
  "serde",
  "serde_json",
  "sha2",

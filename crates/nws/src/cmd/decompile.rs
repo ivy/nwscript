@@ -157,13 +157,18 @@ impl Drop for Nwnnsscomp {
 
 /// The engine table, read with the declarations the bytecode is verified
 /// against.
-fn engine_table(ctx: &Ctx, resolver: &mut nwscript::FsResolver) -> Result<EngineTable, Exit> {
+fn engine_table(ctx: &Ctx, resolver: &mut crate::sources::Sources) -> Result<EngineTable, Exit> {
     let mut table_map = SourceMap::new();
     let mut table = match nwscript::engine::load_table(resolver, &mut table_map) {
         Ok(Some((t, _))) => t,
         Ok(None) => {
+            if let Some(d) = resolver.missing_nwscript() {
+                ctx.out
+                    .emit(super::envelope("decompile", ctx.game), "", &[d], &table_map);
+                return Err(Exit::Errors);
+            }
             eprintln!(
-                "error: decompiling needs nwscript.nss for the engine routines: pass -I DIR or --nwscript FILE"
+                "error: decompiling needs nwscript.nss for the engine routines: pass -I DIR, --nwscript FILE or --game-dir DIR"
             );
             return Err(Exit::Usage);
         }
@@ -240,11 +245,10 @@ fn verifier(
     })))
 }
 
-fn nwscript_path(resolver: &nwscript::FsResolver) -> Option<PathBuf> {
-    nwscript::Resolver::inputs(resolver)
-        .iter()
-        .find(|i| i.role == "nwscript")
-        .map(|i| PathBuf::from(&i.path))
+/// The `nwscript.nss` read from a directory, which an external compiler is
+/// pointed at; one read from an install's archive is no file to point at.
+fn nwscript_path(resolver: &crate::sources::Sources) -> Option<PathBuf> {
+    resolver.nwscript_file()
 }
 
 pub fn run(ctx: &Ctx, args: &Args) -> Exit {

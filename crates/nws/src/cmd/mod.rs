@@ -14,7 +14,8 @@ pub mod test;
 use crate::Exit;
 use crate::cli::{Cli, Command, GameArg};
 use crate::output::Output;
-use nwscript::diag::{Diagnostic, Level, Levels, SourceMap, codes, has_errors};
+use crate::sources::{GameDir, Sources};
+use nwscript::diag::{Diagnostic, Level, Levels, SourceMap, has_errors};
 use nwscript::modes::Mode;
 use nwscript::{Envelope, FsResolver, Game};
 
@@ -31,6 +32,8 @@ pub struct Ctx {
     pub global: crate::cli::Global,
     /// The `--overlay` files, read: each one's path and bytes.
     pub overlays: Vec<(String, std::sync::Arc<[u8]>)>,
+    /// The install `--game-dir` names, opened once.
+    pub game_dir: Option<GameDir>,
 }
 
 impl Ctx {
@@ -81,13 +84,16 @@ impl Ctx {
     }
 
     /// A resolver over the `-I` directories (after `first`, the input's own
-    /// directory) and `--nwscript`.
-    pub fn resolver(&self, first: Option<std::path::PathBuf>) -> FsResolver {
+    /// directory) and `--nwscript`, then the install `--game-dir` names.
+    pub fn resolver(&self, first: Option<std::path::PathBuf>) -> Sources {
         let dirs = first
             .into_iter()
             .chain(self.global.include.iter().cloned())
             .collect();
-        FsResolver::new(dirs, self.global.nwscript.clone())
+        Sources::new(
+            FsResolver::new(dirs, self.global.nwscript.clone()),
+            self.game_dir.clone(),
+        )
     }
 
     /// The game profile, or a usage error naming the flag.
@@ -101,7 +107,7 @@ impl Ctx {
 
 fn levels(g: &crate::cli::Global) -> Result<Levels, Exit> {
     let mut l = Levels::default();
-    let mut set = |id: &str, level| match codes::lookup(id) {
+    let mut set = |id: &str, level| match crate::codes::lookup(id) {
         Some(c) => {
             l.set(c.id, level);
             Ok(())
@@ -150,15 +156,33 @@ pub fn run(cli: Cli) -> Exit {
             }
         }
     }
+    let game = cli.global.game.map(|g| match g {
+        GameArg::K1 => Game::K1,
+        GameArg::K2 => Game::K2,
+    });
+    let game_dir = match &cli.global.game_dir {
+        None => None,
+        Some(dir) => {
+            let Some(game) = game else {
+                eprintln!("error: --game-dir needs the game profile: pass --game k1 or --game k2");
+                return Exit::Usage;
+            };
+            match crate::sources::open(dir, game, cli.global.module.as_deref()) {
+                Ok(g) => Some(g),
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    return Exit::Usage;
+                }
+            }
+        }
+    };
     let ctx = Ctx {
-        game: cli.global.game.map(|g| match g {
-            GameArg::K1 => Game::K1,
-            GameArg::K2 => Game::K2,
-        }),
+        game,
         levels,
         out: Output::new(cli.global.format, cli.global.color, cli.global.quiet),
         global: cli.global,
         overlays,
+        game_dir,
     };
     match cli.command {
         Command::Explain { code } => explain::run(&ctx, &code),

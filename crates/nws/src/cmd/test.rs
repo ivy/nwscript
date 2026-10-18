@@ -55,7 +55,14 @@ fn host(ctx: &Ctx, game: nwscript::Game, base: &Path) -> Result<Host, Exit> {
     let table = match nwscript::engine::load_table(&mut resolver, &mut map) {
         Ok(Some((t, _))) => t,
         Ok(None) => {
-            eprintln!("error: Lua needs the game's nwscript.nss: pass --nwscript FILE or -I DIR");
+            if let Some(d) = resolver.missing_nwscript() {
+                ctx.out
+                    .emit(super::envelope("test", Some(game)), "", &[d], &map);
+                return Err(Exit::Errors);
+            }
+            eprintln!(
+                "error: Lua needs the game's nwscript.nss: pass --nwscript FILE, -I DIR or --game-dir DIR"
+            );
             return Err(Exit::Usage);
         }
         Err(e) => {

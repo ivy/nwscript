@@ -4,8 +4,10 @@
 
 mod cli;
 mod cmd;
+mod codes;
 mod io;
 mod output;
+mod sources;
 
 use clap::Parser;
 use std::process::ExitCode;

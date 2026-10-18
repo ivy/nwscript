@@ -12,6 +12,7 @@ Examples:
   nws explain E0001                    explain a diagnostic code
   nws --format json explain E0001      the same, as one JSON document
   nws --game k1 -I scripts compile k_my_script.nss
+  nws --game k1 --game-dir ~/games/swkotor --module danm14ac compile k_my_script.nss
 
 Exit codes: 0 success, 1 errors reported, 2 bad invocation,
 3 a comparison found a difference, 101 internal error.";
@@ -38,6 +39,14 @@ pub struct Global {
     /// Use this nwscript.nss instead of searching the include directories.
     #[arg(long, global = true, value_name = "FILE")]
     pub nwscript: Option<PathBuf>,
+
+    /// A game install, the folder holding chitin.key. Includes and nwscript.nss the input's directory and the -I directories lack are read from the copies the game loads: Override/, then the capsules of --module, then the game's own archives. Needs --game.
+    #[arg(long, global = true, value_name = "DIR")]
+    pub game_dir: Option<PathBuf>,
+
+    /// The module whose capsules --game-dir searches after Override/, by the stem of modules/STEM.mod: `danm14ac`.
+    #[arg(long, global = true, value_name = "STEM", requires = "game_dir")]
+    pub module: Option<String>,
 
     /// Which declarations of the engine's routines to compile against: `shipped`, the nwscript.nss found, as it is; or `bioware`, the routines BioWare's own scripts were compiled against restored where they differ (KotOR 1's eleven-argument ActionStartConversation), which the vanilla scripts need to compile to BioWare's bytes.
     #[arg(long, global = true, value_enum, default_value_t = DeclarationsArg::Shipped)]

@@ -14,9 +14,11 @@ Examples:
   nws --game k1 -I ~/kotor/scripts check a.nss b.nss       includes from a directory
   nws --game k1 --nwscript ~/kotor/nwscript.nss check *.nss
   nws --game k1 --format json check k_my_script.nss         one JSON document
+  nws --game k1 --game-dir ~/games/swkotor check k_my_script.nss   from the install
 
 Each file is checked on its own: includes are searched in its directory,
-then each -I directory in order, ignoring case. A file with neither
+then each -I directory in order, ignoring case, then in the install
+--game-dir names as the game loads them. A file with neither
 `void main()` nor `int StartingConditional()` is checked as a library,
 such as an include file. Exit 0 when no file has errors, 1 otherwise.")]
 pub struct CheckArgs {
@@ -61,7 +63,11 @@ pub fn run(ctx: &Ctx, args: &CheckArgs) -> Exit {
             push_input(&mut env.inputs, i.clone());
         }
         // A file's status counts what remains after lints, directives and levels.
-        let found = ctx.linted(out.analysis.as_ref(), out.diagnostics, &map);
+        let found = ctx.linted(
+            out.analysis.as_ref(),
+            resolver.report(out.diagnostics),
+            &map,
+        );
         let errors = found.iter().filter(|d| d.is_error()).count();
         if errors > 0 {
             failed += 1;

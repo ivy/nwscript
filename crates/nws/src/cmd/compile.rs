@@ -16,12 +16,14 @@ Examples:
   nws --game k1 -I ~/kotor/scripts compile a.nss -o a.ncs
   nws --game k1 compile *.nss --out-dir build --emit ncs,asm
   nws --game k1 --format json compile k_my_script.nss     one JSON document
+  nws --game k1 --game-dir ~/games/swkotor --module danm14ac compile k_my_script.nss
 
 Each file is checked, then compiled when no error remains after lint levels
 apply. Includes and nwscript.nss are searched in the file's directory, then
-each -I directory in order, ignoring case; each is read and parsed once. A
-file with errors writes nothing, and the command goes on to the next; it
-exits 1 at the end if any file had errors.")]
+each -I directory in order, ignoring case, then in the install --game-dir
+names as the game loads them; each is read and parsed once. A file with
+errors writes nothing, and the command goes on to the next; it exits 1 at
+the end if any file had errors.")]
 pub struct CompileArgs {
     /// The NWScript source files to compile.
     #[arg(required = true)]
@@ -111,7 +113,11 @@ pub fn run(ctx: &Ctx, args: &CompileArgs) -> Exit {
         }
         // Whether this file compiles is decided after lints, directives and
         // levels: what they demote no longer stops it, and a strict-mode lint does.
-        let mut diags = ctx.linted(out.analysis.as_ref(), out.diagnostics, &map);
+        let mut diags = ctx.linted(
+            out.analysis.as_ref(),
+            resolver.report(out.diagnostics),
+            &map,
+        );
         let mut outputs = Vec::new();
         if !has_errors(&diags)
             && let Some(a) = &out.analysis

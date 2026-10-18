@@ -2,11 +2,11 @@
 
 use super::Ctx;
 use crate::Exit;
-use nwscript::diag::{SourceMap, codes};
+use nwscript::diag::SourceMap;
 
 pub fn run(ctx: &Ctx, code: &str) -> Exit {
-    let Some(c) = codes::lookup(code) else {
-        eprintln!("error: no diagnostic code `{code}`; codes look like E0001 or W0001");
+    let Some(c) = crate::codes::lookup(code) else {
+        eprintln!("error: no diagnostic code `{code}`; codes look like E0001, W0001 or NE0001");
         return Exit::Usage;
     };
     let mut env = super::envelope("explain", ctx.game);
