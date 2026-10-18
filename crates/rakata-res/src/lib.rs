@@ -17,6 +17,7 @@
 mod error;
 mod hash;
 mod locstring;
+mod refs;
 mod resid;
 mod resref;
 mod restype;
@@ -26,6 +27,7 @@ pub use hash::ContentHash;
 pub use locstring::{
     Gender, Language, LocalizedString, StrRef, Substring, from_string_id, string_id,
 };
+pub use refs::{Ref, RefKind};
 pub use resid::ResId;
 pub use resref::ResRef;
 pub use restype::ResType;
