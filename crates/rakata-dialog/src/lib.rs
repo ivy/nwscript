@@ -36,6 +36,7 @@ pub mod audio;
 mod check;
 mod edit;
 mod error;
+pub mod facts;
 mod key;
 mod model;
 mod transcript;
