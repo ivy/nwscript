@@ -7,6 +7,20 @@
 
 use rakata_lyt::{DoorHook, Error, Lyt, Placement, Quaternion, Vis, VisRoom};
 
+/// `bytes`, kept as a seed for the fuzz targets in the directory
+/// `$RAKATA_FUZZ_SEEDS` names, when it is set.
+fn seed(bytes: &[u8]) -> &[u8] {
+    if let Some(dir) = std::env::var_os("RAKATA_FUZZ_SEEDS") {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        bytes.hash(&mut h);
+        let dir = std::path::Path::new(&dir);
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(format!("{:016x}", h.finish())), bytes).unwrap();
+    }
+    bytes
+}
+
 /// Lines joined with CRLF, each ended by one.
 fn crlf(lines: &[&str]) -> Vec<u8> {
     lines
@@ -38,7 +52,7 @@ fn layout() -> Vec<u8> {
 #[test]
 fn a_layout_with_every_section_reads_and_writes_back() {
     let bytes = layout();
-    let lyt = Lyt::parse(&bytes).unwrap();
+    let lyt = Lyt::parse(seed(&bytes)).unwrap();
     assert_eq!(lyt.file_dependency.as_deref(), Some("Test01.max"));
     assert_eq!(
         lyt.rooms,
@@ -99,7 +113,7 @@ fn a_layout_built_from_nothing_is_written_in_the_vanilla_form() {
         orientation: Quaternion::from_array([0.707107, 0.0, 0.0, -0.707107]),
     });
     assert_eq!(lyt.to_bytes().unwrap(), layout());
-    assert!(lyt.semantic_eq(&Lyt::parse(&layout()).unwrap()));
+    assert!(lyt.semantic_eq(&Lyt::parse(seed(&layout())).unwrap()));
 
     let empty = String::from_utf8(Lyt::default().to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -125,10 +139,30 @@ fn departures_from_the_written_form_are_kept_and_an_edited_line_is_rewritten() {
         "donelayout",
     ]);
     bytes.extend_from_slice(b"Test02_b");
-    let mut lyt = Lyt::parse(&bytes).unwrap();
+    let mut lyt = Lyt::parse(seed(&bytes)).unwrap();
     assert_eq!(lyt.departures(), 1);
     assert_eq!(lyt.trailer(), "Test02_b");
     assert_eq!(lyt.to_bytes().unwrap(), bytes);
+
+    // Blank lines before donelayout: the bytes after it are still what
+    // follows it (found by fuzzing, which read past the lines).
+    for trailer in [&b""[..], b"Test02_b\r\nTest02_c"] {
+        let mut b = crlf(&[
+            "beginlayout",
+            "",
+            "",
+            "   roomcount 0",
+            "",
+            "   trackcount 0",
+            "   obstaclecount 0",
+            "   doorhookcount 0",
+            "donelayout",
+        ]);
+        b.extend_from_slice(trailer);
+        let l = Lyt::parse(seed(&b)).unwrap();
+        assert_eq!(l.trailer().as_bytes(), trailer);
+        assert_eq!(l.to_bytes().unwrap(), b);
+    }
 
     lyt.rooms[0].position[0] = 5.0;
     let written = String::from_utf8(lyt.to_bytes().unwrap()).unwrap();
@@ -140,14 +174,14 @@ fn departures_from_the_written_form_are_kept_and_an_edited_line_is_rewritten() {
 
     // LF endings throughout, keywords in another case, no final ending.
     let lf: &[u8] = b"#MAXLAYOUT ASCII\nBEGINLAYOUT\n   RoomCount 1\n      R 1.0 2.0 3.0\n   trackcount 0\n   obstaclecount 0\n   doorhookcount 0\nDoneLayout";
-    let lyt = Lyt::parse(lf).unwrap();
+    let lyt = Lyt::parse(seed(lf)).unwrap();
     assert_eq!(lyt.rooms, [Placement::new("R", [1.0, 2.0, 3.0])]);
     assert_eq!(lyt.to_bytes().unwrap(), lf);
 }
 
 #[test]
 fn a_layout_is_refused_with_the_code_for_what_is_wrong() {
-    let code = |b: &[u8]| Lyt::parse(b).unwrap_err().code();
+    let code = |b: &[u8]| Lyt::parse(seed(b)).unwrap_err().code();
     assert_eq!(code(b"#MAXLAYOUT ASCII\r\n"), "RE2301");
     assert_eq!(code(b""), "RE2301");
     assert_eq!(
@@ -189,13 +223,13 @@ fn a_layout_is_refused_with_the_code_for_what_is_wrong() {
         code(&crlf(&["beginlayout", "   roomcount -1", "donelayout"])),
         "RE2303"
     );
-    let e = Lyt::parse(&crlf(&[
+    let e = Lyt::parse(seed(&crlf(&[
         "beginlayout",
         "   roomcount 2",
         "      R 1.0 2.0 3.0",
         "   doorhookcount 0",
         "donelayout",
-    ]))
+    ])))
     .unwrap_err();
     assert_eq!(
         e,
@@ -230,7 +264,7 @@ fn a_visibility_file_reads_and_writes_back() {
     let bytes = crlf(&[
         "test_a 2", "  test_b", "  TEST_c", "test_b 1", "  test_a", "test_c 0",
     ]);
-    let vis = Vis::parse(&bytes).unwrap();
+    let vis = Vis::parse(seed(&bytes)).unwrap();
     assert_eq!(vis.rooms.len(), 3);
     assert_eq!(vis.visible("TEST_A").unwrap(), ["test_b", "TEST_c"]);
     assert_eq!(vis.visible("test_c").unwrap(), [] as [&str; 0]);
@@ -261,7 +295,7 @@ fn a_visibility_files_departures_are_kept_and_its_rooms_follow_the_indentation()
     // A count one off, a room line with no count, a trailing space, two
     // spaces before a count, no final line ending: each in a vanilla file.
     let bytes = b"test_a 3\r\n  test_b\r\n  test_c \r\ntest_b\r\ntest_c  1\r\n  test_a";
-    let vis = Vis::parse(bytes).unwrap();
+    let vis = Vis::parse(seed(bytes)).unwrap();
     assert_eq!(vis.visible("test_a").unwrap(), ["test_b", "test_c"]);
     assert_eq!(vis.visible("test_b").unwrap(), [] as [&str; 0]);
     assert_eq!(vis.visible("test_c").unwrap(), ["test_a"]);
@@ -281,7 +315,7 @@ fn a_visibility_files_departures_are_kept_and_its_rooms_follow_the_indentation()
 fn a_room_seen_with_a_count_after_it_is_a_room_seen() {
     // A mod's visibility file writes the last room seen as `  NAME 5`.
     let bytes = b"test_a 2\r\n  test_b\r\n  test_c 5\r\n";
-    let vis = Vis::parse(bytes).unwrap();
+    let vis = Vis::parse(seed(bytes)).unwrap();
     assert_eq!(vis.visible("test_a").unwrap(), ["test_b", "test_c"]);
     assert_eq!(vis.departures(), 1);
     assert_eq!(vis.to_bytes().unwrap(), bytes);
@@ -292,22 +326,31 @@ fn blank_lines_and_mixed_line_endings_write_back() {
     // A mod's visibility file: LF after some rooms seen, an indented blank
     // line ended CR LF after each, a blank line before the first.
     let bytes = b"\r\ntest_a 2\n  \r\n  test_b\n  \r\n  test_c\r\ntest_b 0\r\n";
-    let vis = Vis::parse(bytes).unwrap();
+    let vis = Vis::parse(seed(bytes)).unwrap();
     assert_eq!(vis.visible("test_a").unwrap(), ["test_b", "test_c"]);
     assert_eq!(vis.to_bytes().unwrap(), bytes);
 }
 
 #[test]
 fn a_visibility_file_is_refused_with_the_code_for_what_is_wrong() {
-    let e = Vis::parse(b"  test_b\r\ntest_a 1\r\n").unwrap_err();
+    let e = Vis::parse(seed(b"  test_b\r\ntest_a 1\r\n")).unwrap_err();
     assert_eq!(e.code(), "RE2311");
-    assert_eq!(Vis::parse(b"test_a 1 2\r\n").unwrap_err().code(), "RE2312");
     assert_eq!(
-        Vis::parse(b"test_a 1\r\n  test_b test_c\r\n")
+        Vis::parse(seed(b"test_a 1 2\r\n")).unwrap_err().code(),
+        "RE2312"
+    );
+    assert_eq!(
+        Vis::parse(seed(b"test_a 1\r\n  test_b test_c\r\n"))
             .unwrap_err()
             .code(),
         "RE2312"
     );
-    assert_eq!(Vis::parse(b"test_a one\r\n").unwrap_err().code(), "RE2303");
-    assert_eq!(Vis::parse(b"test_\xff 0\r\n").unwrap_err().code(), "RE2306");
+    assert_eq!(
+        Vis::parse(seed(b"test_a one\r\n")).unwrap_err().code(),
+        "RE2303"
+    );
+    assert_eq!(
+        Vis::parse(seed(b"test_\xff 0\r\n")).unwrap_err().code(),
+        "RE2306"
+    );
 }

@@ -330,7 +330,10 @@ impl Lyt {
             }
         }
         let done = done.ok_or(Error::Unterminated)?;
-        lyt.trailer = lines[done..].iter().map(|l| l.raw).collect();
+        // Blank lines fold into the line before them, so a line's number
+        // is not its place in `lines`.
+        let after = lines.iter().position(|l| l.number == done).expect("read") + 1;
+        lyt.trailer = lines[after..].iter().map(|l| l.raw).collect();
         lyt.style = style;
         Ok(lyt)
     }
