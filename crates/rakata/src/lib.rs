@@ -14,6 +14,7 @@ pub mod patch;
 
 pub use nwscript_diag as diag;
 pub use nwscript_diag::{Exit, InputRecord, OutputRecord};
+pub use rakata_game as game;
 pub use rakata_res as res;
 
 use std::path::PathBuf;

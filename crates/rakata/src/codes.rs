@@ -36,6 +36,11 @@ nwscript_diag::codes! {
     RW0302 Warning "a key the section does not take";
     RW0303 Warning "a section or key written twice";
     RW0304 Warning "a memory token read before anything sets it";
+    RE0401 Error "not a game install: no chitin.key";
+    RE0402 Error "a BIF the KEY names is missing from the install";
+    RE0403 Error "no module capsule carries the name";
+    RE0404 Error "no layer of the install holds the resource";
+    RW0401 Warning "Override files that differ only in case";
     RE0501 Error "a directory that is not a game install";
     RE0502 Error "a round trip wrote bytes the format's own reader rejects";
 }
