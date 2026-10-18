@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "nwscript",
-  "description": "The Claude Code plugin for nws, the NWScript toolchain, from the nwscript repository.",
+  "description": "The Claude Code plugin for nws and rakata, the NWScript toolchain and the KotOR data toolset, from the nwscript repository.",
   "owner": {
     "name": "Ivy Evans"
   },
@@ -9,7 +9,7 @@
     {
       "name": "nwscript",
       "source": "./plugin",
-      "description": "NWScript for KotOR with nws: write, check, test and compile scripts, read diagnostics, and learn from the game's own scripts by decompiling them.",
+      "description": "KotOR modding with nws and rakata: write, check, test and compile NWScript; find the copy of a resource the game loads, read and change dialogues, globals, tables and blueprints through the Python module, and check a change with the lints and a diff.",
       "category": "development"
     }
   ]

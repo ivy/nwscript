@@ -1,6 +1,6 @@
 {
   "name": "nwscript",
-  "description": "NWScript for KotOR with nws: write, check, test and compile scripts, read diagnostics, and learn from the game's own scripts by decompiling them.",
+  "description": "KotOR modding with nws and rakata: write, check, test and compile NWScript; find the copy of a resource the game loads, read and change dialogues, globals, tables and blueprints through the Python module, and check a change with the lints and a diff.",
   "author": {
     "name": "Ivy Evans"
   },
@@ -10,6 +10,8 @@
     "kotor",
     "modding",
     "compiler",
-    "decompiler"
+    "decompiler",
+    "rakata",
+    "dialogue"
   ]
 }
