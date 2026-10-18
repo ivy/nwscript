@@ -24,6 +24,7 @@
 
 mod diff;
 mod error;
+pub mod facts;
 mod model;
 mod path;
 mod read;
