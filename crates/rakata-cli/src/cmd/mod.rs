@@ -22,6 +22,8 @@ pub use gff::GffArgs;
 mod inspect;
 mod lip;
 pub use lip::LipArgs;
+mod lua;
+pub use lua::LuaArgs;
 mod tlk;
 pub use tlk::TlkArgs;
 mod twoda;
@@ -98,6 +100,7 @@ pub fn run(cli: Cli) -> Exit {
         Command::TwoDa(args) => twoda::run(&ctx, &args),
         Command::Tlk(args) => tlk::run(&ctx, &args),
         Command::Lip(args) => lip::run(&ctx, &args),
+        Command::Lua(args) => lua::run(&ctx, &args),
         Command::Save(args) => save::run(&ctx, &args),
         Command::Dialog(args) => dialog::run(&ctx, &args),
         Command::Diff(args) => diff::run(&ctx, &args),

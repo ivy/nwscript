@@ -172,6 +172,7 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
             "index",
             "install",
             "lip",
+            "lua",
             "save",
             "tlk",
             "which"
@@ -190,6 +191,7 @@ fn every_help_has_an_example_and_lists_only_built_commands() {
         "index",
         "install",
         "lip",
+        "lua",
         "save",
         "tlk",
         "which",

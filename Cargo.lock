@@ -1155,6 +1155,7 @@ dependencies = [
  "rakata",
  "rakata-archive",
  "rakata-gff",
+ "rakata-lua",
  "rakata-res",
  "serde_json",
  "tempfile",

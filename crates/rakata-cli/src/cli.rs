@@ -34,6 +34,7 @@ Examples:
   rakata index build --game DIR --tree vanilla
                                            index a tree: facts, references and full text
   rakata index query \"SELECT * FROM refs WHERE value = 'k_pman_aioff'\"
+  rakata lua build.lua OUT --game DIR     a Lua script over the façade, writing below OUT
 
 Exit codes: 0 success, 1 errors reported, 2 bad invocation,
 3 a comparison found a difference, 101 internal error.";
@@ -157,6 +158,8 @@ pub enum Command {
     Tlk(crate::cmd::TlkArgs),
     /// Show a lip-sync file's keyframes.
     Lip(crate::cmd::LipArgs),
+    /// Run a Lua script with the façade loaded, hermetically: its inputs are its arguments and --game.
+    Lua(crate::cmd::LuaArgs),
     /// A saved game by name: globals, the party, each module's creatures with their flags, effects and action queues, and the pending events.
     Save(crate::cmd::SaveArgs),
     /// Conversations: show prints a dialogue's transcript, conditions decompiled.
