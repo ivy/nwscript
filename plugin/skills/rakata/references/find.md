@@ -30,6 +30,8 @@ rakata dialog show NAME.dlg --game DIR
 
 The transcript lists the starts in the order the engine tries them, each with its condition, then each branch indented. `E3` is `EntryList[3]` (the owner's or another speaker's line), `R0` is `ReplyList[0]` (the player's). Each node shows its strref, its voice resref (`voice nm14acjuha07024_`), its sound, its action script, and every condition decompiled to source and marked `[verified]` when the source recompiles to the original bytes. `(a link)` marks a link that reuses a node shown elsewhere; `-> E3 (shown above)` points back to it. `--scripts` decompiles the action scripts too.
 
+The engine opens a conversation with the first start whose condition passes, trying them in the order listed, so a start without a condition is the fallback and every start after it is unreachable. An entry that appears among the starts is itself a starting line: a reply added under it is offered whenever the conversation opens there. A voice resref shown with "no file under streamwaves/" is a note, not a finding: many vanilla lines name a voice-over that was never recorded, the game shows them unvoiced, and `dialog lint` reports a missing voice-over only for nodes the game would try to voice.
+
 To pick a node to edit, note its **voice resref** or **strref** from the transcript: those are its stable keys (`voice:nm14acjuha07024_`, `strref:38576`). A node with neither has only its index, which is fragile.
 
 A module's dialogue copied into `Override/` is global as far as the search order goes, so without `--module` it is shown against the install alone and its module's scripts read as missing. After writing one, always name the module: `rakata dialog show NAME.dlg --module STEM --game SCRATCH`.

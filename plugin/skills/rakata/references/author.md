@@ -4,7 +4,7 @@ Changes are made in Python with the module `rakata`, which reads the install as 
 
 ## Before you start
 
-- The module must import in the interpreter you use: `python3 -c "import rakata; print(rakata.__version__)"` prints the same build as `rakata --version`. If it does not import, ask the user which environment holds it.
+- The module must import in the interpreter you use, which is not necessarily `python3`: the user names it (a virtual environment's `bin/python`, or a wrapper that sets `PYTHONPATH` to an unpacked wheel), and every `python3` below means that interpreter. `PYTHON -c "import rakata; print(rakata.__version__)"` prints the same build as `rakata --version`. If it does not import, ask the user which environment holds it. `-I` (isolated mode) ignores `PYTHONPATH`, so it breaks a wrapper that relies on it; with a virtual environment, `-I` is fine.
 - The module's documentation is its type stubs, which ship beside it. Print where they are and read the ones the task needs:
 
   ```bash
