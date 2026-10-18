@@ -13,6 +13,7 @@ pub use rakata_index::{Answer, Direction, Hit, Location, RefKind, RefsQuery, ref
 pub use rakata_index::{
     ArgType, BuildReport, COUNTED, CoverageRow, Error, Param, Routine, Rows, SCHEMA_VERSION,
     Status, Timings, TreeCoverage, Warning, codes, coverage, digest, open, parse_changed, query,
+    query_script,
 };
 
 use crate::codes as registry;

@@ -103,6 +103,53 @@ fn build_query_digest_and_coverage_over_a_small_install() {
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&out.stderr).contains("RE1504"));
+
+    // A script: a temporary view made once, then two selects reading it.
+    let script = "CREATE TEMP VIEW g AS SELECT value FROM refs WHERE kind = 'global';\n\
+                  SELECT value FROM g;\n\
+                  SELECT count(*) AS n FROM g;";
+    let text = rakata()
+        .args(["index", "query", "--db", s(&db), script])
+        .output()
+        .unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&text.stdout),
+        "value\nK_SWG_HELENA\n(1 rows)\n\nn\n1\n(1 rows)\n"
+    );
+    let file = dir.path().join("report.sql");
+    std::fs::write(&file, script).unwrap();
+    let q = json(&["index", "query", "--db", s(&db), "--file", s(&file)]);
+    assert_eq!(
+        q["result"],
+        serde_json::json!([
+            {"columns": ["value"], "rows": [["K_SWG_HELENA"]]},
+            {"columns": ["n"], "rows": [[1]]},
+        ])
+    );
+    // Writes stay refused inside a script, and what follows does not run.
+    for sql in [
+        "SELECT 1; DELETE FROM refs; SELECT 2",
+        "CREATE TABLE x(a)",
+        "INSERT INTO trees(label) VALUES ('x')",
+    ] {
+        let out = rakata()
+            .args(["index", "query", "--db", s(&db), sql])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(1), "{sql}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains("RE1504"),
+            "{sql}"
+        );
+    }
+    let q = json(&[
+        "index",
+        "query",
+        "--db",
+        s(&db),
+        "SELECT count(*) FROM refs",
+    ]);
+    assert_eq!(q["result"]["rows"], serde_json::json!([[1]]));
 }
 
 fn tree(var: &str) -> Option<PathBuf> {

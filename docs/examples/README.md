@@ -4,15 +4,15 @@ Queries over the index `rakata index build` writes, each one SQL statement in a 
 
 ## Running one
 
-Build the index of the tree once, then pass the file's text to `rakata index query`:
+Build the index of the tree once, then pass the file to `rakata index query --file`:
 
 ```bash
 rakata index build --game PATH/TO/swkotor --tree build --db idx.sqlite
-rakata index query --db idx.sqlite "$(cat docs/examples/canderous.sql)"
-rakata index query --db idx.sqlite --format json "$(cat docs/examples/canderous.sql)"
+rakata index query --db idx.sqlite --file docs/examples/canderous.sql
+rakata index query --db idx.sqlite --format json --file docs/examples/canderous.sql
 ```
 
-The database is opened read-only, so a query cannot change it. `--format json` gives the column names and the rows as arrays, for a script to read. A query reports on the tree built last unless its `tree` CTE names another by label.
+The database is opened read-only, so a query cannot change it. `--format json` gives the column names and the rows as arrays, for a script to read. A file may hold several statements separated by `;`, a `CREATE TEMP VIEW` prelude then the selects that read it; each select prints as its own table. A query reports on the tree built last unless its `tree` CTE names another by label.
 
 ## The queries
 

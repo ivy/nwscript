@@ -7,6 +7,7 @@
 ```bash
 rakata index build --game DIR --tree LABEL [--db FILE] [--parent LABEL --changed FILE]
 rakata index query [--db FILE] SQL              # rows as a table, or --format json
+rakata index query [--db FILE] --file FILE      # a script: statements separated by ;
 rakata index digest [--db FILE] [--tree LABEL]  # the content digest
 rakata index coverage [--db FILE] [--tree LABEL] [--list]
 rakata refs THING [--kind strref|resref|tag|global|auto] [--to|--from] [--direct] [--tree LABEL] [--db FILE]

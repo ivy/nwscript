@@ -58,6 +58,48 @@ pub fn query(conn: &Connection, sql: &str) -> Result<Rows> {
     Ok(out)
 }
 
+/// Run `sql`, one statement or several separated by `;`, in order on
+/// `conn`, and return the rows of each statement that has columns (a
+/// `SELECT`, a `WITH`, an `EXPLAIN`, a `PRAGMA` that answers), in order.
+/// Each statement is prepared after the one before it has run, so a later
+/// one may read a temporary view an earlier one made. On the read-only
+/// connection [`crate::open`] gives, a statement that would change the
+/// database fails, and the statements after it do not run.
+pub fn query_script(conn: &Connection, sql: &str) -> Result<Vec<Rows>> {
+    use rusqlite::fallible_iterator::FallibleIterator as _;
+    let fail = |sql: String| {
+        move |source| Error::Query {
+            sql: sql.trim().to_string(),
+            source,
+        }
+    };
+    let mut out = Vec::new();
+    let mut batch = rusqlite::Batch::new(conn, sql);
+    while let Some(mut st) = batch.next().map_err(fail(sql.to_string()))? {
+        let text = st.expanded_sql().unwrap_or_else(|| sql.to_string());
+        let n = st.column_count();
+        if n == 0 {
+            st.raw_execute().map_err(fail(text))?;
+            continue;
+        }
+        let columns: Vec<String> = st.column_names().iter().map(|c| c.to_string()).collect();
+        let mut set = Rows {
+            columns,
+            rows: Vec::new(),
+        };
+        let mut rows = st.raw_query();
+        while let Some(row) = rows.next().map_err(fail(text.clone()))? {
+            let mut r = Vec::with_capacity(n);
+            for i in 0..n {
+                r.push(json(row.get_ref(i).map_err(fail(text.clone()))?));
+            }
+            set.rows.push(r);
+        }
+        out.push(set);
+    }
+    Ok(out)
+}
+
 /// One coverage row.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CoverageRow {

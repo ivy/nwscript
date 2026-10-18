@@ -21,7 +21,7 @@ Each hit is the resource holding the reference, the site in it (a GFF field path
 
 ## index query
 
-`rakata index query --db FILE "SQL"` runs one read-only statement. `rakata index query --help` lists the tables with their key columns; every column:
+`rakata index query --db FILE "SQL"` runs SQL read-only: one statement, or a script of several separated by `;`. `rakata index query --help` lists the tables with their key columns; every column:
 
 ```bash
 rakata index query --db FILE "SELECT name, sql FROM sqlite_master WHERE type = 'table'"
@@ -34,3 +34,11 @@ rakata index query --db FILE "SELECT path FROM locations WHERE name = 'NAME' AND
 ```
 
 A dialogue name in more than one module means a copy in Override replaces all of them.
+
+A report with a shared prelude is one script: the `CREATE TEMP VIEW` statements run once, on one connection, and every `SELECT` after them reads the views. `--file FILE` reads the script from a file (`-` for standard input) instead of the command line:
+
+```bash
+rakata index query --db FILE --file report.sql
+```
+
+Each statement that returns rows prints as its own table, a blank line between them. With `--format json` one such statement gives `{columns, rows}` and several give an array of them, in order. Statements that would change the database (`INSERT`, `DELETE`, `CREATE TABLE`, …) fail with `RE1504`, and nothing after the failure runs.

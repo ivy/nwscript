@@ -74,10 +74,20 @@ Examples:
         #[arg(long, default_value_t = 0)]
         threads: usize,
     },
-    /// Run one SQL statement over the database, read-only, and print its rows.
+    /// Run SQL over the database, read-only, and print the rows: one statement, or a script of several separated by `;`.
     #[command(after_help = "\
-The rows print as an aligned table with a header, NULL as an empty cell;
---format json gives the column names and the rows as arrays.
+SQL is one statement or a script: statements separated by `;`, run in order
+on one connection, so a prelude of CREATE TEMP VIEW statements is run once
+and every SELECT after it reads its views. --file FILE reads the script from
+a file instead (`-` for standard input). The connection is read-only: SELECT,
+WITH, EXPLAIN, PRAGMA and CREATE TEMP run, any statement that would change
+the database fails with RE1504, and the statements after a failure do not
+run.
+
+Each statement that returns rows prints as an aligned table with a header,
+NULL as an empty cell, and a blank line between tables. --format json gives
+the column names and the rows as arrays, {columns, rows}; a script with more
+than one such statement gives an array of them, in order.
 
 Tables, joined through hash (a content's SHA-256); locations says where each
 content lies:
@@ -103,12 +113,18 @@ sql FROM sqlite_master. The full reference is docs/index.md in the source.
 
 Examples:
   rakata index query \"SELECT t.label, l.path FROM calls c JOIN locations l ON l.hash = c.hash JOIN trees t ON t.id = l.tree WHERE json_extract(c.args, '$[0]') = 'k_pman_aioff'\"
-  rakata index query \"SELECT kind, site, body FROM search WHERE search MATCH 'rakghoul*'\"")]
+  rakata index query \"SELECT kind, site, body FROM search WHERE search MATCH 'rakghoul*'\"
+  rakata index query \"CREATE TEMP VIEW t AS SELECT id FROM trees WHERE label = 'vanilla'; SELECT count(*) FROM locations WHERE tree IN t; SELECT count(*) FROM coverage WHERE tree IN t\"
+  rakata index query --file report.sql --db idx.sqlite")]
     Query {
         #[command(flatten)]
         db: DbArg,
-        /// The SQL statement.
-        sql: String,
+        /// The SQL: one statement, or several separated by `;`.
+        #[arg(required_unless_present = "file", conflicts_with = "file")]
+        sql: Option<String>,
+        /// Read the SQL from this file, `-` for standard input.
+        #[arg(long, value_name = "FILE")]
+        file: Option<PathBuf>,
     },
     /// Print the content digest of a tree, or of the whole database: equal digests mean equal facts.
     #[command(after_help = "\
@@ -198,17 +214,35 @@ pub fn run(ctx: &Ctx, args: &IndexArgs) -> Exit {
             env.result = serde_json::to_value(&report).expect("the report serializes");
             ctx.finish(env, &text, diags, &map, Exit::Ok)
         }
-        IndexAction::Query { db, sql } => {
+        IndexAction::Query { db, sql, file } => {
             let db = match db_path(db) {
                 Ok(p) => p,
                 Err(e) => return e,
             };
             let mut env = ctx.envelope("index query");
-            let rows = index::open(&db).and_then(|c| index::query(&c, sql));
-            match rows {
-                Ok(rows) => {
-                    let text = table(&rows);
-                    env.result = json!({ "columns": rows.columns, "rows": rows.rows });
+            let sql = match (sql, file) {
+                (Some(sql), _) => sql.clone(),
+                (None, Some(path)) => match read_sql(path) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        let d = index::diagnostic(
+                            "RE0001",
+                            format!("cannot read {}: {e}", path.display()),
+                        );
+                        return ctx.finish(env, "", vec![d], &map, Exit::Ok);
+                    }
+                },
+                (None, None) => unreachable!("clap requires SQL or --file"),
+            };
+            let sets = index::open(&db).and_then(|c| index::query_script(&c, &sql));
+            match sets {
+                Ok(sets) => {
+                    let text = sets.iter().map(table).collect::<Vec<_>>().join("\n");
+                    let set = |r: &index::Rows| json!({ "columns": r.columns, "rows": r.rows });
+                    env.result = match sets.as_slice() {
+                        [one] => set(one),
+                        many => many.iter().map(set).collect(),
+                    };
                     ctx.finish(env, &text, Vec::new(), &map, Exit::Ok)
                 }
                 Err(e) => ctx.finish(env, "", vec![index::error(&e)], &map, Exit::Ok),
@@ -304,6 +338,17 @@ fn build_text(r: &index::BuildReport) -> String {
         t.save
     ));
     s
+}
+
+/// The SQL in `path`, or on standard input for `-`.
+fn read_sql(path: &std::path::Path) -> std::io::Result<String> {
+    if path.as_os_str() == "-" {
+        let mut s = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut s)?;
+        Ok(s)
+    } else {
+        std::fs::read_to_string(path)
+    }
 }
 
 fn cell(v: &serde_json::Value) -> String {

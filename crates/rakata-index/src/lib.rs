@@ -39,7 +39,7 @@ pub use digest::digest;
 pub use error::{Error, Result, Warning, codes};
 pub use extract::{Param, Routine, Status, is_archive, is_gff, ref_kind};
 pub use nwscript_ncs::facts::ArgType;
-pub use query::{CoverageRow, Rows, TreeCoverage, coverage, query};
+pub use query::{CoverageRow, Rows, TreeCoverage, coverage, query, query_script};
 pub use rakata_res::RefKind;
 pub use refs::{Answer, Direction, Hit, Location, RefsQuery, refs};
 pub use rusqlite::Connection;
