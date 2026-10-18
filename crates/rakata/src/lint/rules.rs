@@ -133,8 +133,7 @@ impl Rules<'_> {
         for (kind, value, site) in refs {
             match kind {
                 RefKind::ResRef => {
-                    let label = site.rsplit('.').next().unwrap_or(site);
-                    if let Some(want) = TABLE.gff(&item.ext, label) {
+                    if let Some(want) = TABLE.gff(&item.ext, site) {
                         self.dangling(item, site.clone(), value, want, out);
                     }
                 }

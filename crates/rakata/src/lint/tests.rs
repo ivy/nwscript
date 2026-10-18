@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use rakata_2da::TwoDa;
 use rakata_archive::Key;
-use rakata_gff::{Gff, Label, LocString, Value};
+use rakata_gff::{Gff, Label, LocString, Struct, Value};
 use rakata_tlk::{Entry, Tlk};
 
 use super::*;
@@ -156,6 +156,35 @@ fn a_texture_site_resolves_to_a_tpc_a_tga_or_a_dds() {
         r.findings
     );
     assert_eq!(r.findings[0].want.as_deref(), Some("tpc"));
+    let _ = fs::remove_dir_all(&game);
+}
+
+#[test]
+fn a_waypoint_instance_names_no_blueprint_and_a_creature_instance_does() {
+    let game = scratch("instances");
+    let instance = |template: &str| {
+        let mut i = Struct::new(0);
+        i.push(l("Tag"), Value::string(template))
+            .push(l("TemplateResRef"), Value::resref(template).unwrap());
+        Value::List(vec![i])
+    };
+    let mut g = Gff::new(*b"GIT ");
+    g.root
+        .push(l("Creature List"), instance("c_nobody"))
+        .push(l("WaypointList"), instance("wp_nobody"));
+    write(&game.join("Override/m01aa.git"), &g.to_bytes().unwrap());
+    let r = lint(&game, None, None);
+    assert_eq!(
+        brief(&r),
+        [(
+            "RW1901",
+            "Override/m01aa.git",
+            "Creature List[0].TemplateResRef",
+            "c_nobody"
+        )],
+        "{:#?}",
+        r.findings
+    );
     let _ = fs::remove_dir_all(&game);
 }
 

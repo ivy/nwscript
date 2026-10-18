@@ -39,6 +39,13 @@ pub(crate) struct Sites {
 /// `rakata dialog lint` checks voices per dialogue (RW1104).
 const UNCHECKED: &[(&str, &str)] = &[("dlg", "VO_ResRef")];
 
+/// The GIT lists whose instances hold the whole object, so the
+/// `TemplateResRef` each keeps names the blueprint it was made from and is
+/// not loaded: a waypoint's struct carries its tag, names, map note and
+/// appearance, where a creature's, a placeable's or a door's carries a
+/// position and the blueprint the engine loads.
+const WHOLE_INSTANCES: &[&str] = &["WaypointList"];
+
 fn split(key: &str) -> (String, String) {
     let (a, b) = key
         .split_once('.')
@@ -65,10 +72,20 @@ pub(crate) static TABLE: LazyLock<Sites> = LazyLock::new(|| {
 });
 
 impl Sites {
-    /// What a GFF field names, `None` for a field the lint leaves alone;
-    /// a field the table does not type names a resource of any type.
-    pub(crate) fn gff(&self, ext: &str, label: &str) -> Option<Want> {
+    /// What the GFF field at `site` (its path) names, `None` for a field
+    /// the lint leaves alone; a field the table does not type names a
+    /// resource of any type.
+    pub(crate) fn gff(&self, ext: &str, site: &str) -> Option<Want> {
+        let label = site.rsplit('.').next().unwrap_or(site);
         if UNCHECKED.iter().any(|(e, l)| *e == ext && *l == label) {
+            return None;
+        }
+        if ext == "git"
+            && label == "TemplateResRef"
+            && WHOLE_INSTANCES
+                .iter()
+                .any(|list| site.strip_prefix(list).is_some_and(|r| r.starts_with('[')))
+        {
             return None;
         }
         Some(
@@ -125,6 +142,12 @@ mod tests {
         assert_eq!(t.gff("dlg", "Script"), Some(Want::Type(ResType::Ncs)));
         assert_eq!(t.gff("git", "LinkedToModule"), Some(Want::Module));
         assert_eq!(t.gff("dlg", "VO_ResRef"), None);
+        assert_eq!(t.gff("dlg", "EntryList[4].VO_ResRef"), None);
+        assert_eq!(t.gff("git", "WaypointList[3].TemplateResRef"), None);
+        assert_eq!(
+            t.gff("git", "Creature List[0].TemplateResRef"),
+            Some(Want::Any)
+        );
         assert_eq!(t.gff("utc", "NoSuchLabel"), Some(Want::Any));
         assert_eq!(
             t.twoda("Appearance", "ModelA"),

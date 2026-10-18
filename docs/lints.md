@@ -144,6 +144,7 @@ A name resolves when the install holds a resource of that name and type where th
 
 Empty resrefs are not references. A dialogue node's `VO_ResRef` is not checked: BioWare's dialogues name a recording for lines whether or not one was made (24,755 of the 37,989 voice-over names in the vanilla dialogues resolve to nothing, every reply's among them), the engine shows an unvoiced line's text, and `rakata dialog lint` checks voices per dialogue (RW1104).
 
+A GIT waypoint's `TemplateResRef` is not checked either. A waypoint instance holds the whole waypoint (its tag, names, map note and appearance), so the field records the blueprint it was made from, which BioWare's waypoint format describes as such; a creature, placeable, door, sound or trigger instance holds a position and the blueprint the engine loads, and its `TemplateResRef` is checked.
 
 ### RW1902: a strref past the talk table
 
