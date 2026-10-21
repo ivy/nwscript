@@ -122,13 +122,16 @@ The mesh header is 332 bytes, following the node header. That length is confirme
 | 176 | 12 | Array of index counts: one u32 in every mesh with faces, equal to three times the face count. |
 | 188 | 12 | Array of index-list offsets: one u32, the offset in the model data of a u16 triangle list. |
 | 200 | 12 | Array of one u32, non-zero in all but 178 meshes; not established. |
-| 212 | 4 | -1 in 78,406 meshes. |
+| 212 | 4 | -1 in every mesh but the 15 trimeshes with no vertices, which hold values of no pattern. |
 | 216 | 4 | -1. |
 | 220 | 4 | Zero. |
-| 224 | 4 | 3 in 78,339 meshes. |
-| 228 | 4 | Zero in 78,353 meshes. |
-| 232 | 4 | Zero, or 1 in 214 meshes. |
-| 236 | 16 | Four floats of various values; not established. |
+| 224 | 4 | 3 in every mesh but the 68 sabers and 14 of the 15 trimeshes with no vertices, which hold values of no pattern. |
+| 228 | 4 | Zero in every mesh but the 68 sabers, which hold values of no pattern. |
+| 232 | 4 | Texture motion: 1 in 214 meshes, whose texture coordinates move by the four floats after it (below); 0 in the other 78,207. |
+| 236 | 4 | With 232 set, the rate the first texture coordinate (U) moves at: -0.006 to 0.03, zero in 27 meshes. |
+| 240 | 4 | With 232 set, the rate the second texture coordinate (V) moves at: -0.05 to 0.1, zero in 155 meshes. |
+| 244 | 4 | With 232 set, a float from 0.01 to 4, never zero (0.01 in 141 meshes); not established. |
+| 248 | 4 | With 232 set, a float from 0 to 1, zero in 158 meshes; not established. |
 | 252 | 4 | MDX stride: the bytes per vertex in the mesh's MDX block. |
 | 256 | 4 | MDX flags: the attributes each vertex of the block holds (below). |
 | 260 | 4 | Offset of the position within a vertex, or -1. |
@@ -146,13 +149,25 @@ The mesh header is 332 bytes, following the node header. That length is confirme
 | 311 | 1 | Shadow: 1 in 11,991 meshes, nearly all on characters' meshes (10,954) and none on an AABB node. |
 | 312 | 1 | Zero. |
 | 313 | 1 | Render: 1 in 59,294 meshes, 0 in 19,127, including 822 of the 1,102 AABB nodes (walkmeshes). |
-| 314 | 2 | Various values; not established. |
-| 316 | 4 | A float, often near 0.00015; not established. |
+| 314 | 2 | Values of no pattern: 4,796 distinct, zero in 31,531 meshes, 54 in 12,755, and 16,256 (0x3F80, the high half of the float 1.0) in 1,596; not established. |
+| 316 | 4 | Surface area: the sum of the faces' areas in the node's coordinates, to 0.1%, in all 74,664 trimeshes and AABB nodes that have faces; zero in every skin, dangly mesh and saber (3,742) and in the 15 trimeshes with no vertices. |
 | 320 | 4 | Zero. |
 | 324 | 4 | Offset of the mesh's block in the MDX. |
 | 328 | 4 | Offset in the model data of the positions again, three floats per vertex. |
 
 What the flag bytes 308, 311 and 313 are rests on their correlations above and on the position of the kotor_mdl document's shadow and render flags (u16s of 256 at 310 and 312, so the 1 in their high bytes); the render flag reads as the torlack document says NWN's defaults (off for AABB meshes, on otherwise). The walkmesh an AABB node holds is invisible in the game even when its render flag is 1, though 92 of the 280 such nodes name a texture (and one of the 822 with the flag 0); whether the engine loads that texture is not established.
+
+### Texture motion
+
+The word at 232 is 1 in 214 meshes, all of them trimeshes (0x021) and six of them lightmapped; 23 are `global.rim`'s copies of `models.bif` models, so 191 nodes of 108 models carry it once each model is counted once. They are water, clouds, energy and other effects: the `Beam` meshes of 67 room models textured `LKOfx_clouds` (111), fountain water textured `LMA_waterfall` in five `m26` rooms (7), sea textured `LMA_sea04` in `m28ab_01a` and `m28ad_04a` (8), river and falls textured `LDA_water03` and `LDA_waterfall` in four `m14` rooms (6), the acid river of `m39aa_05` (`LKOa_acid01`), the planets of `planet_01` to `planet_07` (textures `GUI_*_1`) and `lplanet_01`, the sphere of `m50aa_02a` (`LYV_yavin01`), the planes of `plc_starmap` and the spheres of the `v_field*_dur` effects (`fx_tex_12`, `13`, `16`, `17`), the spheres of the `v_mn*` effects (`fx_static`, 8) and of `v_grnadhs_imp` (`fx_splat2`, 6), the meshes of `plc_fccage` and `plc_fccage2` (`PLC_FrcDist01`, `02`, 10), the thrusters of `v_superbike` (`LMG_jet01`, `02`, 7), and a few more (`LTS_grad` in `m05aa_06a`, `LZA_sttic` in `m21aa_09a`, and three test meshes in `mqa_01a`). No mesh named or textured as a hologram carries it.
+
+When 232 is 0 the four floats at 236 to 248 hold values of no pattern: all four are zero in 15,032 of those 78,207 meshes, and in 28,357 at least one is not a plausible float (not finite, or of a magnitude below 0.000001 but not zero, or of 10,000 or more).
+
+Which of 236 and 240 moves which axis comes from meshes where only one of them is non-zero and the geometry shows the direction of the motion. The seven meshes named `FountainWater*`, `Falls_a` and `Falls_b` set only 240 (0.008 to 0.1), and their V coordinate follows the vertices' height (a correlation above 0.9; U's is not), so 240 moves the texture down or up the fall: along V. The eight `Planet` meshes set only 236 (-0.00005), and their V follows the sphere's axis, so U runs around it and 236 turns the texture about the axis: along U. Of the 214, 148 set 236 alone, 20 set 240 alone, 39 both, and 7 neither: the thrusters of `v_superbike`, which hold 244 = 0.09 or 0.18 and 248 = 1. The rates' unit (per second or per frame) and which way a positive rate moves are not established.
+
+The floats at 244 and 248 are a second pair: 244 is never zero (0.01 in 141 meshes, up to 4 in `v_fieldspydr_dur`), 248 lies in 0 to 1 and is zero in 158. That the thrusters set the flag with both rates zero suggests the pair drives a motion of its own; what that motion is, and which of the two is its amount and which its speed, the files do not say.
+
+No animation key relates: the marked meshes carry the same controller types as other meshes (8, 20, 36, 100 and 132), in the geometry and in animations, and no type occurs only on them.
 
 ### Faces
 
@@ -490,7 +505,7 @@ The xoreos-docs `kotor_mdl.html` gives the headers' shape; the files say more, a
 - The names are not only "stored one after the other": an array of offsets to them comes first.
 - The controller's u16s at 8 and 10 index floats of the data array; they are not byte offsets. The u16 at 4 is always 0xFFFF.
 - The node header's orientation is `w, x, y, z`; the orientation controller's value is `x, y, z, w`.
-- In the mesh header, offset 84 (unknown there) is the transparency hint; 152 to 176 is zero; the arrays at 176 and 188 are the index count and the triangle list's offset, not vertex locations; 256 is the MDX flags word; 260 is the position's MDX offset, 0 when present, not "always 0"; the seven words from 276 hold the second texture coordinates' offset and, at 288, the tangent space's; byte 308 is the lightmapped flag. Fields called "always" a value there are that value in most meshes but not all (212, 224, 232).
+- In the mesh header, offset 84 (unknown there) is the transparency hint; 152 to 176 is zero; the arrays at 176 and 188 are the index count and the triangle list's offset, not vertex locations; 256 is the MDX flags word; 260 is the position's MDX offset, 0 when present, not "always 0"; the seven words from 276 hold the second texture coordinates' offset and, at 288, the tangent space's; byte 308 is the lightmapped flag; 232, "always 0" there, is the texture motion flag, and the 16 bytes from 236 its rates; 316 is the surface area. Fields called "always" a value there are that value in most meshes but not all (212, 224, 232).
 - The model header's first byte is the classification, and the KotOR values 16 and 32 are not in the torlack NWN list. The bounding box there is the default in all but one model.
 - The "names array header" field the document calls the root node's location is a different node in the head models.
 - Neither document describes the MDX: the per-mesh blocks, the flags word's bits, or the terminator rows.
@@ -502,7 +517,7 @@ The xoreos-docs `kotor_mdl.html` gives the headers' shape; the files say more, a
 
 ## What could not be established
 
-The meaning of the model header's byte 0x51, the mesh header's arrays at 200 and fields at 212 to 248 and 314 to 320, and the classification value 64; whether byte 0x53 is the fog flag; the skin header's array at 52 and bytes 98 to 100; which of a bezier key's two control values is which; the light header's words at 72, 76, 84 and 88 beyond their position in the torlack document's layout; the emitter header's dead space, its words at 12, 16 and 28, its name at 187 and byte at 219, the meaning of flag bits 1 to 3 and 5 to 12 beyond the torlack document's names, and emitter types 196, 200, 240 and 252 to 272; how a frame index past the grid is drawn; the saber header's two words and the forty columns that repeat the blade's centre line; whether the engine adds an animation's position keys to the rest position or puts them in its place, and whether it uses the stored qbones and tbones or the rest pose's (the files differ in the five models above). Each needs the engine's behaviour, not the files alone.
+The meaning of the model header's byte 0x51, the mesh header's arrays at 200, its words at 212 to 228 and its u16 at 314, the texture motion's unit and direction, what the floats at 244 and 248 drive and which of them is which, and the classification value 64; whether byte 0x53 is the fog flag; the skin header's array at 52 and bytes 98 to 100; which of a bezier key's two control values is which; the light header's words at 72, 76, 84 and 88 beyond their position in the torlack document's layout; the emitter header's dead space, its words at 12, 16 and 28, its name at 187 and byte at 219, the meaning of flag bits 1 to 3 and 5 to 12 beyond the torlack document's names, and emitter types 196, 200, 240 and 252 to 272; how a frame index past the grid is drawn; the saber header's two words and the forty columns that repeat the blade's centre line; whether the engine adds an animation's position keys to the rest position or puts them in its place, and whether it uses the stored qbones and tbones or the rest pose's (the files differ in the five models above). Each needs the engine's behaviour, not the files alone.
 
 ## Provenance
 
@@ -514,8 +529,10 @@ Measured: on 2026-10-18, every count above but those of lights, emitters and sab
 
 Measured: on 2026-10-20, the light, emitter and saber headers, their controllers and the names emitters hold, over the same install, with `crates/rakata-mdl/tests/vanilla.rs`'s `the_light_emitter_and_saber_headers` (`RAKATA_GAME_K1=… cargo test -p rakata-mdl --test vanilla the_light_emitter_and_saber_headers -- --nocapture`): it confirms each header's length from where the next structure begins in the raw model data, counts every field's values by kind of node and update, counts each controller type by the kind of node that carries it in the geometry and in animations, checks the frame, lightning, P2P and colour readings, and resolves each emitter's texture and chunk names through every layer of the install, modules included, over the 2,833 distinct MDL contents. The fits of the mid-life and colour types, and the spark, fire and explosion emitters' colours, were measured by short Python scripts over a dump of the same headers and controllers.
 
+Measured: on 2026-10-20, the mesh header's words at 212 to 252 and 314 to 324, over the same install, with `crates/rakata-mdl/tests/vanilla.rs`'s `the_mesh_header_texture_motion` (`RAKATA_GAME_K1=… cargo test -p rakata-mdl --test vanilla the_mesh_header_texture_motion -- --nocapture`): it counts each word's values by kind of node, lists the meshes with the texture motion flag by model, node and texture, correlates their texture coordinates with their vertices' height, compares 316 with the faces' area, and counts the controllers on meshes with and without the flag, in the geometry and in animations. The values by mesh were first read by short Python scripts over a dump of the same headers and of the flagged meshes' vertices. The motion's fields were named from these files alone; no description of them from outside was read.
+
 Observed in a renderer: the winding, the undrawn AABB nodes and the skin meshes' texture coordinates, from the OdysseyUE runtime drawing the Endar Spire (`end_m01aa`) from these structures and comparing with the game.
 
-Date: 2026-10-18; lights, emitters and sabers 2026-10-20.
+Date: 2026-10-18; lights, emitters, sabers and the texture motion 2026-10-20.
 
 Written by the implementer from measurement; no implementation's source was read.

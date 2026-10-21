@@ -7,7 +7,9 @@
 //! keys, and the skins. A census of the light, emitter and saber headers
 //! counts every field of each, confirms their lengths from where the next
 //! structure begins, counts the controllers lights and emitters carry, and
-//! resolves the names emitters hold. Further tests resolve every
+//! resolves the names emitters hold. A census of the mesh header's words
+//! at 212 to 252 and 314 to 324 counts the meshes whose texture
+//! coordinates move and the rates they hold. Further tests resolve every
 //! supermodel chain, read the four character skeletons (`s_male01`,
 //! `s_male02`, `s_female01`, `s_female02`) through theirs, and read every
 //! room, door and placeable model the Endar Spire's first area,
@@ -1608,4 +1610,306 @@ fn every_light_emitter_and_saber_reads_as_the_spec_says() {
     let glow = a.controller(mesh::SELF_ILLUM_COLOR).unwrap();
     assert_eq!(glow.len(), 2);
     assert!(glow.vector_keys().is_some());
+}
+
+/// Pearson's correlation of two series; `None` when either is constant.
+fn correlation(a: &[f32], b: &[f32]) -> Option<f32> {
+    let n = a.len() as f32;
+    let (ma, mb) = (a.iter().sum::<f32>() / n, b.iter().sum::<f32>() / n);
+    let (mut sab, mut saa, mut sbb) = (0.0, 0.0, 0.0);
+    for (x, y) in a.iter().zip(b) {
+        sab += (x - ma) * (y - mb);
+        saa += (x - ma) * (x - ma);
+        sbb += (y - mb) * (y - mb);
+    }
+    (saa > 0.0 && sbb > 0.0).then(|| sab / (saa * sbb).sqrt())
+}
+
+/// The census of the mesh header's words at 212 to 252 and 314 to 324
+/// (docs/formats/mdl.md, "Mesh header"): the defaults of 212 to 228 and
+/// the nodes that break them, the word at 232 that marks a mesh whose
+/// texture coordinates move and the four floats after it, which texture
+/// axis each of the first two moves (against the vertices' height in
+/// waterfalls and planets), the floats at 316 against the mesh's
+/// surface area, and the controllers on meshes with and without the
+/// mark, in the geometry and in animations.
+#[test]
+fn the_mesh_header_texture_motion() {
+    let Some(root) = game() else { return };
+
+    let mut fields: BTreeMap<String, usize> = BTreeMap::new();
+    let mut moving: BTreeMap<String, usize> = BTreeMap::new();
+    let mut controllers: BTreeMap<String, usize> = BTreeMap::new();
+    let mut textures: BTreeMap<String, usize> = BTreeMap::new();
+    let mut pairs: BTreeSet<(String, String)> = BTreeSet::new();
+    let mut models: BTreeSet<String> = BTreeSet::new();
+    let mut distinct_314: BTreeMap<&str, BTreeSet<u16>> = BTreeMap::new();
+    let mut still: BTreeSet<String> = BTreeSet::new();
+    let mut failed = Vec::new();
+    let (mut meshes, mut marked) = (0, 0);
+    let count = |map: &mut BTreeMap<String, usize>, k: String| *map.entry(k).or_default() += 1;
+
+    each_model(&root, |label, mdl, mdx| {
+        let m = ModelFile::parse(mdl, mdx).unwrap();
+        let model = label.rsplit('/').next().unwrap().to_ascii_lowercase();
+        let mut flagged: BTreeSet<u16> = BTreeSet::new();
+        let mut kind_of: HashMap<u16, u16> = HashMap::new();
+        for n in m.nodes() {
+            kind_of.insert(n.number(), n.flags());
+            let Body::Mesh(me) = &n.body else { continue };
+            meshes += 1;
+            let b = &me.header;
+            let kind = kind_name_raw(n.flags());
+            let empty = me.vertex_count() == 0;
+            for (o, default) in [(212, -1), (216, -1), (220, 0), (224, 3), (228, 0)] {
+                let v = word(b, o) as i32;
+                if v != default {
+                    count(
+                        &mut fields,
+                        format!("{o} not {default}: {kind}, no vertices {empty}"),
+                    );
+                }
+            }
+            count(&mut fields, format!("232: {}", word(b, 232)));
+            let mark = if word(b, 232) == 1 {
+                "marked"
+            } else {
+                "unmarked"
+            };
+            for c in &n.controllers {
+                let (ty, cols, _) = controller_head(n, c);
+                count(
+                    &mut controllers,
+                    format!("{mark} mesh {ty:3} cols {cols:2} geometry"),
+                );
+            }
+            count(&mut fields, format!("320: {}", word(b, 320)));
+            let w314 = u16::from_le_bytes([b[314], b[315]]);
+            count(
+                &mut fields,
+                format!(
+                    "314 on {kind}: {}",
+                    if w314 == 0 { "zero" } else { "not zero" }
+                ),
+            );
+            distinct_314.entry(kind).or_default().insert(w314);
+            let rates = [236, 240, 244, 248].map(|o| float(b, o));
+
+            // 316 against the faces' total area.
+            if me.positions.len() == 12 * me.vertex_count() && !me.faces.is_empty() {
+                let p = |i: usize| [0, 4, 8].map(|k| float(&me.positions, 12 * i + k));
+                let mut area = 0.0f64;
+                for f in me.faces.chunks(32) {
+                    let [a, bb, c] =
+                        [26, 28, 30].map(|k| p(u16::from_le_bytes([f[k], f[k + 1]]) as usize));
+                    let u = [0, 1, 2].map(|i| (bb[i] - a[i]) as f64);
+                    let v = [0, 1, 2].map(|i| (c[i] - a[i]) as f64);
+                    let x = [
+                        u[1] * v[2] - u[2] * v[1],
+                        u[2] * v[0] - u[0] * v[2],
+                        u[0] * v[1] - u[1] * v[0],
+                    ];
+                    area += 0.5 * (x[0] * x[0] + x[1] * x[1] + x[2] * x[2]).sqrt();
+                }
+                let stored = float(b, 316) as f64;
+                let close = (stored - area).abs() <= 1e-3 * area.max(1e-6);
+                let what = if close {
+                    "the faces' area to 0.1%"
+                } else if stored == 0.0 {
+                    "zero"
+                } else {
+                    "neither"
+                };
+                count(&mut fields, format!("316 on {kind}: {what}"));
+            } else {
+                count(
+                    &mut fields,
+                    format!("316 with no faces or positions: {}", float(b, 316)),
+                );
+            }
+
+            match word(b, 232) {
+                0 => {
+                    let zero = rates.iter().all(|&v| v == 0.0);
+                    let plain = rates
+                        .iter()
+                        .all(|v| v.is_finite() && (*v == 0.0 || (1e-6..1e4).contains(&v.abs())));
+                    count(
+                        &mut fields,
+                        format!("232 is 0: 236 to 248 all zero {zero}, all plain floats {plain}"),
+                    );
+                }
+                1 => {
+                    marked += 1;
+                    flagged.insert(n.number());
+                    let name = String::from_utf8_lossy(&m.names[n.number() as usize]).into_owned();
+                    pairs.insert((model.clone(), name.clone()));
+                    models.insert(model.clone());
+                    let tex = field_name(&b[88..120]).0.to_ascii_lowercase();
+                    count(&mut textures, tex.clone());
+                    count(&mut moving, format!("kind: {kind}"));
+                    count(
+                        &mut moving,
+                        format!("lightmapped: {}", !field_name(&b[120..152]).0.is_empty()),
+                    );
+                    let zeros: String = rates
+                        .iter()
+                        .zip(["236", "240", "244", "248"])
+                        .filter(|(v, _)| **v == 0.0)
+                        .map(|(_, o)| format!(" {o}"))
+                        .collect();
+                    count(&mut moving, format!("zero among 236 to 248:{zeros}"));
+                    for (o, v) in [236, 240, 244, 248].iter().zip(rates) {
+                        count(&mut moving, format!("{o}: {v}"));
+                    }
+                    if !(rates[2] > 0.0 && (0.0..=1.0).contains(&rates[3])) {
+                        failed.push(format!("{label} {name}: 244, 248 = {rates:?}"));
+                    }
+                    // Which texture axis follows the mesh's height, by which
+                    // rate is non-zero.
+                    if let Some(x) = &me.mdx {
+                        let [s, p, t] = [252, 260, 272].map(|o| word(b, o) as usize);
+                        let col = |o: usize| -> Vec<f32> {
+                            x.vertices.chunks(s).map(|v| float(v, o)).collect()
+                        };
+                        let (z, u, v) = (col(p + 8), col(t), col(t + 4));
+                        let follows = |c: Option<f32>| c.is_some_and(|c| c.abs() > 0.9);
+                        let axis =
+                            match (follows(correlation(&u, &z)), follows(correlation(&v, &z))) {
+                                (true, false) => "U",
+                                (false, true) => "V",
+                                _ => "neither",
+                            };
+                        let rate = match (rates[0] != 0.0, rates[1] != 0.0) {
+                            (true, false) => "236 only",
+                            (false, true) => "240 only",
+                            (true, true) => "both",
+                            (false, false) => "neither",
+                        };
+                        let lower = name.to_ascii_lowercase();
+                        let group = if lower.contains("fall") || lower.contains("fountain") {
+                            "waterfall or fountain"
+                        } else if lower == "planet" {
+                            "planet"
+                        } else {
+                            "other"
+                        };
+                        count(
+                            &mut moving,
+                            format!(
+                                "{group}: rate in {rate}, the axis following the height {axis}"
+                            ),
+                        );
+                        if rate == "neither" {
+                            still.insert(format!("{model} {name} ({tex})"));
+                        }
+                    }
+                }
+                v => failed.push(format!("{label}: 232 is {v}")),
+            }
+        }
+
+        // Controllers on meshes, by the mark at 232.
+        let mark = |n: u16| {
+            if flagged.contains(&n) {
+                "marked"
+            } else {
+                "unmarked"
+            }
+        };
+        for a in &m.animations {
+            let mut stack = vec![&a.root];
+            while let Some(n) = stack.pop() {
+                stack.extend(n.children.iter());
+                if !kind_of.get(&n.number()).is_some_and(|f| f & 0x020 != 0) {
+                    continue;
+                }
+                for c in &n.controllers {
+                    let (ty, cols, _) = controller_head(n, c);
+                    count(
+                        &mut controllers,
+                        format!("{} mesh {ty:3} cols {cols:2} animations", mark(n.number())),
+                    );
+                }
+            }
+        }
+    });
+
+    println!(
+        "{meshes} meshes, {marked} marked at 232, {} distinct (model, node) names in {} models",
+        pairs.len(),
+        models.len()
+    );
+    table("fields", &fields);
+    table("meshes marked at 232", &moving);
+    table("their textures", &textures);
+    table("controllers on meshes", &controllers);
+    for (kind, s) in &distinct_314 {
+        show(
+            &format!("distinct values at 314 on {kind}"),
+            &s.iter().map(u16::to_string).collect::<Vec<_>>(),
+        );
+    }
+    show(
+        "marked meshes with zero at 236 and 240",
+        &still.iter().cloned().collect::<Vec<_>>(),
+    );
+    assert!(failed.is_empty(), "{failed:#?}");
+    assert_eq!((meshes, marked), (78_421, 214));
+    assert_eq!((pairs.len(), models.len()), (191, 108));
+    // 232 is a flag, and only trimeshes carry it.
+    assert_eq!(fields["232: 0"] + fields["232: 1"], meshes);
+    assert_eq!(moving["kind: trimesh"], marked);
+    // 212 to 228 hold their defaults but in the sabers and the trimeshes
+    // with no vertices.
+    for k in fields
+        .keys()
+        .filter(|k| k.starts_with("2") && k.contains(" not "))
+    {
+        assert!(k.contains("saber") || k.contains("no vertices true"), "{k}");
+    }
+    assert_eq!(fields["320: 0"], meshes);
+    // 316 is the faces' area in the meshes that draw from the model
+    // data's positions, and zero in the others.
+    for (k, n) in &fields {
+        if let Some(rest) = k.strip_prefix("316 on ") {
+            let area = rest.starts_with("trimesh") || rest.starts_with("AABB");
+            let want = if area {
+                "the faces' area to 0.1%"
+            } else {
+                "zero"
+            };
+            assert!(rest.ends_with(want), "{k}: {n}");
+        }
+    }
+    // A waterfall's or fountain's V runs along its height and only 240
+    // moves; a planet's V runs along its axis and only 236 moves.
+    assert_eq!(
+        moving["waterfall or fountain: rate in 240 only, the axis following the height V"],
+        7
+    );
+    assert_eq!(
+        moving["planet: rate in 236 only, the axis following the height V"],
+        8
+    );
+    // No controller type is peculiar to the marked meshes.
+    let types = |mark: &str| -> BTreeSet<String> {
+        controllers
+            .keys()
+            .filter_map(|k| k.strip_prefix(mark))
+            .map(|k| k.split_whitespace().nth(1).unwrap().to_string())
+            .collect()
+    };
+    assert!(types("marked mesh ").is_subset(&types("unmarked mesh ")));
+}
+
+fn kind_name_raw(flags: u16) -> &'static str {
+    match flags {
+        0x021 => "trimesh",
+        0x061 => "skin",
+        0x121 => "dangly",
+        0x221 => "AABB",
+        0x821 => "saber",
+        _ => "other",
+    }
 }
