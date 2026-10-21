@@ -705,3 +705,87 @@ fn the_vanilla_assets_of_end_m01aa_read_by_name() {
         "no walkmesh node"
     );
 }
+
+#[test]
+fn mdl_show_prints_the_vanilla_emitters_lights_and_sabers() {
+    let Some(g) = vanilla() else { return };
+    let g = s(&g);
+
+    // A muzzle flash: each emitter's update, textures and grid.
+    let t = text(&["--game", g, "mdl", "show", "v_muzflash_01.mdl"], 0);
+    let emitters: Vec<&str> = t.lines().filter(|l| l.contains("update ")).collect();
+    assert_eq!(emitters.len(), 5, "{t}");
+    assert!(emitters.iter().all(|l| l.contains("update Explosion")
+        && l.contains("render Billboard_to_Local_Z")
+        && l.contains("blend Lighten")
+        && l.contains("two-sided")));
+    assert!(
+        t.contains("texture fx_muzflash  grid 1x1  birth rate 1"),
+        "{t}"
+    );
+    assert!(t.contains("texture fx_flare02  grid 0x0"), "{t}");
+    let full = text(
+        &[
+            "--game",
+            g,
+            "mdl",
+            "show",
+            "v_muzflash_01.mdl",
+            "--controllers",
+        ],
+        0,
+    );
+    assert!(full.contains("        birth_rate  1"), "{full}");
+    assert!(full.contains("        type 240  "), "{full}");
+    let (code, doc) = json(&["--game", g, "mdl", "show", "v_muzflash_01.mdl"]);
+    assert_eq!(code, Some(0), "{doc}");
+    let node = &doc["result"]["nodes"][2];
+    assert_eq!(node["name"], "muzflash01");
+    assert_eq!(node["emitter"]["update"], "Explosion");
+    assert_eq!(node["emitter"]["texture"], "fx_muzflash");
+    assert_eq!(node["emitter"]["two_sided"], true);
+    assert_eq!(node["emitter"]["name_187"], "NULL");
+    let birth = node["controllers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "birth_rate")
+        .unwrap();
+    assert_eq!(birth["type"], 88);
+    assert_eq!(birth["keys"][0]["value"][0], 1.0);
+
+    // A light model: colour, radius, priority and flags.
+    let t = text(&["--game", g, "mdl", "show", "gidy_sun.mdl"], 0);
+    assert!(
+        t.contains(
+            "color 0.313726 0.352941 0.431373  radius 100000  priority 1  ambient only  fading"
+        ),
+        "{t}"
+    );
+    assert!(
+        t.contains("color 1 1 1  radius 100000  priority 1  shadow  fading"),
+        "{t}"
+    );
+    let t = text(&["--game", g, "mdl", "show", "fx_explode_03.mdl"], 0);
+    assert!(t.contains("flares fx_flare01, "), "{t}");
+    let (_, doc) = json(&["--game", g, "mdl", "show", "gidy_sun.mdl"]);
+    let amb = &doc["result"]["nodes"][1];
+    assert_eq!(amb["light"]["ambient_only"], true);
+    assert_eq!(amb["controllers"][2]["name"], "radius");
+
+    // A saber model: each blade's vertices and words.
+    let t = text(&["--game", g, "mdl", "show", "w_dblsbr_001.mdl"], 0);
+    assert!(
+        t.contains("blade 176 vertices along z -0.0432471 to 0.980982  words 98 97"),
+        "{t}"
+    );
+    let (_, doc) = json(&["--game", g, "mdl", "show", "w_dblsbr_001.mdl"]);
+    let blade = doc["result"]["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["name"] == "plane269")
+        .unwrap();
+    assert_eq!(blade["saber"]["positions"].as_array().unwrap().len(), 176);
+    assert_eq!(blade["saber"]["words"], serde_json::json!([98, 97]));
+}
