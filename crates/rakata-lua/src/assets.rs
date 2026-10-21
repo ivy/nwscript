@@ -14,8 +14,8 @@ use mlua::{Lua, Table, UserData, UserDataFields, UserDataMethods, UserDataRef};
 use rakata::game::ModuleName;
 use rakata::lyt::{Lyt, Placement, Vis};
 use rakata::mdl::{
-    Animation, Attribute, BoundingBox, Classification, Controller, Mesh, Model, ModelFile, Node,
-    NodeKind, Quaternion, Skin,
+    Animation, Attribute, BoundingBox, Classification, Controller, Emitter, Light, Mesh, Model,
+    ModelFile, Node, NodeKind, Quaternion, Saber, Skin, controller_types,
 };
 use rakata::texture::{ImageType, Layout, Origin, PixelFormat, Tga, Tpc, Txi, TxiEntry};
 use rakata::walkmesh::{EdgeRef, Kind, SurfaceMaterials, Vertices, Walkmesh};
@@ -679,9 +679,67 @@ fn skin_table(lua: &Lua, s: &Skin<'_>) -> mlua::Result<Table> {
     Ok(t)
 }
 
-fn controller_table(lua: &Lua, c: &Controller<'_>) -> mlua::Result<Table> {
+fn light_table(lua: &Lua, l: &Light<'_>) -> mlua::Result<Table> {
+    let t = lua.create_table()?;
+    t.set("flare_radius", l.flare_radius)?;
+    let flares = lua.create_table()?;
+    for (i, f) in l.flares.iter().enumerate() {
+        let ft = lua.create_table()?;
+        ft.set("texture", f.texture)?;
+        ft.set("size", f.size)?;
+        ft.set("position", f.position)?;
+        ft.set("color_shift", seq(lua, f.color_shift)?)?;
+        flares.raw_set(i + 1, ft)?;
+    }
+    t.set("flares", flares)?;
+    t.set("priority", l.priority)?;
+    t.set("ambient_only", l.ambient_only)?;
+    t.set("dynamic_type", l.dynamic_type)?;
+    t.set("affect_dynamic", l.affect_dynamic)?;
+    t.set("shadow", l.shadow)?;
+    t.set("generate_flare", l.generate_flare)?;
+    t.set("fading", l.fading)?;
+    Ok(t)
+}
+
+fn emitter_table(lua: &Lua, e: &Emitter<'_>) -> mlua::Result<Table> {
+    let t = lua.create_table()?;
+    t.set("dead_space", e.dead_space)?;
+    t.set("blast_radius", e.blast_radius)?;
+    t.set("blast_length", e.blast_length)?;
+    t.set(
+        "lightning_words",
+        lua.create_sequence_from(e.lightning_words)?,
+    )?;
+    t.set("x_grid", e.x_grid)?;
+    t.set("y_grid", e.y_grid)?;
+    t.set("space_type", e.space_type)?;
+    t.set("update", e.update)?;
+    t.set("render", e.render)?;
+    t.set("blend", e.blend)?;
+    t.set("texture", e.texture)?;
+    t.set("chunk", e.chunk)?;
+    t.set("two_sided", e.two_sided)?;
+    t.set("looping", e.looping)?;
+    t.set("render_order", e.render_order)?;
+    t.set("name_187", e.name_187)?;
+    t.set("flags", e.flags)?;
+    Ok(t)
+}
+
+fn saber_table(lua: &Lua, s: &Saber<'_>) -> mlua::Result<Table> {
+    let t = lua.create_table()?;
+    t.set("positions", attribute(lua, &s.positions)?)?;
+    t.set("uv", attribute(lua, &s.uv)?)?;
+    t.set("normals", attribute(lua, &s.normals)?)?;
+    t.set("words", lua.create_sequence_from(s.words)?)?;
+    Ok(t)
+}
+
+fn controller_table(lua: &Lua, c: &Controller<'_>, node: NodeKind) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("kind", c.kind)?;
+    t.set("name", controller_types::name(node, c.kind))?;
     t.set("field", c.field)?;
     t.set("columns", c.columns)?;
     t.set("is_bezier", c.is_bezier())?;
@@ -731,9 +789,18 @@ fn node_table(lua: &Lua, n: &Node<'_>) -> mlua::Result<Table> {
     if let Some(s) = &n.skin {
         t.set("skin", skin_table(lua, s)?)?;
     }
+    if let Some(l) = &n.light {
+        t.set("light", light_table(lua, l)?)?;
+    }
+    if let Some(e) = &n.emitter {
+        t.set("emitter", emitter_table(lua, e)?)?;
+    }
+    if let Some(s) = &n.saber {
+        t.set("saber", saber_table(lua, s)?)?;
+    }
     let cs = lua.create_table()?;
     for (i, c) in n.controllers.iter().enumerate() {
-        cs.raw_set(i + 1, controller_table(lua, c)?)?;
+        cs.raw_set(i + 1, controller_table(lua, c, n.kind)?)?;
     }
     t.set("controllers", cs)?;
     Ok(t)

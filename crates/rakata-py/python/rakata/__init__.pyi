@@ -510,10 +510,90 @@ class Skin:
     def qbone(self, node: int) -> Quat | None: ...
     def tbone(self, node: int) -> Vec3 | None: ...
 
+class Light:
+    @property
+    def flare_radius(self) -> float: ...
+    @property
+    def flares(self) -> list[tuple[str, float, float, Vec3]]:
+        """Each flare as `(texture, size, position, colour shift)`."""
+    @property
+    def priority(self) -> int: ...
+    @property
+    def ambient_only(self) -> bool: ...
+    @property
+    def dynamic_type(self) -> int:
+        """The torlack document's dynamic type, by position alone."""
+    @property
+    def affect_dynamic(self) -> bool:
+        """The torlack document's affect-dynamic flag, by position alone."""
+    @property
+    def shadow(self) -> bool: ...
+    @property
+    def generate_flare(self) -> bool:
+        """Where the torlack document puts the generate-flare flag; false in every vanilla light."""
+    @property
+    def fading(self) -> bool:
+        """The torlack document's fading flag, by position alone."""
+
+class Emitter:
+    @property
+    def dead_space(self) -> float: ...
+    @property
+    def blast_radius(self) -> float: ...
+    @property
+    def blast_length(self) -> float: ...
+    @property
+    def lightning_words(self) -> tuple[int, int]:
+        """The words at 12 and 16, set only on `Lightning` emitters; not established."""
+    @property
+    def x_grid(self) -> int: ...
+    @property
+    def y_grid(self) -> int: ...
+    @property
+    def space_type(self) -> int: ...
+    @property
+    def update(self) -> str:
+        """`Single`, `Fountain`, `Explosion` or `Lightning` in vanilla."""
+    @property
+    def render(self) -> str: ...
+    @property
+    def blend(self) -> str: ...
+    @property
+    def texture(self) -> str | None: ...
+    @property
+    def chunk(self) -> str | None:
+        """The model each particle is, if any."""
+    @property
+    def two_sided(self) -> bool: ...
+    @property
+    def looping(self) -> bool: ...
+    @property
+    def render_order(self) -> int: ...
+    @property
+    def name_187(self) -> str:
+        """The name at 187 as stored: `NULL`, empty or `fx_depth` in vanilla; not established."""
+    @property
+    def flags(self) -> int: ...
+
+class Saber:
+    @property
+    def positions(self) -> list[Vec3]: ...
+    @property
+    def uv(self) -> list[tuple[float, float]]: ...
+    @property
+    def normals(self) -> list[Vec3]: ...
+    @property
+    def words(self) -> tuple[int, int]:
+        """The words at 12 and 16; not established."""
+
 class Controller:
     @property
     def kind(self) -> int:
         """8 position, 20 orientation, 36 scale, ..."""
+    @property
+    def name(self) -> str | None:
+        """The type's name on the kind of node that carries it (`radius` on a light, `birth_rate` on an
+        emitter); `None` when not established."""
     @property
     def field(self) -> int: ...
     @property
@@ -565,6 +645,12 @@ class ModelNode:
     def mesh(self) -> Mesh | None: ...
     @property
     def skin(self) -> Skin | None: ...
+    @property
+    def light(self) -> Light | None: ...
+    @property
+    def emitter(self) -> Emitter | None: ...
+    @property
+    def saber(self) -> Saber | None: ...
     @property
     def controllers(self) -> list[Controller]: ...
 

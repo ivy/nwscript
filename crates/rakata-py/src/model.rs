@@ -1,6 +1,6 @@
 //! Binary models (`rakata::mdl`): a model's MDL and MDX read from bytes, a
-//! path or the install, its node tree, meshes, skins, controllers and
-//! animations as Python objects, and the pair written back as bytes.
+//! path or the install, its node tree, meshes, skins, lights, emitters,
+//! sabers, controllers and animations as Python objects, and the pair written back as bytes.
 //!
 //! The reader borrows every name and array from its inputs, so the class
 //! copies what it reads into objects of its own once, when it is made, and
@@ -15,8 +15,8 @@ use std::path::PathBuf;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use rakata::mdl::{
-    Animation, Attribute, BoundingBox, Classification, Controller, Mesh, Model, ModelFile, Node,
-    NodeKind, Quaternion, Skin,
+    Animation, Attribute, BoundingBox, Classification, Controller, Emitter, Light, Mesh, Model,
+    ModelFile, Node, NodeKind, Quaternion, Saber, Skin, controller_types,
 };
 
 use crate::fail;
@@ -316,11 +316,136 @@ impl PySkin {
     }
 }
 
+/// A light's header: its flares, priority and flags.
+#[pyclass(name = "Light", module = "rakata", frozen, get_all)]
+pub struct PyLight {
+    flare_radius: f32,
+    /// Each flare as `(texture, size, position, colour shift)`.
+    flares: Vec<(String, f32, f32, V3)>,
+    priority: i32,
+    ambient_only: bool,
+    dynamic_type: u32,
+    affect_dynamic: bool,
+    shadow: bool,
+    generate_flare: bool,
+    fading: bool,
+}
+
+impl PyLight {
+    fn new(l: &Light<'_>) -> Self {
+        PyLight {
+            flare_radius: l.flare_radius,
+            flares: l
+                .flares
+                .iter()
+                .map(|f| (f.texture.to_owned(), f.size, f.position, v3(f.color_shift)))
+                .collect(),
+            priority: l.priority,
+            ambient_only: l.ambient_only,
+            dynamic_type: l.dynamic_type,
+            affect_dynamic: l.affect_dynamic,
+            shadow: l.shadow,
+            generate_flare: l.generate_flare,
+            fading: l.fading,
+        }
+    }
+}
+
+#[pymethods]
+impl PyLight {
+    fn __repr__(&self) -> String {
+        format!("Light({} flares)", self.flares.len())
+    }
+}
+
+/// A particle emitter's header.
+#[pyclass(name = "Emitter", module = "rakata", frozen, get_all)]
+pub struct PyEmitter {
+    dead_space: f32,
+    blast_radius: f32,
+    blast_length: f32,
+    lightning_words: (u32, u32),
+    x_grid: u32,
+    y_grid: u32,
+    space_type: u32,
+    update: String,
+    render: String,
+    blend: String,
+    texture: Option<String>,
+    chunk: Option<String>,
+    two_sided: bool,
+    looping: bool,
+    render_order: u16,
+    name_187: String,
+    flags: u32,
+}
+
+impl PyEmitter {
+    fn new(e: &Emitter<'_>) -> Self {
+        PyEmitter {
+            dead_space: e.dead_space,
+            blast_radius: e.blast_radius,
+            blast_length: e.blast_length,
+            lightning_words: (e.lightning_words[0], e.lightning_words[1]),
+            x_grid: e.x_grid,
+            y_grid: e.y_grid,
+            space_type: e.space_type,
+            update: e.update.to_owned(),
+            render: e.render.to_owned(),
+            blend: e.blend.to_owned(),
+            texture: e.texture.map(str::to_owned),
+            chunk: e.chunk.map(str::to_owned),
+            two_sided: e.two_sided,
+            looping: e.looping,
+            render_order: e.render_order,
+            name_187: e.name_187.to_owned(),
+            flags: e.flags,
+        }
+    }
+}
+
+#[pymethods]
+impl PyEmitter {
+    fn __repr__(&self) -> String {
+        format!("Emitter({:?}, {:?})", self.update, self.render)
+    }
+}
+
+/// A saber blade's vertices; its triangles are its mesh's faces.
+#[pyclass(name = "Saber", module = "rakata", frozen, get_all)]
+pub struct PySaber {
+    positions: Vec<V3>,
+    uv: Vec<(f32, f32)>,
+    normals: Vec<V3>,
+    words: (u32, u32),
+}
+
+impl PySaber {
+    fn new(s: &Saber<'_>) -> Self {
+        PySaber {
+            positions: s.positions.iter().map(v3).collect(),
+            uv: s.uv.iter().map(v2).collect(),
+            normals: s.normals.iter().map(v3).collect(),
+            words: (s.words[0], s.words[1]),
+        }
+    }
+}
+
+#[pymethods]
+impl PySaber {
+    fn __repr__(&self) -> String {
+        format!("Saber({} vertices)", self.positions.len())
+    }
+}
+
 /// One controller of a node: a type and its keys.
 #[pyclass(name = "Controller", module = "rakata", frozen, get_all)]
 pub struct PyController {
     /// The controller type: 8 position, 20 orientation, 36 scale, ...
     kind: u32,
+    /// The type's name on the kind of node that carries it (`radius` on a
+    /// light, `birth_rate` on an emitter); `None` when not established.
+    name: Option<&'static str>,
     /// The u16 after the type, as stored.
     field: u16,
     /// The column byte as stored, 0x10 set on a bezier-keyed controller.
@@ -335,7 +460,7 @@ pub struct PyController {
 }
 
 impl PyController {
-    fn new(c: &Controller<'_>) -> Self {
+    fn new(c: &Controller<'_>, node: NodeKind) -> Self {
         let keys = match c.orientation_keys() {
             Some(keys) => keys
                 .map(|k| (k.time, vec![k.value.w, k.value.x, k.value.y, k.value.z]))
@@ -351,6 +476,7 @@ impl PyController {
         };
         PyController {
             kind: c.kind,
+            name: controller_types::name(node, c.kind),
             field: c.field,
             columns: c.columns,
             is_bezier: c.is_bezier(),
@@ -388,6 +514,9 @@ pub struct PyModelNode {
     orientation: Q,
     mesh: Option<Py<PyMesh>>,
     skin: Option<Py<PySkin>>,
+    light: Option<Py<PyLight>>,
+    emitter: Option<Py<PyEmitter>>,
+    saber: Option<Py<PySaber>>,
     controllers: Vec<Py<PyController>>,
 }
 
@@ -413,10 +542,25 @@ impl PyModelNode {
                 .as_ref()
                 .map(|s| Py::new(py, PySkin::new(s)))
                 .transpose()?,
+            light: n
+                .light
+                .as_ref()
+                .map(|l| Py::new(py, PyLight::new(l)))
+                .transpose()?,
+            emitter: n
+                .emitter
+                .as_ref()
+                .map(|e| Py::new(py, PyEmitter::new(e)))
+                .transpose()?,
+            saber: n
+                .saber
+                .as_ref()
+                .map(|s| Py::new(py, PySaber::new(s)))
+                .transpose()?,
             controllers: n
                 .controllers
                 .iter()
-                .map(|c| Py::new(py, PyController::new(c)))
+                .map(|c| Py::new(py, PyController::new(c, n.kind)))
                 .collect::<PyResult<_>>()?,
         })
     }

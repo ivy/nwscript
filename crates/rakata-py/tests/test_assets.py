@@ -167,6 +167,31 @@ def test_a_character_model_reads_its_skin_and_animations(install: rakata.Install
     assert (mdl, mdx) == (install.read("c_bantha.mdl"), install.read("c_bantha.mdx"))
 
 
+def test_lights_emitters_and_sabers_read_as_typed_values(install: rakata.Install) -> None:
+    muzzle = rakata.Model.load(install, "v_muzflash_01")
+    node = muzzle.node("muzflash01")
+    assert node is not None and node.kind == "emitter"
+    e = node.emitter
+    assert e is not None
+    assert (e.update, e.render, e.blend) == ("Explosion", "Billboard_to_Local_Z", "Lighten")
+    assert e.texture == "fx_muzflash" and e.chunk is None
+    assert e.two_sided and e.name_187 == "NULL"
+    assert "birth_rate" in [c.name for c in node.controllers]
+    sun = rakata.Model.load(install, "gidy_sun")
+    amb, diff = sun.node("gidy_sun_amb"), sun.node("gidy_sun_diff")
+    assert amb is not None and diff is not None
+    assert amb.light is not None and diff.light is not None
+    assert amb.light.ambient_only and not diff.light.ambient_only
+    assert diff.light.shadow and not amb.light.shadow
+    assert [c.name for c in amb.controllers if c.kind == 88] == ["radius"]
+    blades = rakata.Model.load(install, "w_dblsbr_001")
+    blade = blades.node("plane269")
+    assert blade is not None and blade.saber is not None and blade.mesh is not None
+    assert blade.saber.positions == blade.mesh.positions
+    assert len(blade.saber.uv) == len(blade.saber.normals) == 176
+    assert blade.saber.words == (98, 97)
+
+
 def test_a_room_walkmesh_reads_and_changes_a_material(install: rakata.Install) -> None:
     raw = install.read("m01aa_01a.wok")
     wok = rakata.Walkmesh.parse(raw)

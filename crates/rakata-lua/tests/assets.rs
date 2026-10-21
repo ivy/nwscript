@@ -248,3 +248,38 @@ fn end_m01aa_rooms_read_and_write_back_as_the_install_holds_them() {
         );
     }
 }
+
+#[test]
+fn lights_emitters_and_sabers_read_as_typed_tables() {
+    let Some(game) = game() else {
+        return;
+    };
+    let o = ok(
+        r#"
+        local g = rakata.Install.open()
+        local muzzle = rakata.mdl.load(g, "v_muzflash_01"):node("muzflash01")
+        local e = muzzle.emitter
+        local names = {}
+        for _, c in ipairs(muzzle.controllers) do names[#names + 1] = c.name end
+        print(e.update, e.render, e.blend, e.texture, e.chunk, e.two_sided, e.name_187,
+          table.concat(names, ","):find("birth_rate") ~= nil)
+        local sun = rakata.mdl.load(g, "gidy_sun")
+        local amb, diff = sun:node("gidy_sun_amb").light, sun:node("gidy_sun_diff").light
+        print(amb.ambient_only, diff.ambient_only, amb.shadow, diff.shadow)
+        local flares = rakata.mdl.load(g, "fx_explode_03"):node("AuroraLight04").light.flares
+        print(#flares, flares[1].texture)
+        local blade = rakata.mdl.load(g, "w_dblsbr_001"):node("plane269")
+        print(#blade.saber.positions, #blade.saber.uv, blade.saber.words[1], blade.saber.words[2],
+          blade.mesh.positions[2][3] == blade.saber.positions[2][3])
+        "#,
+        &[],
+        Some(&game),
+    );
+    assert_eq!(
+        o,
+        "Explosion\tBillboard_to_Local_Z\tLighten\tfx_muzflash\tnil\ttrue\tNULL\ttrue\n\
+         true\tfalse\tfalse\ttrue\n\
+         6\tfx_flare01\n\
+         176\t176\t98\t97\ttrue\n"
+    );
+}

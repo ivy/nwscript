@@ -249,7 +249,7 @@ A binary model and its MDX. Nodes are named from 0 by their place in the sequenc
 - `rakata.mdl.parse(mdl, [mdx])`: read a model; the MDX may be left out for one whose meshes have none. `rakata.mdl.load(install, name, [module])` reads both.
 - `model.name`, `model.supermodel` (nil for none), `model.subclassification`, `model.fog`, `model.radius`, `model.animation_scale`, `model.bounding_box` (`{min, max}`).
 - `model.classification`: `other` (rooms), `effect`, `tile`, `character`, `door`, `lightsaber`, `placeable` or `unknown`.
-- `model:nodes()`: every node of the geometry, the root first. A node is `{name, kind, flags, number, supernode, parent, children, position, orientation, controllers, mesh, skin}`, `kind` one of `dummy`, `light`, `emitter`, `reference`, `trimesh`, `skin`, `animmesh`, `dangly`, `aabb`, `saber`, `other`; `position` and `orientation` relative to the parent; `mesh` and `skin` nil on a node without them.
+- `model:nodes()`: every node of the geometry, the root first. A node is `{name, kind, flags, number, supernode, parent, children, position, orientation, controllers, mesh, skin, light, emitter, saber}`, `kind` one of `dummy`, `light`, `emitter`, `reference`, `trimesh`, `skin`, `animmesh`, `dangly`, `aabb`, `saber`, `other`; `position` and `orientation` relative to the parent; `mesh`, `skin`, `light`, `emitter` and `saber` nil on a node without them.
 - `model:node(name)`: the first node named `name`, in any case, or nil.
 - `model:animations()`, `model:animation(name)`: the model's own animations, `{name, length, transition, root, events, nodes}`, `events` `{time, name}` each and `nodes` as `model:nodes()` gives them.
 - `model:to_bytes()`: two strings, the MDL and the MDX, laid out as BioWare's compiler lays them out.
@@ -258,7 +258,9 @@ A mesh is `{texture, lightmap, texture_count, lightmapped, render, shadow, trans
 
 A skin is `{bones, weights, bone_indices, bind}`: `bones` the node numbers of the bones by local index; `weights` and `bone_indices` four numbers for each vertex (-1 where a slot names no bone); `bind[number]` the bone's bind transform, `{rotation, translation}`, by node number.
 
-A controller is `{kind, field, columns, is_bezier, is_compressed, keys}`, `kind` the controller type (8 position, 20 orientation, 36 scale) and `keys` `{time, value}` each: an orientation's value its rotation, a compressed one decoded; any other controller's its row of numbers as stored (a bezier key's value, then its two control values).
+A light is `{flare_radius, flares, priority, ambient_only, dynamic_type, affect_dynamic, shadow, generate_flare, fading}`, `flares` `{texture, size, position, color_shift}` each. An emitter is `{dead_space, blast_radius, blast_length, lightning_words, x_grid, y_grid, space_type, update, render, blend, texture, chunk, two_sided, looping, render_order, name_187, flags}`: `update` `Single`, `Fountain`, `Explosion` or `Lightning` in vanilla, `texture` and `chunk` (the model each particle is) nil when the field names none, `name_187` the name at 187 as stored. A saber is `{positions, uv, normals, words}`, its vertices; its triangles are its mesh's faces. `docs/formats/mdl.md` ("Light header", "Emitter header", "Saber header") says what each field is and which meanings the files leave open.
+
+A controller is `{kind, name, field, columns, is_bezier, is_compressed, keys}`, `kind` the controller type (8 position, 20 orientation, 36 scale), `name` its name on the kind of node that carries it (`radius` on a light, `birth_rate` on an emitter; nil when not established), and `keys` `{time, value}` each: an orientation's value its rotation, a compressed one decoded; any other controller's its row of numbers as stored (a bezier key's value, then its two control values).
 
 A file that is not a binary model is `RE2401`, a truncated one `RE2402`, an MDX shorter than its meshes say `RE2403`.
 
