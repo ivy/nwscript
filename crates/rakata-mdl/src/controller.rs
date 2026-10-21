@@ -7,11 +7,17 @@ use crate::model::{Data, Quaternion};
 /// The length of one controller record in the MDL.
 pub const CONTROLLER_LEN: usize = 16;
 
-/// The controller types this crate names. Any other type is read all the
-/// same, its keys available as rows of floats; what a type means depends
-/// on the kind of node that carries it (88 is a light's radius and an
-/// emitter's birth rate).
+/// The controller types of `docs/formats/mdl.md` ("Controllers"). What a
+/// type means depends on the kind of node that carries it: 88 is a
+/// light's [`light::RADIUS`] and an emitter's [`emitter::BIRTH_RATE`], 100
+/// a mesh's [`mesh::SELF_ILLUM_COLOR`], a light's
+/// [`light::VERTICAL_DISPLACEMENT`] and an emitter's [`emitter::DRAG`]. So
+/// the types every node carries are named here, and the rest in a module
+/// per kind; [`name`] gives a type's name on a kind of node. Any type is
+/// read all the same, its keys available as rows of floats.
 pub mod controller_types {
+    use crate::NodeKind;
+
     /// Position, three floats: the node header's position in a model's
     /// geometry. In an animation the keys of most nodes lie near the
     /// origin, as offsets from the rest position would; the files do not
@@ -20,10 +26,236 @@ pub mod controller_types {
     /// Orientation, a quaternion stored `x, y, z, w`, or compressed into
     /// one 32-bit word (see [`decompress_quaternion`](crate::decompress_quaternion)).
     pub const ORIENTATION: u32 = 20;
-    /// Scale, one float.
+    /// Scale, one float; on meshes and on a few dummies.
     pub const SCALE: u32 = 36;
-    /// A mesh's self-illumination colour, three floats.
-    pub const SELF_ILLUM_COLOR: u32 = 100;
+    /// A mesh's self-illumination colour: [`mesh::SELF_ILLUM_COLOR`].
+    pub const SELF_ILLUM_COLOR: u32 = mesh::SELF_ILLUM_COLOR;
+
+    /// The types of a node with a mesh header.
+    pub mod mesh {
+        /// Self-illumination colour, three floats. Shares 100 with
+        /// [`light::VERTICAL_DISPLACEMENT`](super::light::VERTICAL_DISPLACEMENT)
+        /// and [`emitter::DRAG`](super::emitter::DRAG).
+        pub const SELF_ILLUM_COLOR: u32 = 100;
+        /// Alpha, one float: 1 on nearly every mesh, less on water, beams
+        /// and holograms. Shares 132 with
+        /// [`emitter::P2P_BEZIER_3`](super::emitter::P2P_BEZIER_3).
+        pub const ALPHA: u32 = 132;
+    }
+
+    /// The types of a light (`docs/formats/mdl.md`, "Controllers"), the
+    /// torlack document's NWN numbers unchanged.
+    pub mod light {
+        /// Colour, three floats; negative on the lights that darken.
+        pub const COLOR: u32 = 76;
+        /// Radius, one float. Shares 88 with
+        /// [`emitter::BIRTH_RATE`](super::emitter::BIRTH_RATE).
+        pub const RADIUS: u32 = 88;
+        /// Shadow radius, one float; on `fx_flame01`'s light only. Shares
+        /// 96 with [`emitter::COMBINE_TIME`](super::emitter::COMBINE_TIME).
+        pub const SHADOW_RADIUS: u32 = 96;
+        /// Vertical displacement, one float; on `fx_flame01`'s light only.
+        /// Shares 100 with [`mesh::SELF_ILLUM_COLOR`](super::mesh::SELF_ILLUM_COLOR)
+        /// and [`emitter::DRAG`](super::emitter::DRAG).
+        pub const VERTICAL_DISPLACEMENT: u32 = 100;
+        /// Multiplier, one float. Shares 140 with
+        /// [`emitter::RANDOM_VELOCITY`](super::emitter::RANDOM_VELOCITY).
+        pub const MULTIPLIER: u32 = 140;
+    }
+
+    /// The types of an emitter (`docs/formats/mdl.md`, "Controllers"): the
+    /// torlack document's NWN numbers, but that its two colours are
+    /// elsewhere and every NWN type after them is 24 less, and the
+    /// mid-life types KotOR adds. One float each but the colours, three.
+    /// Many numbers here are a light's or a mesh's type too; read them by
+    /// the node's kind.
+    pub mod emitter {
+        /// Alpha at the end of a particle's life.
+        pub const ALPHA_END: u32 = 80;
+        /// Alpha at the start of a particle's life.
+        pub const ALPHA_START: u32 = 84;
+        /// Particles born per second. Shares 88 with
+        /// [`light::RADIUS`](super::light::RADIUS).
+        pub const BIRTH_RATE: u32 = 88;
+        /// Bounce coefficient.
+        pub const BOUNCE_COEFFICIENT: u32 = 92;
+        /// Combine time; non-zero in one vanilla emitter. Shares 96 with
+        /// [`light::SHADOW_RADIUS`](super::light::SHADOW_RADIUS).
+        pub const COMBINE_TIME: u32 = 96;
+        /// Drag. Shares 100 with [`mesh::SELF_ILLUM_COLOR`](super::mesh::SELF_ILLUM_COLOR)
+        /// and [`light::VERTICAL_DISPLACEMENT`](super::light::VERTICAL_DISPLACEMENT).
+        pub const DRAG: u32 = 100;
+        /// Frames per second of the texture's frames.
+        pub const FPS: u32 = 104;
+        /// The last frame, an index into the texture's grid of cells.
+        pub const FRAME_END: u32 = 108;
+        /// The first frame; at most [`FRAME_END`] in every vanilla emitter
+        /// but one.
+        pub const FRAME_START: u32 = 112;
+        /// Gravity.
+        pub const GRAVITY: u32 = 116;
+        /// A particle's life expectancy in seconds; -1 in most.
+        pub const LIFE_EXPECTANCY: u32 = 120;
+        /// Mass.
+        pub const MASS: u32 = 124;
+        /// P2P bezier 2; non-zero only with the P2P flag.
+        pub const P2P_BEZIER_2: u32 = 128;
+        /// P2P bezier 3; non-zero only with the P2P flag. Shares 132 with
+        /// [`mesh::ALPHA`](super::mesh::ALPHA).
+        pub const P2P_BEZIER_3: u32 = 132;
+        /// Particle rotation.
+        pub const PARTICLE_ROTATION: u32 = 136;
+        /// Random velocity. Shares 140 with
+        /// [`light::MULTIPLIER`](super::light::MULTIPLIER).
+        pub const RANDOM_VELOCITY: u32 = 140;
+        /// Size at the start of a particle's life.
+        pub const SIZE_START: u32 = 144;
+        /// Size at the end.
+        pub const SIZE_END: u32 = 148;
+        /// Y size at the start.
+        pub const SIZE_START_Y: u32 = 152;
+        /// Y size at the end.
+        pub const SIZE_END_Y: u32 = 156;
+        /// Spread, radians.
+        pub const SPREAD: u32 = 160;
+        /// Threshold.
+        pub const THRESHOLD: u32 = 164;
+        /// Velocity.
+        pub const VELOCITY: u32 = 168;
+        /// The emitter's X size.
+        pub const X_SIZE: u32 = 172;
+        /// The emitter's Y size.
+        pub const Y_SIZE: u32 = 176;
+        /// Blur length.
+        pub const BLUR_LENGTH: u32 = 180;
+        /// Lightning delay.
+        pub const LIGHTNING_DELAY: u32 = 184;
+        /// Lightning radius.
+        pub const LIGHTNING_RADIUS: u32 = 188;
+        /// Lightning scale.
+        pub const LIGHTNING_SCALE: u32 = 192;
+        /// Not established; non-zero mostly on `Lightning` emitters.
+        pub const TYPE_196: u32 = 196;
+        /// Not established; non-zero only on `Lightning` emitters.
+        pub const TYPE_200: u32 = 200;
+        /// Alpha at mid-life.
+        pub const ALPHA_MID: u32 = 216;
+        /// The fraction of life at which the start values hold.
+        pub const PERCENT_START: u32 = 220;
+        /// The fraction of life at which the mid-life values hold.
+        pub const PERCENT_MID: u32 = 224;
+        /// The fraction of life at which the end values hold.
+        pub const PERCENT_END: u32 = 228;
+        /// Size at mid-life.
+        pub const SIZE_MID: u32 = 232;
+        /// Y size at mid-life.
+        pub const SIZE_MID_Y: u32 = 236;
+        /// Not established; non-zero mostly on `Fountain` and `Explosion`
+        /// emitters.
+        pub const TYPE_240: u32 = 240;
+        /// Not established; non-zero mostly on `Lightning` emitters.
+        pub const TYPE_252: u32 = 252;
+        /// Not established; non-zero mostly on `Lightning` emitters.
+        pub const TYPE_256: u32 = 256;
+        /// Not established; non-zero mostly on `Lightning` emitters.
+        pub const TYPE_260: u32 = 260;
+        /// Not established; non-zero only on `Lightning` emitters.
+        pub const TYPE_264: u32 = 264;
+        /// Not established; non-zero mostly on `Lightning` emitters.
+        pub const TYPE_268: u32 = 268;
+        /// Not established; non-zero mostly on `Lightning` emitters.
+        pub const TYPE_272: u32 = 272;
+        /// Colour at mid-life, three floats.
+        pub const COLOR_MID: u32 = 284;
+        /// Colour at the end of a particle's life, three floats.
+        pub const COLOR_END: u32 = 380;
+        /// Colour at the start of a particle's life, three floats.
+        pub const COLOR_START: u32 = 392;
+    }
+
+    /// The name of controller type `ty` on a node of kind `kind`, in
+    /// lower case with underscores (`birth_rate`); `None` for a type the
+    /// kind does not carry in vanilla, or one whose meaning is not
+    /// established.
+    pub fn name(kind: NodeKind, ty: u32) -> Option<&'static str> {
+        let common = match ty {
+            POSITION => Some("position"),
+            ORIENTATION => Some("orientation"),
+            _ => None,
+        };
+        let own = match kind {
+            NodeKind::Light => match ty {
+                light::COLOR => Some("color"),
+                light::RADIUS => Some("radius"),
+                light::SHADOW_RADIUS => Some("shadow_radius"),
+                light::VERTICAL_DISPLACEMENT => Some("vertical_displacement"),
+                light::MULTIPLIER => Some("multiplier"),
+                _ => None,
+            },
+            NodeKind::Emitter => emitter_name(ty),
+            NodeKind::Trimesh
+            | NodeKind::Skin
+            | NodeKind::AnimMesh
+            | NodeKind::Dangly
+            | NodeKind::Aabb
+            | NodeKind::Saber => match ty {
+                SCALE => Some("scale"),
+                mesh::SELF_ILLUM_COLOR => Some("self_illum_color"),
+                mesh::ALPHA => Some("alpha"),
+                _ => None,
+            },
+            NodeKind::Dummy | NodeKind::Reference | NodeKind::Other(_) => match ty {
+                SCALE => Some("scale"),
+                _ => None,
+            },
+        };
+        common.or(own)
+    }
+
+    fn emitter_name(ty: u32) -> Option<&'static str> {
+        use emitter::*;
+        Some(match ty {
+            ALPHA_END => "alpha_end",
+            ALPHA_START => "alpha_start",
+            BIRTH_RATE => "birth_rate",
+            BOUNCE_COEFFICIENT => "bounce_coefficient",
+            COMBINE_TIME => "combine_time",
+            DRAG => "drag",
+            FPS => "fps",
+            FRAME_END => "frame_end",
+            FRAME_START => "frame_start",
+            GRAVITY => "gravity",
+            LIFE_EXPECTANCY => "life_expectancy",
+            MASS => "mass",
+            P2P_BEZIER_2 => "p2p_bezier_2",
+            P2P_BEZIER_3 => "p2p_bezier_3",
+            PARTICLE_ROTATION => "particle_rotation",
+            RANDOM_VELOCITY => "random_velocity",
+            SIZE_START => "size_start",
+            SIZE_END => "size_end",
+            SIZE_START_Y => "size_start_y",
+            SIZE_END_Y => "size_end_y",
+            SPREAD => "spread",
+            THRESHOLD => "threshold",
+            VELOCITY => "velocity",
+            X_SIZE => "x_size",
+            Y_SIZE => "y_size",
+            BLUR_LENGTH => "blur_length",
+            LIGHTNING_DELAY => "lightning_delay",
+            LIGHTNING_RADIUS => "lightning_radius",
+            LIGHTNING_SCALE => "lightning_scale",
+            ALPHA_MID => "alpha_mid",
+            PERCENT_START => "percent_start",
+            PERCENT_MID => "percent_mid",
+            PERCENT_END => "percent_end",
+            SIZE_MID => "size_mid",
+            SIZE_MID_Y => "size_mid_y",
+            COLOR_MID => "color_mid",
+            COLOR_END => "color_end",
+            COLOR_START => "color_start",
+            _ => return None,
+        })
+    }
 }
 
 /// The bit of the column byte that marks a bezier-keyed controller.

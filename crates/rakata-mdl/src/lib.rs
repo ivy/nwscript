@@ -11,11 +11,16 @@
 //! [`Mesh`]: its texture and lightmap names, render and shadow flags,
 //! transparency hint, colours, faces and triangle list, and its vertices.
 //! A skin node also carries a [`Skin`]: its bones, their bind transforms
-//! and each vertex's weights. An animation is a tree of nodes whose
+//! and each vertex's weights. A light carries a [`Light`] (its flares,
+//! priority and flags), an emitter an [`Emitter`] (how its particles are
+//! born, drawn and blended, their texture or chunk model, the texture's
+//! frame grid), and a saber blade a [`Saber`] (its vertices).
+//! [`controller_types`] names every controller type by the kind of node
+//! that carries it. An animation is a tree of nodes whose
 //! controllers hold the keys, positions and orientations among them
 //! (compressed orientations decoded by [`decompress_quaternion`]).
-//! Dangly constraints, AABB trees, emitters and lights are not decoded
-//! beyond their controllers; a model that has them reads all the same.
+//! Dangly constraints and AABB trees are not decoded; a model that has
+//! them reads all the same.
 //!
 //! A model inherits its supermodel's animations. [`Chain::load`] fetches a
 //! model and its supermodels through a caller's loader, and [`Lineage`]
@@ -43,6 +48,7 @@
 
 mod animation;
 mod controller;
+mod effects;
 mod error;
 pub mod facts;
 mod file;
@@ -57,6 +63,7 @@ pub use animation::{ANIMATION_HEADER_LEN, Animation, EVENT_LEN, Event};
 pub use controller::{
     BEZIER, CONTROLLER_LEN, Controller, Key, controller_types, decompress_quaternion,
 };
+pub use effects::{Emitter, Flare, Light, Saber, emitter_flags};
 pub use error::{ChainError, Error, Result, codes};
 pub use file::{
     AABB_ENTRY_LEN, AABB_HEADER_LEN, AabbEntry, AnimationFile, Body, DANGLY_HEADER_LEN, DanglyFile,

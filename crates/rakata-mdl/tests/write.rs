@@ -261,7 +261,11 @@ fn every_kind() -> ModelFile {
                 put_u32(&mut h, 16, 87);
                 h
             },
-            arrays: [vec![1; 36], vec![2; 24], vec![3; 36]],
+            arrays: [
+                floats(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
+                floats(&[0.0, 0.0, 1.0, 0.0, 0.0, 1.0]),
+                floats(&[0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0]),
+            ],
         })),
         24,
         false,
@@ -274,6 +278,10 @@ fn every_kind() -> ModelFile {
     let mut light_header = [0u8; 92];
     put_f32s(&mut light_header, 0, &[100.0]);
     put_u32(&mut light_header, 64, 1);
+    put_u32(&mut light_header, 68, 1);
+    put_u32(&mut light_header, 72, 2);
+    put_u32(&mut light_header, 80, 1);
+    put_u32(&mut light_header, 88, 1);
     let lamp = Body::Light(Box::new(LightFile {
         header: light_header,
         unknown: Vec::new(),
@@ -284,7 +292,18 @@ fn every_kind() -> ModelFile {
     }));
 
     let mut emitter = [0u8; 224];
+    put_f32s(&mut emitter, 4, &[5.0, 1.0]);
+    put_u32(&mut emitter, 20, 4);
+    put_u32(&mut emitter, 24, 2);
     put_str(&mut emitter, 32, "Fountain");
+    put_str(&mut emitter, 64, "Billboard_to_Local_Z");
+    put_str(&mut emitter, 96, "Lighten");
+    put_str(&mut emitter, 128, "fx_smoke");
+    put_str(&mut emitter, 160, "fx_part_01");
+    put_u32(&mut emitter, 176, 1);
+    put_u16(&mut emitter, 184, 3);
+    put_str(&mut emitter, 187, "NULL");
+    put_u32(&mut emitter, 220, 0x0122);
     let mut reference = [0u8; 36];
     put_str(&mut reference, 0, "dor_lhr01");
     put_u32(&mut reference, 32, 1);
@@ -399,6 +418,43 @@ fn a_model_of_every_kind_writes_and_reads_back_equal() {
     let blade = m.node("blade").unwrap().mesh.as_ref().unwrap();
     assert!(blade.vertex_buffer.is_empty());
     assert_eq!(blade.positions.get(2), Some([0.0, 1.0, 0.0]));
+    let saber = m.node("blade").unwrap().saber.as_ref().unwrap();
+    assert_eq!(saber.words, [88, 87]);
+    assert_eq!(saber.positions.get(1), Some([1.0, 0.0, 0.0]));
+    assert_eq!(saber.uv.get(2), Some([0.0, 1.0]));
+    assert_eq!(saber.normals.get(0), Some([0.0, -1.0, 0.0]));
+    let light = m.node("lamp").unwrap().light.as_ref().unwrap();
+    assert_eq!(light.flare_radius, 100.0);
+    assert_eq!(light.priority, 1);
+    assert!(light.ambient_only && light.shadow && light.fading);
+    assert!(!light.affect_dynamic && !light.generate_flare);
+    assert_eq!(light.dynamic_type, 2);
+    assert_eq!(light.flares.len(), 2);
+    assert_eq!(light.flares[1].texture, "fx_ring");
+    assert_eq!(light.flares[1].size, 0.25);
+    assert_eq!(light.flares[1].position, 1.0);
+    assert_eq!(light.flares[1].color_shift, [0.5, 0.5, 0.5]);
+    let smoke = m.node("smoke").unwrap().emitter.as_ref().unwrap();
+    assert_eq!((smoke.blast_radius, smoke.blast_length), (5.0, 1.0));
+    assert_eq!((smoke.x_grid, smoke.y_grid), (4, 2));
+    assert_eq!(
+        (smoke.update, smoke.render, smoke.blend),
+        ("Fountain", "Billboard_to_Local_Z", "Lighten")
+    );
+    assert_eq!(
+        (smoke.texture, smoke.chunk),
+        (Some("fx_smoke"), Some("fx_part_01"))
+    );
+    assert!(smoke.two_sided && !smoke.looping);
+    assert_eq!(smoke.render_order, 3);
+    assert_eq!(smoke.name_187, "NULL");
+    assert_eq!(
+        smoke.flags,
+        rakata_mdl::emitter_flags::P2P_SEL
+            | rakata_mdl::emitter_flags::RANDOM
+            | rakata_mdl::emitter_flags::INHERIT_LOCAL
+    );
+    assert!(m.node("trimesh").unwrap().light.is_none());
     assert_eq!(m.node("dangly").unwrap().position, [1.0, 0.0, 0.0]);
     // What it names, from the MDL alone: no supermodel (`NULL`), each
     // mesh's texture but the `NULL`s, the light's flares, the reference's

@@ -1440,3 +1440,127 @@ fn the_light_emitter_and_saber_headers() {
     assert!(failed.is_empty(), "{failed:#?}");
     assert_eq!((lights, emitters, sabers), (5_599, 9_442, 68));
 }
+
+/// Every light, emitter and saber of the install read as typed values,
+/// with values `docs/formats/mdl.md` states; and an animation node that
+/// keys neither position nor orientation kept with its keys.
+#[test]
+fn every_light_emitter_and_saber_reads_as_the_spec_says() {
+    use rakata_mdl::controller_types::{self, emitter, light, mesh};
+    use rakata_mdl::emitter_flags;
+
+    let Some(root) = game() else { return };
+    let (mut lights, mut emitters, mut sabers) = (0, 0, 0);
+    each_model(&root, |label, mdl, mdx| {
+        let m = Model::parse(mdl, mdx).unwrap_or_else(|e| panic!("{label}: {e}"));
+        for n in &m.nodes {
+            assert_eq!(n.light.is_some(), n.kind == NodeKind::Light, "{label}");
+            assert_eq!(n.emitter.is_some(), n.kind == NodeKind::Emitter, "{label}");
+            assert_eq!(n.saber.is_some(), n.kind == NodeKind::Saber, "{label}");
+            if let Some(l) = &n.light {
+                lights += 1;
+                assert_eq!(l.flare_radius > 0.0, !l.flares.is_empty(), "{label}");
+                assert!(!l.generate_flare, "{label}");
+            }
+            if let Some(e) = &n.emitter {
+                emitters += 1;
+                assert!(
+                    ["Single", "Fountain", "Explosion", "Lightning"].contains(&e.update),
+                    "{label}: {}",
+                    e.update
+                );
+                // The mid-life controllers come with the name at 187.
+                assert_eq!(
+                    n.controller(emitter::COLOR_MID).is_some(),
+                    !e.name_187.is_empty(),
+                    "{label}"
+                );
+            }
+            if let Some(s) = &n.saber {
+                sabers += 1;
+                let mesh = n.mesh.as_ref().unwrap();
+                assert_eq!(s.positions.len(), 176);
+                assert!(s.positions.iter().eq(mesh.positions.iter()), "{label}");
+                assert_eq!(mesh.faces.len(), 12);
+                assert_ne!(s.words[0], s.words[1]);
+            }
+        }
+    });
+    assert_eq!((lights, emitters, sabers), (5_599, 9_442, 68));
+
+    let install = install().unwrap();
+    let model = |name: &str| load_model(&install, name).unwrap().unwrap();
+
+    // `v_muzflash_01`'s emitters: two-sided `Explosion` billboards.
+    let (mdl, mdx) = model("v_muzflash_01");
+    let m = Model::parse(&mdl, &mdx).unwrap();
+    let n = m.node("muzflash01").unwrap();
+    let e = n.emitter.as_ref().unwrap();
+    assert_eq!(
+        (e.update, e.render, e.blend),
+        ("Explosion", "Billboard_to_Local_Z", "Lighten")
+    );
+    assert_eq!(e.texture, Some("fx_muzflash"));
+    assert_eq!((e.x_grid, e.y_grid, e.chunk), (1, 1, None));
+    assert!(e.two_sided);
+    assert_eq!(e.name_187, "NULL");
+    assert_eq!(e.flags, emitter_flags::P2P_SEL | emitter_flags::INHERIT);
+    assert!(n.controller(emitter::BIRTH_RATE).is_some());
+    assert_eq!(controller_types::name(n.kind, 88), Some("birth_rate"));
+
+    // `v_grnfrag_fnf`'s `Explode05`: a blast, drawn fifth.
+    let (mdl, mdx) = model("v_grnfrag_fnf");
+    let m = Model::parse(&mdl, &mdx).unwrap();
+    let e = m.node("Explode05").unwrap().emitter.as_ref().unwrap();
+    assert_eq!((e.blast_radius, e.blast_length), (5.0, 1.0));
+    assert_eq!(e.render_order, 5);
+    assert_eq!(e.texture, Some("fx_chunks"));
+
+    // `gidy_sun`: the ambient light and the shadow-casting diffuse one.
+    let (mdl, mdx) = model("gidy_sun");
+    let m = Model::parse(&mdl, &mdx).unwrap();
+    let amb = m.node("gidy_sun_amb").unwrap();
+    let diff = m.node("gidy_sun_diff").unwrap().light.as_ref().unwrap();
+    assert!(amb.light.as_ref().unwrap().ambient_only && !diff.ambient_only);
+    assert!(diff.shadow && !amb.light.as_ref().unwrap().shadow);
+    assert_eq!(controller_types::name(amb.kind, 88), Some("radius"));
+    let radius = amb
+        .controller(light::RADIUS)
+        .unwrap()
+        .scalar_keys()
+        .unwrap();
+    assert_eq!(radius.map(|k| k.value).collect::<Vec<_>>(), [100_000.0]);
+
+    // `fx_explode_03`'s light has six flares.
+    let (mdl, mdx) = model("fx_explode_03");
+    let m = Model::parse(&mdl, &mdx).unwrap();
+    let l = m.node("AuroraLight04").unwrap().light.as_ref().unwrap();
+    assert_eq!(l.flares.len(), 6);
+    assert_eq!(l.flares[0].texture, "fx_flare01");
+    assert_eq!(l.priority, 1);
+
+    // A double-bladed saber's first blade.
+    let (mdl, mdx) = model("w_dblsbr_001");
+    let m = Model::parse(&mdl, &mdx).unwrap();
+    let n = m.node("plane269").unwrap();
+    let s = n.saber.as_ref().unwrap();
+    assert_eq!(s.words, [98, 97]);
+    let normal = s.normals.get(0).unwrap();
+    assert!((normal[1] + 1.0).abs() < 1e-3, "{normal:?}");
+    let uv = s.uv.get(3).unwrap();
+    assert!(
+        (uv[0] - 0.5).abs() < 1e-3 && (uv[1] - 1.0).abs() < 1e-3,
+        "{uv:?}"
+    );
+    assert_eq!(controller_types::name(n.kind, mesh::ALPHA), Some("alpha"));
+
+    // An animation node keyed by self-illumination alone is kept.
+    let (mdl, mdx) = model("c_drdspyder");
+    let m = Model::parse(&mdl, &mdx).unwrap();
+    let a = m.animation("cdead").unwrap().node("Object01").unwrap();
+    assert!(a.controller(controller_types::POSITION).is_none());
+    assert!(a.controller(controller_types::ORIENTATION).is_none());
+    let glow = a.controller(mesh::SELF_ILLUM_COLOR).unwrap();
+    assert_eq!(glow.len(), 2);
+    assert!(glow.vector_keys().is_some());
+}

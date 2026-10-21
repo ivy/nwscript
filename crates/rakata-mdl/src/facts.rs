@@ -12,8 +12,7 @@
 //! `NODE` is the node's name. An empty name and `NULL` name nothing. Only
 //! the geometry's tree is read: an animation's nodes are dummies in every
 //! vanilla model and name nothing. Emitters' names (a texture, a chunk
-//! model) are not read: `docs/formats/mdl.md` does not decode the emitter
-//! header.
+//! model) are not read.
 
 use std::collections::HashSet;
 

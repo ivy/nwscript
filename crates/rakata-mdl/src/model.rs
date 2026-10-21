@@ -5,6 +5,7 @@ use std::collections::HashSet;
 
 use crate::animation::{Animation, read_animation};
 use crate::controller::{Controller, read_controllers};
+use crate::effects::{Emitter, Light, Saber, read_emitter, read_light, read_saber};
 use crate::error::{Error, Result};
 use crate::skin::{Skin, read_skin};
 use crate::view::{Attribute, FACE_LEN, Faces, Indices, Vec2s, Vec3s};
@@ -298,6 +299,12 @@ pub struct Node<'a> {
     pub mesh: Option<Mesh<'a>>,
     /// The skin part of a skin node: its bones and its vertices' weights.
     pub skin: Option<Skin<'a>>,
+    /// A light's header.
+    pub light: Option<Light<'a>>,
+    /// An emitter's header.
+    pub emitter: Option<Emitter<'a>>,
+    /// A saber blade's vertices; its triangles are its mesh's faces.
+    pub saber: Option<Saber<'a>>,
     /// The node's controllers, in stored order. In a model's geometry each
     /// holds one key, the node's resting value (the position and
     /// orientation controllers repeat the header's); in an animation they
@@ -564,6 +571,19 @@ pub(crate) fn read_tree<'a>(
             )?),
             _ => None,
         };
+        let h = at + NODE_HEADER_LEN;
+        let light = match flags {
+            0x003 => Some(read_light(d, h)?),
+            _ => None,
+        };
+        let emitter = match flags {
+            0x005 => Some(read_emitter(d, h)?),
+            _ => None,
+        };
+        let saber = match (&mesh, NodeKind::from_flags(flags)) {
+            (Some(m), NodeKind::Saber) => Some(read_saber(d, h + MESH_HEADER_LEN, m.vertex_count)?),
+            _ => None,
+        };
         let controllers = read_controllers(d, at, name)?;
         let (ch_off, ch_count) = d.array(at + NODE_CHILDREN, "child array")?;
         d.slice(ch_off, ch_count * 4, "child array")?;
@@ -588,6 +608,9 @@ pub(crate) fn read_tree<'a>(
             },
             mesh,
             skin,
+            light,
+            emitter,
+            saber,
             controllers,
         });
         for i in (0..ch_count).rev() {
@@ -792,6 +815,14 @@ impl<'a> Data<'a> {
             .iter()
             .position(|&c| c == 0)
             .ok_or(Error::BadName { what, offset: at })?;
+        ascii(&s[..end], what, at)
+    }
+
+    /// A name field of `len` bytes: ASCII up to a NUL, or the whole field
+    /// when it holds none.
+    pub(crate) fn field_str(&self, at: usize, len: usize, what: &'static str) -> Result<&'a str> {
+        let s = self.slice(at, len, what)?;
+        let end = s.iter().position(|&c| c == 0).unwrap_or(len);
         ascii(&s[..end], what, at)
     }
 
