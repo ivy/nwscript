@@ -259,6 +259,13 @@ class Tpc:
         """A copy; setting it replaces the TXI `to_bytes` writes."""
     @txi.setter
     def txi(self, value: Txi | None) -> None: ...
+    def rgba(self, level: int = 0, image: int | None = None) -> bytes:
+        """Level `level` as RGBA8, four bytes a pixel, rows top first: the whole texture at the
+        header's size (a cube's faces stacked top to bottom, a sheet's frames across then down),
+        or the one face or frame `image` names. DXT1 and DXT5 decoded; grey, RGB and RGBA bytes
+        widened as stored. RE2210, RE2211."""
+    def to_png(self, level: int = 0, image: int | None = None) -> bytes:
+        """What `rgba` gives, as an 8-bit RGBA PNG file; RE2210, RE2211, RE2212."""
     def to_bytes(self) -> bytes:
         """RE2207, RE2208."""
 
@@ -290,6 +297,8 @@ class Tga:
         (`ValueError` otherwise)."""
     @rgba.setter
     def rgba(self, value: bytes) -> None: ...
+    def to_png(self) -> bytes:
+        """The pixels as an 8-bit RGBA PNG file; RE2212."""
     def to_bytes(self) -> bytes:
         """In the stored depth, order and packing; RE2209."""
 

@@ -194,10 +194,12 @@ fn end_m01aa_rooms_read_and_write_back_as_the_install_holds_them() {
         txi:set("bumpmaptexture", "LHR_flr02B")
         tpc:set_txi(txi)
         print(rakata.tpc.parse(tpc:to_bytes()):txi():get("bumpmaptexture"))
+        print(#tpc:rgba() == tpc.width * tpc.height * 4, #tpc:rgba(1) * 4 == #tpc:rgba(),
+          tpc:to_png():sub(2, 4), select(2, pcall(tpc.rgba, tpc, 0, 1)).code)
         save("lbl_menudarr.txi", rakata.txi.load(g, "lbl_menudarr"):to_bytes())
 
         local tga = rakata.tga.load(g, "M01aa_01a_lm1")
-        print(#tga:rgba() == tga.width * tga.height * 4, tga.image_type)
+        print(#tga:rgba() == tga.width * tga.height * 4, tga.image_type, tga:to_png():sub(2, 4))
         save("M01aa_01a_lm1.tga", tga:to_bytes())
         print(select(2, pcall(tga.set_rgba, tga, "x")).code)
         print(select(2, pcall(rakata.lyt.load, g, "no_such_area")).code)
@@ -227,7 +229,8 @@ fn end_m01aa_rooms_read_and_write_back_as_the_install_holds_them() {
             "character\t14\ttrue\t20\ttrue\t4",
             "dxt1\tsingle\tnil\ttrue\ttrue",
             "LHR_flr02B",
-            "true\ttruecolor",
+            "true\ttrue\tPNG\tRE2211",
+            "true\ttruecolor\tPNG",
             "RE1805",
             "RE0404",
         ]

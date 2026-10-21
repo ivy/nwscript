@@ -259,3 +259,21 @@ def test_a_lightmap_decodes_and_writes_back(install: rakata.Install) -> None:
     assert set(black.rgba[i] for i in range(0, len(black.rgba), 4)) == {0}
     with pytest.raises(ValueError):
         tga.rgba = b"\x00"
+
+
+def test_a_texture_decodes_to_rgba_and_png(install: rakata.Install) -> None:
+    tpc = rakata.Tpc.load(install, "LHR_flr02")
+    rgba = tpc.rgba()
+    assert len(rgba) == tpc.width * tpc.height * 4
+    assert len(tpc.rgba(level=1)) == len(rgba) // 4
+    png = tpc.to_png()
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+    assert struct.unpack(">II", png[16:24]) == (tpc.width, tpc.height)
+    with pytest.raises(rakata.RakataError) as e:
+        tpc.rgba(level=tpc.level_count)
+    assert e.value.code == "RE2210"
+    with pytest.raises(rakata.RakataError) as e:
+        tpc.rgba(image=1)
+    assert e.value.code == "RE2211"
+    tga = rakata.Tga.load(install, "M01aa_01a_lm1")
+    assert struct.unpack(">II", tga.to_png()[16:24]) == (tga.width, tga.height)

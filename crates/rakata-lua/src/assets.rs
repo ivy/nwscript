@@ -17,7 +17,7 @@ use rakata::mdl::{
     Animation, Attribute, BoundingBox, Classification, Controller, Emitter, Light, Mesh, Model,
     ModelFile, Node, NodeKind, Quaternion, Saber, Skin, controller_types,
 };
-use rakata::texture::{ImageType, Layout, Origin, PixelFormat, Tga, Tpc, Txi, TxiEntry};
+use rakata::texture::{ImageType, Layout, Origin, PixelFormat, Rgba, Tga, Tpc, Txi, TxiEntry};
 use rakata::walkmesh::{EdgeRef, Kind, SurfaceMaterials, Vertices, Walkmesh};
 
 use crate::error::{Lift, bad};
@@ -149,6 +149,18 @@ impl LTpc {
     fn tpc(&self) -> Tpc<'_> {
         Tpc::parse(&self.data).expect("the bytes read when the TPC was made")
     }
+
+    /// Level `level` (0 when nil) of the whole texture, or of the one image
+    /// `image` names, as RGBA8.
+    fn decode(&self, level: Option<usize>, image: Option<usize>) -> mlua::Result<Rgba> {
+        let t = self.tpc();
+        let level = level.unwrap_or(0);
+        match image {
+            Some(i) => t.decode_image(i, level),
+            None => t.decode_level(level),
+        }
+        .lift()
+    }
 }
 
 fn format_name(f: PixelFormat) -> &'static str {
@@ -206,6 +218,18 @@ impl UserData for LTpc {
             Ok(out)
         });
         m.add_method("pixels", |lua, this, ()| bytes(lua, this.tpc().pixels));
+        m.add_method(
+            "rgba",
+            |lua, this, (level, image): (Option<usize>, Option<usize>)| {
+                bytes(lua, &this.decode(level, image)?.pixels)
+            },
+        );
+        m.add_method(
+            "to_png",
+            |lua, this, (level, image): (Option<usize>, Option<usize>)| {
+                bytes(lua, &this.decode(level, image)?.to_png().lift()?)
+            },
+        );
         m.add_method("txi", |_, this, ()| Ok(this.txi.clone().map(LTxi)));
         m.add_method_mut("set_txi", |_, this, txi: Option<UserDataRef<LTxi>>| {
             this.txi = txi.map(|t| t.0.clone());
@@ -273,6 +297,9 @@ impl UserData for LTga {
             }
             this.0.rgba = b.to_vec();
             Ok(())
+        });
+        m.add_method("to_png", |lua, this, ()| {
+            bytes(lua, &this.0.to_png().lift()?)
         });
         m.add_method("to_bytes", |lua, this, ()| {
             bytes(lua, &this.0.to_bytes().lift()?)

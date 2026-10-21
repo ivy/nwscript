@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
-use rakata::texture::{ImageType, Layout, Origin, PixelFormat, Tga, Tpc, Txi, TxiEntry};
+use rakata::texture::{ImageType, Layout, Origin, PixelFormat, Rgba, Tga, Tpc, Txi, TxiEntry};
 
 use crate::fail;
 use crate::game::{PyInstall, load, read_file};
@@ -180,6 +180,15 @@ impl PyTpc {
     fn tpc(&self) -> Tpc<'_> {
         Tpc::parse(&self.data).expect("the bytes read when the class was made")
     }
+
+    fn decode(&self, level: usize, image: Option<usize>) -> PyResult<Rgba> {
+        let t = self.tpc();
+        match image {
+            Some(i) => t.decode_image(i, level),
+            None => t.decode_level(level),
+        }
+        .map_err(fail)
+    }
 }
 
 #[pymethods]
@@ -313,6 +322,33 @@ impl PyTpc {
         self.txi = txi.map(|t| t.inner.clone());
     }
 
+    /// Level `level` as RGBA8, rows top first: the whole texture laid out
+    /// at the header's size (a cube's faces stacked top to bottom, a
+    /// sheet's frames across then down), or the one image `image` names.
+    /// Raises `RE2210` and `RE2211`.
+    #[pyo3(signature = (level = 0, image = None))]
+    fn rgba<'py>(
+        &self,
+        py: Python<'py>,
+        level: usize,
+        image: Option<usize>,
+    ) -> PyResult<Bound<'py, PyBytes>> {
+        Ok(PyBytes::new(py, &self.decode(level, image)?.pixels))
+    }
+
+    /// What `rgba` gives, as a PNG file. Raises `RE2210`, `RE2211` and
+    /// `RE2212`.
+    #[pyo3(signature = (level = 0, image = None))]
+    fn to_png<'py>(
+        &self,
+        py: Python<'py>,
+        level: usize,
+        image: Option<usize>,
+    ) -> PyResult<Bound<'py, PyBytes>> {
+        let png = self.decode(level, image)?.to_png().map_err(fail)?;
+        Ok(PyBytes::new(py, &png))
+    }
+
     /// The TPC: the header and pixels as read, and the TXI. Raises `RE2207`
     /// and `RE2208`.
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
@@ -435,6 +471,11 @@ impl PyTga {
         }
         self.inner.rgba = rgba;
         Ok(())
+    }
+
+    /// The pixels as a PNG file. Raises `RE2212`.
+    fn to_png<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        Ok(PyBytes::new(py, &self.inner.to_png().map_err(fail)?))
     }
 
     /// The TGA in its stored depth, order and packing. Raises `RE2209`.

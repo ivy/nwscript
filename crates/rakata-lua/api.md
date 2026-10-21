@@ -188,6 +188,8 @@ A TPC texture, its pixel format kept as stored: DXT1 and DXT5 levels are the blo
 - `tpc.layout`: `single`, `cube` or `flipbook`; `tpc.frames`, a flipbook's `{numx, numy}`, else nil.
 - `tpc:images()`: each image (one, six faces, or the frames in row order) as a sequence of its levels, largest first, each `{width, height, offset, data}`, `offset` where it begins in the file.
 - `tpc:pixels()`: every level of every image, back to back.
+- `tpc:rgba([level], [image])`: level `level` (0 when nil) as RGBA8, four bytes a pixel, rows top first: the whole texture at the header's size (a cube's faces stacked top to bottom, a sheet's frames across then down), or the one face or frame `image` names, from 0. DXT1 and DXT5 are decoded; grey, RGB and RGBA bytes widened as stored. A level the texture lacks is `RE2210`, an image `RE2211`.
+- `tpc:to_png([level], [image])`: what `rgba` gives, as an 8-bit RGBA PNG file.
 - `tpc:txi()`: a copy of the TXI, or nil. `tpc:set_txi(txi)`: replace it, nil for none.
 - `tpc:to_bytes()`: the header and pixels as read, then the TXI.
 
@@ -200,6 +202,7 @@ A TARGA image (the game's lightmaps), decoded to RGBA8, rows top first.
 - `tga.width`, `tga.height`, `tga.bits`, `tga.alpha_bits`: as stored.
 - `tga.image_type`: `truecolor`, `grey`, `truecolor_rle` or `grey_rle`; `tga.origin`: `bottom_left`, `bottom_right`, `top_left` or `top_right`.
 - `tga:rgba()`: the pixels, four bytes each. `tga:set_rgba(bytes)`: replace them, `width * height * 4` bytes (`RE1805` otherwise).
+- `tga:to_png()`: the pixels as an 8-bit RGBA PNG file.
 - `tga:to_bytes()`: the image in its stored depth, order and packing.
 
 A truncated file is `RE2204`, an image type or pixel depth it does not decode `RE2205`.
