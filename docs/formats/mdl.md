@@ -331,7 +331,7 @@ A type's meaning depends on the kind of node that carries it (88 is a light's ra
 | 36 | 1 | 75,056 | 751 | scale |
 | 100 | 3 | 74,969 | 459 | a mesh's self-illumination colour |
 | 100 | 19 | | 51 | the same, bezier |
-| 132 | 1 | 74,968 | 1,395 | on meshes: 1 in 74,156, from -0.4 to 6.01; the torlack document numbers NWN's mesh alpha 128 |
+| 132 | 1 | 74,968 | 1,395 | a mesh's alpha: 1 in 74,156 meshes; less in water (`FountainWater03` 0.7, `puddle1` 0.2), beams, ice and hologram screens (`plc_btlscreen01` 0.5), and keyed to fade glows in animations (`c_drdsentry`'s `eye_glow` in `cdead`); from -0.4 to 6.01 in all. The torlack document numbers NWN's mesh alpha 128 |
 
 The counts are of the controllers on every kind of node; a light's or an emitter's types 100 and 132 are its own (below), and not counted here. 36 is on meshes and on 88 dummies; 100 and 132 on meshes, the sabers among them.
 
