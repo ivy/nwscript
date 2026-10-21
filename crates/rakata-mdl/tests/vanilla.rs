@@ -1483,6 +1483,51 @@ fn every_light_emitter_and_saber_reads_as_the_spec_says() {
                 assert!(s.positions.iter().eq(mesh.positions.iter()), "{label}");
                 assert_eq!(mesh.faces.len(), 12);
                 assert_ne!(s.words[0], s.words[1]);
+                // The arrangement docs/formats/mdl.md records: 44 columns of
+                // four rows; the columns at 0 and 88 the centre line, at 4
+                // and 92 the right and left edges, the rest the centre
+                // line again; one normal; the stored faces sequential.
+                let p: Vec<[f32; 3]> = s.positions.iter().collect();
+                let column = |k: usize| &p[4 * k..4 * k + 4];
+                let near = |a: &[[f32; 3]], b: &[[f32; 3]]| {
+                    a.iter()
+                        .zip(b)
+                        .all(|(x, y)| (0..3).all(|i| (x[i] - y[i]).abs() < 1e-4))
+                };
+                let apart: Vec<usize> = (0..44).filter(|&k| !near(column(k), column(0))).collect();
+                assert_eq!(apart, [1, 23], "{label}");
+                assert!(column(0).windows(2).all(|r| r[0][2] < r[1][2]), "{label}");
+                let u = |v: usize| s.uv.get(v).unwrap()[0];
+                assert_eq!(
+                    [u(0), u(4), u(88), u(92)].map(|x| (x * 2.0).round() / 2.0),
+                    [0.5, 1.0, 0.5, 0.0]
+                );
+                let n0 = s.normals.get(0).unwrap();
+                assert!(
+                    s.normals
+                        .iter()
+                        .all(|n| (0..3).all(|i| (n[i] - n0[i]).abs() < 1e-2))
+                );
+                let stored: Vec<[u16; 3]> = mesh.faces.iter().map(|f| f.vertices).collect();
+                let mut seq: Vec<[u16; 3]> =
+                    (0..11).map(|i| [3 * i, 3 * i + 1, 3 * i + 2]).collect();
+                seq.push([33, 32, 31]);
+                assert_eq!(stored, seq, "{label}");
+                // The derived triangles face the stored normal, as a
+                // mesh's faces do theirs.
+                for [a, b, c] in s.blade_triangles() {
+                    let (a, b, c) = (p[a as usize], p[b as usize], p[c as usize]);
+                    let (e, f) = (
+                        [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+                        [c[0] - a[0], c[1] - a[1], c[2] - a[2]],
+                    );
+                    let x = [
+                        e[1] * f[2] - e[2] * f[1],
+                        e[2] * f[0] - e[0] * f[2],
+                        e[0] * f[1] - e[1] * f[0],
+                    ];
+                    assert!(x[0] * n0[0] + x[1] * n0[1] + x[2] * n0[2] > 0.0, "{label}");
+                }
             }
         }
     });

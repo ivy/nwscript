@@ -519,6 +519,7 @@ fn saber_json(s: &Saber<'_>) -> Json {
         "positions": s.positions.iter().collect::<Vec<_>>(),
         "uv": s.uv.iter().collect::<Vec<_>>(),
         "normals": s.normals.iter().collect::<Vec<_>>(),
+        "triangles": s.blade_triangles(),
         "words": s.words,
     })
 }

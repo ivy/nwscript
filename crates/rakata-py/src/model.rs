@@ -411,12 +411,15 @@ impl PyEmitter {
     }
 }
 
-/// A saber blade's vertices; its triangles are its mesh's faces.
+/// A saber blade's vertices and its surface as triangles.
 #[pyclass(name = "Saber", module = "rakata", frozen, get_all)]
 pub struct PySaber {
     positions: Vec<V3>,
     uv: Vec<(f32, f32)>,
     normals: Vec<V3>,
+    /// The blade's surface: twelve triangles over the vertices, wound as a
+    /// mesh's faces are. The mesh's stored faces are not the blade.
+    triangles: Vec<(u16, u16, u16)>,
     words: (u32, u32),
 }
 
@@ -426,6 +429,11 @@ impl PySaber {
             positions: s.positions.iter().map(v3).collect(),
             uv: s.uv.iter().map(v2).collect(),
             normals: s.normals.iter().map(v3).collect(),
+            triangles: s
+                .blade_triangles()
+                .into_iter()
+                .map(|[a, b, c]| (a, b, c))
+                .collect(),
             words: (s.words[0], s.words[1]),
         }
     }

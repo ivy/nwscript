@@ -592,6 +592,10 @@ class Saber:
     @property
     def normals(self) -> list[Vec3]: ...
     @property
+    def triangles(self) -> list[tuple[int, int, int]]:
+        """The blade's surface: twelve triangles over the vertices, wound as a mesh's faces are. The
+        mesh's stored faces are not the blade."""
+    @property
     def words(self) -> tuple[int, int]:
         """The words at 12 and 16; not established."""
 

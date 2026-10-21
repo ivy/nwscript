@@ -63,22 +63,30 @@ fn an_engine_reads_effects_events_sounds_and_sabers_through_the_facade() {
     assert!(!sounds.is_empty());
     assert!(sounds.iter().all(|r| !r.is_empty()));
 
-    // A saber blade: its vertices from the saber header, its triangles
-    // from its mesh's faces.
+    // A saber blade: its vertices from the saber header, and its surface,
+    // both strips of it, over the whole of the texture's width.
     let (mdl, mdx) = (
-        read(&install, "w_dblsbr_001", ResType::Mdl),
-        read(&install, "w_dblsbr_001", ResType::Mdx),
+        read(&install, "w_lghtsbr_006", ResType::Mdl),
+        read(&install, "w_lghtsbr_006", ResType::Mdx),
     );
     let m = Model::parse(&mdl, &mdx).unwrap();
-    let blade = m.node("plane269").unwrap();
+    let blade = m.nodes.iter().find(|n| n.saber.is_some()).unwrap();
     assert_eq!(blade.kind, NodeKind::Saber);
     let saber = blade.saber.as_ref().unwrap();
-    let mesh = blade.mesh.as_ref().unwrap();
-    assert_eq!(mesh.faces.len(), 12);
-    for f in mesh.faces.iter() {
-        for v in f.vertices {
-            assert!(saber.positions.get(v as usize).is_some());
-            assert!(saber.uv.get(v as usize).is_some());
+    let triangles = saber.blade_triangles();
+    assert_eq!(triangles.len(), 12);
+    let used: std::collections::BTreeSet<u16> = triangles.iter().flatten().copied().collect();
+    let us: Vec<f32> = used
+        .iter()
+        .map(|&v| saber.uv.get(v as usize).unwrap()[0])
+        .collect();
+    assert!(us.iter().any(|&u| u < 0.01) && us.iter().any(|&u| u > 0.99));
+    // Every column of the blade that is not the centre line is drawn.
+    let centre = saber.positions.get(0).unwrap();
+    for v in 0..saber.positions.len() {
+        let p = saber.positions.get(v).unwrap();
+        if v % 4 == 0 && (p[0] - centre[0]).abs() > 1e-4 {
+            assert!(used.contains(&(v as u16)), "vertex {v}");
         }
     }
 

@@ -190,6 +190,8 @@ def test_lights_emitters_and_sabers_read_as_typed_values(install: rakata.Install
     assert blade.saber.positions == blade.mesh.positions
     assert len(blade.saber.uv) == len(blade.saber.normals) == 176
     assert blade.saber.words == (98, 97)
+    assert len(blade.saber.triangles) == 12
+    assert {v for t in blade.saber.triangles for v in t} >= {0, 4, 88, 92}
 
 
 def test_a_room_walkmesh_reads_and_changes_a_material(install: rakata.Install) -> None:

@@ -273,7 +273,13 @@ A saber node's mesh header is followed by a saber header of 20 bytes. That lengt
 | 12 | 4 | A word from 86 to 98. |
 | 16 | 4 | A word from 86 to 98, different from the word at 12 in every saber. Neither word is a node number of its model; what they are is not established. |
 
-Every saber node has 176 vertices and 12 faces, an MDX stride of 0 and no MDX block (above): the three arrays are its vertices. The vertices come in rows along the blade's length (Z): in `w_dblsbr_001`'s `plane269` the first four lie at Z −0.043, 0.005, 0.932 and 0.981 along X 0, the next four at X 0.101, with texture V running 0 to 1 along each row.
+Every saber node has 176 vertices and 12 faces, an MDX stride of 0 and no MDX block (above): the three arrays are its vertices. They form 44 columns of four, each column one vertex per row along the blade's length (Z), the rows rising in every column: in `w_dblsbr_001`'s `plane269` the first column lies at Z −0.043, 0.005, 0.932 and 0.981 along X 0, the second at X 0.101, with texture V running 0 to 1 up each column. In all 68 saber nodes:
+
+- The columns at vertices 0 and 88 are the blade's centre line (texture U 0.5); the column at 4 is its right edge (X about +0.1, U 1) and the column at 92 its left edge (X about −0.1, U 0). The other forty columns repeat the centre line exactly; what the engine does with them is not established.
+- Every vertex has the same normal, (0, −1, 0): the blade is flat, in the node's XZ plane.
+- The 12 stored faces are the sequential triples of vertices 0 to 32, then (33, 32, 31): they are not the blade's surface, and they leave the left half (U 0 to 0.5) undrawn.
+
+The blade's surface is the two strips between the centre line and each edge, three quads each, twelve triangles: `rakata_mdl::Saber::blade_triangles` gives them, wound as a mesh's faces are (counter-clockwise about the stored normal, which every trimesh face of the saber models' other meshes is, 3,847 of 3,847). That the engine draws these strips is inferred from the vertices, not observed.
 
 ## MDX
 
@@ -496,7 +502,7 @@ The xoreos-docs `kotor_mdl.html` gives the headers' shape; the files say more, a
 
 ## What could not be established
 
-The meaning of the model header's byte 0x51, the mesh header's arrays at 200 and fields at 212 to 248 and 314 to 320, and the classification value 64; whether byte 0x53 is the fog flag; the skin header's array at 52 and bytes 98 to 100; which of a bezier key's two control values is which; the light header's words at 72, 76, 84 and 88 beyond their position in the torlack document's layout; the emitter header's dead space, its words at 12, 16 and 28, its name at 187 and byte at 219, the meaning of flag bits 1 to 3 and 5 to 12 beyond the torlack document's names, and emitter types 196, 200, 240 and 252 to 272; how a frame index past the grid is drawn; the saber header's two words; whether the engine adds an animation's position keys to the rest position or puts them in its place, and whether it uses the stored qbones and tbones or the rest pose's (the files differ in the five models above). Each needs the engine's behaviour, not the files alone.
+The meaning of the model header's byte 0x51, the mesh header's arrays at 200 and fields at 212 to 248 and 314 to 320, and the classification value 64; whether byte 0x53 is the fog flag; the skin header's array at 52 and bytes 98 to 100; which of a bezier key's two control values is which; the light header's words at 72, 76, 84 and 88 beyond their position in the torlack document's layout; the emitter header's dead space, its words at 12, 16 and 28, its name at 187 and byte at 219, the meaning of flag bits 1 to 3 and 5 to 12 beyond the torlack document's names, and emitter types 196, 200, 240 and 252 to 272; how a frame index past the grid is drawn; the saber header's two words and the forty columns that repeat the blade's centre line; whether the engine adds an animation's position keys to the rest position or puts them in its place, and whether it uses the stored qbones and tbones or the rest pose's (the files differ in the five models above). Each needs the engine's behaviour, not the files alone.
 
 ## Provenance
 

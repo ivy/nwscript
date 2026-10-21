@@ -303,7 +303,8 @@ pub struct Node<'a> {
     pub light: Option<Light<'a>>,
     /// An emitter's header.
     pub emitter: Option<Emitter<'a>>,
-    /// A saber blade's vertices; its triangles are its mesh's faces.
+    /// A saber blade's vertices and, through
+    /// [`Saber::blade_triangles`](crate::Saber::blade_triangles), its surface.
     pub saber: Option<Saber<'a>>,
     /// The node's controllers, in stored order. In a model's geometry each
     /// holds one key, the node's resting value (the position and

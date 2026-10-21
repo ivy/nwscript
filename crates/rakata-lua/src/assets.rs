@@ -759,6 +759,11 @@ fn saber_table(lua: &Lua, s: &Saber<'_>) -> mlua::Result<Table> {
     t.set("positions", attribute(lua, &s.positions)?)?;
     t.set("uv", attribute(lua, &s.uv)?)?;
     t.set("normals", attribute(lua, &s.normals)?)?;
+    let tris = lua.create_table()?;
+    for (i, tri) in s.blade_triangles().into_iter().enumerate() {
+        tris.raw_set(i + 1, lua.create_sequence_from(tri)?)?;
+    }
+    t.set("triangles", tris)?;
     t.set("words", lua.create_sequence_from(s.words)?)?;
     Ok(t)
 }

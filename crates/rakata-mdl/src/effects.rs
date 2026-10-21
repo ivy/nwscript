@@ -138,7 +138,7 @@ pub mod emitter_flags {
 }
 
 /// A saber blade's vertices, from the saber header's three per-vertex
-/// arrays; its triangles are its mesh's faces.
+/// arrays; [`blade_triangles`](Saber::blade_triangles) gives its surface.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Saber<'a> {
     /// The positions (equal to the mesh's own positions in vanilla).
@@ -150,6 +150,40 @@ pub struct Saber<'a> {
     /// The words at 12 and 16, 86 to 98 in vanilla and never equal; their
     /// meaning is not established.
     pub words: [u32; 2],
+}
+
+impl Saber<'_> {
+    /// The blade's surface as twelve triangles, wound as a mesh's faces
+    /// are (counter-clockwise about the stored normal). The vertices form
+    /// 44 columns of four, one row each along the blade; in every vanilla
+    /// blade the columns at vertex 0 and vertex 88 are its centre line,
+    /// the column at 4 its right edge (texture u 1) and the column at 92
+    /// its left edge (u 0), and the other forty repeat the centre line
+    /// (`docs/formats/mdl.md`, "Saber header"). The triangles are the two
+    /// strips between them, centre to right and centre to left, three
+    /// quads each. The mesh's stored faces are not the blade: in vanilla
+    /// they are sequential triples of vertices 0 to 33. Empty for a blade
+    /// of fewer than 96 vertices.
+    pub fn blade_triangles(&self) -> Vec<[u16; 3]> {
+        if self.positions.len() < 96 {
+            return Vec::new();
+        }
+        let mut out = Vec::with_capacity(12);
+        for r in 0..3 {
+            // Centre to right edge: centre, edge, next edge, next centre.
+            let (c, e) = (r, 4 + r);
+            out.push([c, e, e + 1]);
+            out.push([c, e + 1, c + 1]);
+        }
+        for r in 0..3 {
+            // Centre to left edge, the other way round to face the same
+            // side.
+            let (c, l) = (88 + r, 92 + r);
+            out.push([c, c + 1, l + 1]);
+            out.push([c, l + 1, l]);
+        }
+        out
+    }
 }
 
 /// The light header at `h`.
