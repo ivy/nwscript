@@ -2,7 +2,7 @@
 
 A KotOR model is two resources of the same resref: the MDL (resource type 2002), which holds the model's header, its tree of nodes and everything about them but the per-vertex data of its meshes, and the MDX (resource type 3008), which holds that per-vertex data, one interleaved block per mesh. KotOR 1 ships 3,072 binary models: 2,445 in `data/models.bif`, 305 in `items.bif`, 63 in `player.bif`, 19 in `party.bif`, 168 in `rims/global.rim`, 40 in `miniglobal.rim`, 30 in `chargen.rim`, one in `mainmenu.rim` and one in `patch.erf`. A RIM's MDX lives in its `dx` partner (`globaldx.rim` beside `global.rim`); a BIF or ERF holds both. Every MDL has its MDX. No module capsule holds a model.
 
-This document covers what a renderer needs to draw and animate a model: the headers, the node tree, the trimesh part of every mesh node, controllers and their keys, skin nodes, animations, and supermodels. Dangly constraints, AABB trees, emitters, lights and saber blades are located but not decoded beyond their controllers. [Layout](#layout) gives the order in which BioWare's compiler lays every structure out, which a writer follows to reproduce the files byte for byte.
+This document covers what a renderer needs to draw and animate a model: the headers, the node tree, the trimesh part of every mesh node, controllers and their keys, skin nodes, lights, emitters, saber blades, animations, and supermodels. Dangly constraints and AABB trees are located but not decoded. [Layout](#layout) gives the order in which BioWare's compiler lays every structure out, which a writer follows to reproduce the files byte for byte.
 
 All integers are little-endian; floats are IEEE 754 single precision. Coordinates are metres, Z up.
 
@@ -185,6 +185,96 @@ A vertex's four bone indices are floats in the MDX, each a local bone index or -
 
 The qbone and tbone of a bone are the bind transform: the rotation and then the translation that take the skin node's coordinates to the bone's at the rest pose the geometry stores. With `(Qb, Tb)` the bone's transform to the model's coordinates and `(Qs, Ts)` the skin node's, the qbone is `Qb⁻¹·Qs` and the tbone `Qb⁻¹(Ts − Tb)`, to 0.001, in 11,848 of the 11,955 bones of all skins. The other 107: the 75 of `mainmenu_model`, whose rest pose is posed away from its bind; and eight bones in each of `pfbcl`, `pfbcm` and `pfbcs` (the mesh `LArm`) and `p_bastilabb` (the mesh `torso`), five of each eight holding the transform that fits another bone of the same mesh.
 
+## Light header
+
+A light node's header of 92 bytes follows the node header. That length is confirmed by what follows it: in all 5,599 lights the first array the light points to, or its child array when it points to none, begins exactly 92 bytes after the node header ends. Offsets below are from the start of the light header.
+
+| Offset | Size | Content |
+| --- | --- | --- |
+| 0 | 4 | Flare radius, a float: non-zero exactly in the 61 lights with flares (5,000 in 30, 5,625 in 8, 1,000 in 5), zero in the other 5,538. |
+| 4 | 12 | An array, four bytes per element; empty in every light. |
+| 16 | 12 | Array of flare sizes, a float each. |
+| 28 | 12 | Array of flare positions, a float each. |
+| 40 | 12 | Array of flare colour shifts, three floats each. |
+| 52 | 12 | Array of offsets of the flare textures' names, each NUL-ended. The four flare arrays have one count in every light: 1 in 49, 2 in 8, 4 in one, 6 in three. |
+| 64 | 4 | Priority: 5 in 1,723 lights, 4 in 1,671, 3 in 1,621, 2 in 330, 1 in 253; -7 in `plc_endcorps`'s `SuperNova`. |
+| 68 | 4 | Ambient only: 1 in 178 lights, 0 in 5,421. Every light named as ambient has it (`gidy_sun_amb`, `gidy_intlight_amb`, `AuroraAmb`, `AuroraAmbient`) and their diffuse partners (`gidy_sun_diff`, `gidy_intlight_diff`) do not. |
+| 72 | 4 | 2 in 5,388 lights, 1 in 207, 0 in four (`fx_flame01`'s light, in both its copies, and the two `gidy_intlight` lights); the torlack document's dynamic type. |
+| 76 | 4 | 1 in 34 lights, 0 in 5,565; the torlack document's affect-dynamic flag. |
+| 80 | 4 | Shadow: 1 in 3,028 lights, 0 in 2,571. Every light named for shadow has it (`AuroraShadow`, `AuroraShadow01`, `AurMainShadw`, `ShadowAurora`), and of the `gidy_sun` pair the diffuse light has it and the ambient not. |
+| 84 | 4 | Zero in every light, the 61 with flares too. The torlack document puts the generate-flare flag here. |
+| 88 | 4 | 1 in 5,438 lights, 0 in 161; the torlack document's fading flag. |
+
+The words at 64 to 88 are where the torlack document lists NWN's light priority, ambient-only flag, dynamic type, affect-dynamic flag, shadow flag, generate-flare flag and fading flag, in that order, and its light header is 92 bytes too. The ambient and shadow readings rest on the names above; the others rest on position alone. 5,429 of the lights are in class 0 models (rooms).
+
+A light's own controllers are under [Controllers](#controllers): colour (76), radius (88) and multiplier (140) on nearly every light.
+
+## Emitter header
+
+An emitter node's header of 224 bytes follows the node header. That length is confirmed by what follows it: an emitter points to nothing, and in all 9,442 emitters its child array begins exactly 224 bytes after the node header ends. Offsets below are from the start of the emitter header. A name field holds ASCII up to a NUL; the bytes after the NUL are often not zero (in 8,561 update fields, 8,860 render fields, 8,944 blend fields and 8,493 texture fields), uninitialised memory like the model header's bytes at 0x4D; in the chunk field and the field at 187 they are zero.
+
+| Offset | Size | Content |
+| --- | --- | --- |
+| 0 | 4 | A float, the torlack document's dead space: zero in 9,322 emitters; 12 (43), 10 (37), 0.20944 (28), 1.5708 (8) and 0.087266 (4) in the rest, all `Fountain` emitters but seven `Explosion`. |
+| 4 | 4 | Blast radius, a float: non-zero in 11 emitters (5, 1, 0.2), every one an `Explosion`. |
+| 8 | 4 | Blast length, a float: 1 in 8 emitters, every one an `Explosion`. |
+| 12 | 4 | Zero but in 48 `Lightning` emitters (1 to 5); not established. |
+| 16 | 4 | Zero but in 40 `Lightning` emitters (1); not established. |
+| 20 | 4 | X grid, as the torlack document names the word at its place: with the Y grid, the cells of the texture's frames (below). 16 in 4,926 emitters, 4 in 2,741, 2 in 691, 1 in 520, 0 in 555, 5 in 6, 8 in 3. |
+| 24 | 4 | Y grid. 4 in 2,739, 16 in 2,539, 8 in 2,415, 2 in 688, 1 in 500, 0 in 555, 5 in 6. |
+| 28 | 4 | 1 in 74 `Fountain` emitters, else zero; the torlack document's space type. |
+| 32 | 32 | Update: `Single` (6,539), `Fountain` (2,171), `Explosion` (655), `Lightning` (77). |
+| 64 | 32 | Render: `Billboard_to_Local_Z` (5,099), `Normal` (3,227), `Billboard_to_World_Z` (459), `Motion_Blur` (440), `Linked` (144), `Aligned_to_Particle_Dir` (50), `Aligned_to_World_Z` (23). |
+| 96 | 32 | Blend: `Normal` (7,934), `Lighten` (1,485), `Punch-Through` (19), `PunchThrough` (4). |
+| 128 | 32 | Texture name: 102 names, at most 16 characters; `NULL` in 60 emitters. |
+| 160 | 16 | Chunk name: a model, in 251 emitters (46 names, at most 15 characters); empty in 9,191. Every emitter with a chunk renders `Normal` (248) or `Motion_Blur` (3). |
+| 176 | 4 | 1 in 342 emitters, else zero; the torlack document's two-sided texture flag. |
+| 180 | 4 | 1 in 8 `Single` emitters, else zero; the torlack document's loop flag. |
+| 184 | 2 | Render order: 0 in 7,432 emitters, 1 in 1,764, 2 to 8 in the other 246. |
+| 186 | 1 | Zero. |
+| 187 | 32 | A name: `NULL` in 4,643 emitters, `fx_depth` in one (`Fx_PuffySand`), empty in 4,798. It is set in exactly the 4,644 emitters that carry the controllers of types 216 to 284 (below), and empty in exactly the others. What it names is not established; nothing in the install is named `fx_depth`. |
+| 219 | 1 | Not zero in 1,614 emitters (63, 17, 255 and 191 most); not established. |
+| 220 | 4 | Flags (below). |
+
+The torlack document's NWN emitter header is 216 bytes: the same fields, but for two words fewer before the grid (KotOR's 12 and 16), a texture of 64 bytes rather than 32, and two bytes of padding between the render order and the flags where KotOR has 34 (186 to 220).
+
+The update names how particles are born. `Single` emitters have no velocity or mass (types 168 and 124 are zero in every one); the blast fields are only on `Explosion` emitters; the lightning controllers only on `Lightning` emitters, but for `plc_smk01`'s three `Fountain` emitters, and every `Lightning` emitter renders `Linked`.
+
+A frame index (types 108 and 112, below) counts the cells of the X × Y grid. The frame end is less than the grid's cell count in 6,601 emitters; in 2,841 it is not, among them 1,202 of the 4,754 crowd emitters of `m31aa_00a`, `m31ab_00a` and `m31ad_00a`, whose frames run to 207 with a grid of 16 × 8. How the engine draws a frame past the grid is not established.
+
+The flags word's bits, with emitter counts, named as the torlack document names NWN's:
+
+| Bit | Emitters | Torlack's name | What the files say |
+| --- | --- | --- | --- |
+| 0x0001 | 156 | P2P | Only on `Fountain` emitters; the P2P bezier controllers (128 and 132) are non-zero only on emitters with it. |
+| 0x0002 | 9,210 | P2P Sel | On every emitter with a chunk; not established. |
+| 0x0004 | 154 | Affected by Wind | Only on `Fountain` emitters. |
+| 0x0008 | 719 | Is Tinted | |
+| 0x0010 | 518 | Bounce | 509 of the 848 emitters whose bounce coefficient (92) is not zero have it. |
+| 0x0020 | 6,699 | Random | |
+| 0x0040 | 2,005 | Inherit | |
+| 0x0080 | 13 | Inherit Vel | |
+| 0x0100 | 6,266 | Inherit Local | |
+| 0x0200 | 4 | Splat | Only on `Explosion` emitters. |
+| 0x0400 | 55 | Inherit Part | |
+| 0x1000 | 9 | none | Only on `Fountain` emitters, all with a bounce coefficient. |
+
+Bits 11 and 13 to 31 are clear in every emitter.
+
+## Saber header
+
+A saber node's mesh header is followed by a saber header of 20 bytes. That length is confirmed by its first array, which begins exactly 20 bytes after the saber header in all 68 saber nodes. The 68 are in the 23 class-16 models (`w_*sbr_*`; 22 names, one of them in two places), every one of which has saber nodes. Offsets below are from the start of the saber header.
+
+| Offset | Size | Content |
+| --- | --- | --- |
+| 0 | 4 | Offset of the positions: three floats per vertex, equal to the positions at 328 of the mesh header in every saber. |
+| 4 | 4 | Offset of the texture coordinates: two floats per vertex, all between 0 and 1. |
+| 8 | 4 | Offset of the normals: three floats per vertex, a unit vector in every vertex. |
+| 12 | 4 | A word from 86 to 98. |
+| 16 | 4 | A word from 86 to 98, different from the word at 12 in every saber. Neither word is a node number of its model; what they are is not established. |
+
+Every saber node has 176 vertices and 12 faces, an MDX stride of 0 and no MDX block (above): the three arrays are its vertices. The vertices come in rows along the blade's length (Z): in `w_dblsbr_001`'s `plane269` the first four lie at Z −0.043, 0.005, 0.932 and 0.981 along X 0, the next four at X 0.101, with texture V running 0 to 1 along each row.
+
 ## MDX
 
 A mesh's MDX block is `vertex count × stride` bytes at the offset at 324, one vertex after another, each vertex the attributes the flags name at the offsets the header gives. After each block comes one more vertex's worth of bytes whose first float is 10,000,000 (1,000,000 after each of the 1,033 skin meshes' blocks), a terminator. The positions in the block equal the positions at offset 328 of the mesh header in all 78,338 meshes with a block.
@@ -230,7 +320,7 @@ A node's controllers are two arrays of the node header: at 0x38 the controller r
 
 The time keys are `rows` consecutive floats; the values follow them directly in every controller of every model. A row of values holds as many floats as the columns say, except in two cases: a bezier-keyed controller (columns with 0x10) holds three values' worth per row, the value and then two control values (taken as the value because it is the triple that equals the node's rest position most often and moves least from row to row), and an orientation controller with two columns holds one 32-bit word per row, a compressed quaternion (below). In a model's geometry every controller has one row at time zero; no key of any animation lies past its animation's length.
 
-The types are those the torlack document lists for NWN, meaning by the kind of node that carries them (88 is a light's radius and an emitter's birth rate). By where they occur, with counts across all models:
+A type's meaning depends on the kind of node that carries it (88 is a light's radius and an emitter's birth rate). The types every node and every mesh carries, by where they occur, with counts across all models:
 
 | Type | Columns | Geometry | Animations | What |
 | --- | --- | --- | --- | --- |
@@ -241,8 +331,71 @@ The types are those the torlack document lists for NWN, meaning by the kind of n
 | 36 | 1 | 75,056 | 751 | scale |
 | 100 | 3 | 74,969 | 459 | a mesh's self-illumination colour |
 | 100 | 19 | | 51 | the same, bezier |
-| 132 | 1 | 84,410 | 1,395 | on meshes; on emitters one of their own |
-| others | 1, 3 or 19 | on lights and emitters | 7,652 in all | lights' and emitters' own |
+| 132 | 1 | 74,968 | 1,395 | on meshes: 1 in 74,156, from -0.4 to 6.01; the torlack document numbers NWN's mesh alpha 128 |
+
+The counts are of the controllers on every kind of node; a light's or an emitter's types 100 and 132 are its own (below), and not counted here. 36 is on meshes and on 88 dummies; 100 and 132 on meshes, the sabers among them.
+
+The torlack document's NWN numbers hold for lights unchanged. On lights, with counts across all models:
+
+| Type | Columns | Geometry | Animations | What |
+| --- | --- | --- | --- | --- |
+| 76 | 3 | 5,599 | 402 | colour; components from -1 (the negative lights `AuroraNegLight*`) to 1 |
+| 88 | 1 | 5,599 | 33 | radius, 0 to 140,000 |
+| 96 | 1 | 4 | | shadow radius: two on each copy of `fx_flame01`'s light, 5 and 15 |
+| 100 | 1 | 2 | | vertical displacement: `fx_flame01`'s light |
+| 140 | 1 | 5,589 | | multiplier, 0 to 50; on every light but `fx_flame01`'s and the `gidy_*` lights |
+
+An emitter's types are NWN's, but that the two colours NWN numbers 96 and 108 (twelve bytes each) are elsewhere and every NWN type after them is 24 less: NWN's frame end (132) is KotOR's 108, its lightning scale (216) KotOR's 192. The files bear the reading out: the frame start (112) is at most the frame end (108) in 9,441 of 9,442 emitters; the lightning types (184 to 192) are non-zero only on `Lightning` emitters but for `plc_smk01`'s three; the P2P bezier types (128, 132) only on emitters with the P2P flag; velocity and mass never on a `Single` emitter; the spread (160) holds angles in radians (6.2832, 2.0944, 0.3491 most). Types 196 to 284 are not in the torlack list as numbered here; they are on the 4,644 emitters whose name at 187 is set (above), 4,564 to 4,644 of them by type. On emitters, with counts across all models:
+
+| Type | Columns | Geometry | Animations | What |
+| --- | --- | --- | --- | --- |
+| 80 | 1 | 9,442 | 407 | alpha at the end of a particle's life, 0 to 1 |
+| 84 | 1 | 9,442 | 433 | alpha at the start, 0 to 1 |
+| 88 | 1 | 9,442 | 2,715 | birth rate |
+| 92 | 1 | 9,442 | | bounce coefficient |
+| 96 | 1 | 9,442 | | combine time; non-zero in one emitter |
+| 100 | 1 | 9,442 | | drag |
+| 104 | 1 | 9,442 | | frames per second, 0 to 32 |
+| 108 | 1 | 9,442 | | frame end, an integer |
+| 112 | 1 | 9,442 | | frame start, an integer |
+| 116 | 1 | 9,442 | | gravity |
+| 120 | 1 | 9,442 | 351 | life expectancy in seconds; -1 in 6,507 |
+| 124 | 1 | 9,442 | 59 | mass |
+| 128 | 1 | 9,442 | | P2P bezier 2 |
+| 132 | 1 | 9,442 | | P2P bezier 3 |
+| 136 | 1 | 9,442 | | particle rotation |
+| 140 | 1 | 9,442 | 3 | random velocity |
+| 144 | 1 | 9,442 | 94 | size at the start |
+| 148 | 1 | 9,442 | 37 | size at the end |
+| 152 | 1 | 9,442 | | Y size at the start |
+| 156 | 1 | 9,442 | | Y size at the end |
+| 160 | 1 | 9,442 | 12 | spread, radians |
+| 164 | 1 | 9,442 | | threshold |
+| 168 | 1 | 9,442 | 117 | velocity |
+| 172 | 1 | 9,442 | 36 | X size |
+| 176 | 1 | 9,442 | 60 | Y size |
+| 180 | 1 | 9,442 | | blur length; 10 in 8,812 |
+| 184 | 1 | 9,442 | | lightning delay |
+| 188 | 1 | 9,442 | | lightning radius |
+| 192 | 1 | 9,442 | | lightning scale |
+| 196 | 1 | 4,642 | | 0 to 8; non-zero on 77 `Lightning` emitters and 7 `Fountain`; not established |
+| 200 | 1 | 4,564 | | 0 to 25; non-zero only on 60 `Lightning` emitters; not established |
+| 216 | 1 | 4,644 | 526 | alpha at mid-life: between the start and end alphas in 1,072 of the 1,178 emitters where they differ |
+| 220 | 1 | 4,644 | | percent of life at the start; 0 but in 13 (1) |
+| 224 | 1 | 4,644 | 205 | percent of life at mid-life, 0 to 1: at least the start's and at most the end's in every emitter |
+| 228 | 1 | 4,644 | | percent of life at the end; 1 in 4,635 |
+| 232 | 1 | 4,644 | 300 | size at mid-life: between the start and end sizes in 1,728 of the 2,036 where they differ |
+| 236 | 1 | 4,644 | 205 | Y size at mid-life: non-zero in exactly the 117 emitters whose Y sizes are, and between them in 53 of 55 |
+| 240 | 1 | 4,642 | 738 | -40 to 100, non-zero in 1,251, nearly all `Fountain` and `Explosion`; not established |
+| 252 to 272 | 1 | 4,592 to 4,630 each | | six types (252, 256, 260, 264, 268, 272), non-zero mostly on `Lightning` emitters; not established |
+| 284 | 3 | 4,644 | | colour at mid-life: between the start and end colours in each component in 1,248 of the 1,691 emitters where they differ |
+| 284 | 19 | | 422 | the same, bezier |
+| 380 | 3 | 9,442 | 30 | colour at the end |
+| 380 | 19 | | 232 | the same, bezier |
+| 392 | 3 | 9,442 | 30 | colour at the start |
+| 392 | 19 | | 205 | the same, bezier |
+
+The mid-life types take the torlack document's names for NWN's (alpha mid, percent start, mid and end, size mid, size mid Y, colour mid) by the fit the table gives. 380 is the end colour and 392 the start because sparks fade to black: of the 353 spark, fire, flame and explosion emitters whose two colours differ in total brightness, 380 is the darker in 273. Emitters and lights carry position (8) and orientation (20) controllers too, as every node does; an animation keys an emitter's position in 160 controllers and its orientation in 197.
 
 ### Compressed orientation
 
@@ -284,7 +437,7 @@ A model names its supermodel at 0x88 of the model header; 413 do. The chains, fo
 
 ## What a model names
 
-A model names other resources in five places, all in the geometry's tree or the model header (an animation's nodes are dummies in every vanilla model): the supermodel; each mesh's texture and second texture (the lightmap); each light's flare textures (the light header's array at 52); and a reference node's model (the first 32 bytes of its header, a NUL-ended name). Emitters name textures and chunk models too, in a header not decoded here. Counted over the 2,833 distinct vanilla MDL contents, one naming per node and site, each name matched against every layer of the install without regard to case:
+A model names other resources in seven places, all in the geometry's tree or the model header (an animation's nodes are dummies in every vanilla model): the supermodel; each mesh's texture and second texture (the lightmap); each light's flare textures (the light header's array at 52); a reference node's model (the first 32 bytes of its header, a NUL-ended name); and each emitter's texture (at 128) and chunk model (at 160). Counted over the 2,833 distinct vanilla MDL contents, one naming per node and site, each name matched against every layer of the install without regard to case:
 
 | Site | Namings | Names | Held |
 | --- | --- | --- | --- |
@@ -293,18 +446,20 @@ A model names other resources in five places, all in the geometry's tree or the 
 | light flare | 80 | 10 | 63 as TPC; 17 by nothing (5 names) |
 | reference node | 1,952 | 42 | all as models (`fx_ref`, `OR_Tatshrub01`, `C_Brith`) |
 | supermodel | 375 | 45 | 372 as models; the three above by nothing |
+| emitter texture | 8,823 | 102 | 4,016 as TPC; 4,807 by nothing (14 names) |
+| emitter chunk | 207 | 46 | all as models (`fx_part_01`, `fx_mrock`, `fx_droid02`) |
 
-The 2,356 lightmaps held by nothing are each named once, by 51 models: 2,001 named `MODEL_aNNNNN` with a base-36 counter (611 in `m31ad_00a`, 528 in `m31ab_00a`, 420 in `m31aa_00a`; `M01aa_04a_a0002t` in the Endar Spire's `m01aa_04a`, `DOR_LHR02_a00004` in `dor_lhr02`), 354 named `MODEL_lmNNN` in seven models nothing the index reads names (`crossgob`, `hal01gob` to `hal04gob`, `hcrates`, `v_ehawk`), and `plc_knrthvin01_a`. The textures held by nothing are mostly on character and cutscene models (`pmbf`, `pmbmv_01` and `pmblv` on the body models `n_commkidm` and `pmbc`, whose `appearance.2da` rows name a texture of their own in `texa` and `texb`; `h_f_lo01headtest` and `p_bastillah01` on cutscene characters), and on toolset markers (`toolcolors` on `gi_waypoint` and `gi_sound_*`). One name held by nothing has a longer name held beside it, `pmbf` with `pmbf01` and `pmbf02`; whether the engine completes a mesh's texture name as it completes `appearance.2da`'s texture prefixes is not established, so a name is matched as written.
+The 2,356 lightmaps held by nothing are each named once, by 51 models: 2,001 named `MODEL_aNNNNN` with a base-36 counter (611 in `m31ad_00a`, 528 in `m31ab_00a`, 420 in `m31aa_00a`; `M01aa_04a_a0002t` in the Endar Spire's `m01aa_04a`, `DOR_LHR02_a00004` in `dor_lhr02`), 354 named `MODEL_lmNNN` in seven models nothing the index reads names (`crossgob`, `hal01gob` to `hal04gob`, `hcrates`, `v_ehawk`), and `plc_knrthvin01_a`. The textures held by nothing are mostly on character and cutscene models (`pmbf`, `pmbmv_01` and `pmblv` on the body models `n_commkidm` and `pmbc`, whose `appearance.2da` rows name a texture of their own in `texa` and `texb`; `h_f_lo01headtest` and `p_bastillah01` on cutscene characters), and on toolset markers (`toolcolors` on `gi_waypoint` and `gi_sound_*`). Of the emitter textures held by nothing, 4,754 namings are the four crowd textures of the Taris upper city's rooms (`FX_crowdhead01`, `FX_crowdtorso01`, `FX_crowdlarm01`, `FX_crowdrarm01` in `m31aa_00a`, `m31ab_00a` and `m31ad_00a`), whose `LTS_crowd*` counterparts the install holds and `m02ae_07a` names; the other ten names are `fx_flare04` (15), `fxp_asteroids01` (12), `fxpa_smoke01` (10), `fx_lsabre01`, `fxp_aurabesh01`, `fxpa_sparks` and `lkofx_ripple2` (three each), and `fxpa_cloud02`, `fxpa_flame00` and `fxpa_flame05` (two each). An emitter whose texture is `NULL` (60) names none. The emitter's name at 187 (`fx_depth`, once) is held by nothing. One mesh texture held by nothing has a longer name held beside it, `pmbf` with `pmbf01` and `pmbf02`; whether the engine completes a mesh's texture name as it completes `appearance.2da`'s texture prefixes is not established, so a name is matched as written.
 
 ## Layout
 
 Every byte of the model data of all 3,072 vanilla models belongs to a structure the headers reach: no gaps, no structure shared. The structures beyond those above, as the writer holds them:
 
-- A light's header is 92 bytes: a float, five arrays (at 4, four bytes per element, empty in every vanilla light; at 16, the flare sizes, four bytes; at 28, the flare positions, four bytes; at 40, the flare colour shifts, twelve bytes; at 52, offsets of NUL-ended flare texture names), then seven words.
-- An emitter's header is 224 bytes and a reference's 36 (a model name and a word); neither points anywhere.
+- A light's header is 92 bytes ([Light header](#light-header)): a float, five arrays, then seven words.
+- An emitter's header is 224 bytes ([Emitter header](#emitter-header)) and a reference's 36 (a model name and a word); neither points anywhere.
 - A dangly header is 28 bytes: an array of four-byte constraints (one per vertex), three floats, and at 24 the offset of twelve bytes per vertex.
 - An AABB header is the offset of the tree's root; each entry is 40 bytes, a box, the offsets of its two children at 24 and 28 (zero for none), and two words.
-- A saber header is 20 bytes: the offsets of three per-vertex arrays (twelve bytes per vertex at 0, eight at 4, twelve at 8) and two words.
+- A saber header is 20 bytes ([Saber header](#saber-header)): the offsets of three per-vertex arrays (twelve bytes per vertex at 0, eight at 4, twelve at 8) and two words.
 
 BioWare's compiler lays the model data out in one order, the same in all 3,072 models, so a writer that follows it reproduces every offset:
 
@@ -335,11 +490,13 @@ The xoreos-docs `kotor_mdl.html` gives the headers' shape; the files say more, a
 - Neither document describes the MDX: the per-mesh blocks, the flags word's bits, or the terminator rows.
 - Neither describes compressed orientation keys (two columns, one word per key).
 - The controller's u16 at 4 is not always unknown: in animations it is the node header offset of the field the controller drives.
+- The torlack document's emitter header is NWN's: KotOR's has two more words before the grid (at 12 and 16), a texture field of 32 bytes rather than 64, and 34 bytes between the render order and the flags where NWN has two (a name at 187 among them); KotOR's emitter controllers are NWN's numbers less 24 after the bounce coefficient, with the start, end and mid-life colours at 392, 380 and 284 and the other mid-life values at 216 to 236. Its light header and light controllers match KotOR's, but that the word it calls the generate-flare flag is zero in every KotOR light, those with flares too.
+- Neither document describes the saber header or its per-vertex arrays.
 - In the skin header, the words at 12 and 16 are the MDX offsets of the weights and bone indices; the bone map's count follows its offset directly (no allocated count); the arrays at 28 and 40 are the qbones and tbones; the node list at 64 is seventeen u16s, not fifteen; and the bone map's entries are floats, local bone indices by node number, as the example in `kotor_mdl.html` has it.
 
 ## What could not be established
 
-The meaning of the model header's byte 0x51, the mesh header's arrays at 200 and fields at 212 to 248 and 314 to 320, and the classification value 64; whether byte 0x53 is the fog flag; the skin header's array at 52 and bytes 98 to 100; which of a bezier key's two control values is which; whether the engine adds an animation's position keys to the rest position or puts them in its place, and whether it uses the stored qbones and tbones or the rest pose's (the files differ in the five models above). Each needs the engine's behaviour, not the files alone.
+The meaning of the model header's byte 0x51, the mesh header's arrays at 200 and fields at 212 to 248 and 314 to 320, and the classification value 64; whether byte 0x53 is the fog flag; the skin header's array at 52 and bytes 98 to 100; which of a bezier key's two control values is which; the light header's words at 72, 76, 84 and 88 beyond their position in the torlack document's layout; the emitter header's dead space, its words at 12, 16 and 28, its name at 187 and byte at 219, the meaning of flag bits 1 to 3 and 5 to 12 beyond the torlack document's names, and emitter types 196, 200, 240 and 252 to 272; how a frame index past the grid is drawn; the saber header's two words; whether the engine adds an animation's position keys to the rest position or puts them in its place, and whether it uses the stored qbones and tbones or the rest pose's (the files differ in the five models above). Each needs the engine's behaviour, not the files alone.
 
 ## Provenance
 
@@ -347,10 +504,12 @@ Public documents read: xoreos-docs `specs/kotor_mdl.html` (KotOR's binary MDL), 
 
 Reference projects read: none.
 
-Measured: on 2026-10-18, every count above comes from the vanilla KotOR 1 install under `$RAKATA_GAME_K1`, first with short Python scripts reading the headers, nodes, mesh headers, faces, index lists, controllers, skin headers, animation headers and MDX blocks of every model the KEY's BIFs, `rims/`, `modules/` and `patch.erf` hold, then with `crates/rakata-mdl/tests/vanilla.rs`, which parses every one of them, prints the node kinds, classifications, MDX layouts, flag counts, controllers by type, compressed keys, skins and their bind transforms, resolves every supermodel chain, and reads every model `end_m01aa` uses (`RAKATA_GAME_K1=… cargo test -p rakata-mdl --test vanilla -- --nocapture`). The compressed orientation's partition, its agreement with uncompressed copies and its scale were measured by the Python scripts over the 2,832 models of distinct names (one copy of each name the BIFs and RIMs hold). The layout was measured by Python scripts that list every structure each model's headers reach and check that they tile the model data and fall in the order above, and is confirmed by `crates/rakata-mdl/tests/vanilla.rs`, which writes every vanilla model back from `rakata_mdl::ModelFile` and compares bytes, and by `rakata conformance --only mdl`.
+Measured: on 2026-10-18, every count above but those of lights, emitters and sabers comes from the vanilla KotOR 1 install under `$RAKATA_GAME_K1`, first with short Python scripts reading the headers, nodes, mesh headers, faces, index lists, controllers, skin headers, animation headers and MDX blocks of every model the KEY's BIFs, `rims/`, `modules/` and `patch.erf` hold, then with `crates/rakata-mdl/tests/vanilla.rs`, which parses every one of them, prints the node kinds, classifications, MDX layouts, flag counts, controllers by type, compressed keys, skins and their bind transforms, resolves every supermodel chain, and reads every model `end_m01aa` uses (`RAKATA_GAME_K1=… cargo test -p rakata-mdl --test vanilla -- --nocapture`). The compressed orientation's partition, its agreement with uncompressed copies and its scale were measured by the Python scripts over the 2,832 models of distinct names (one copy of each name the BIFs and RIMs hold). The layout was measured by Python scripts that list every structure each model's headers reach and check that they tile the model data and fall in the order above, and is confirmed by `crates/rakata-mdl/tests/vanilla.rs`, which writes every vanilla model back from `rakata_mdl::ModelFile` and compares bytes, and by `rakata conformance --only mdl`.
+
+Measured: on 2026-10-20, the light, emitter and saber headers, their controllers and the names emitters hold, over the same install, with `crates/rakata-mdl/tests/vanilla.rs`'s `the_light_emitter_and_saber_headers` (`RAKATA_GAME_K1=… cargo test -p rakata-mdl --test vanilla the_light_emitter_and_saber_headers -- --nocapture`): it confirms each header's length from where the next structure begins in the raw model data, counts every field's values by kind of node and update, counts each controller type by the kind of node that carries it in the geometry and in animations, checks the frame, lightning, P2P and colour readings, and resolves each emitter's texture and chunk names through every layer of the install, modules included, over the 2,833 distinct MDL contents. The fits of the mid-life and colour types, and the spark, fire and explosion emitters' colours, were measured by short Python scripts over a dump of the same headers and controllers.
 
 Observed in a renderer: the winding, the undrawn AABB nodes and the skin meshes' texture coordinates, from the OdysseyUE runtime drawing the Endar Spire (`end_m01aa`) from these structures and comparing with the game.
 
-Date: 2026-10-18.
+Date: 2026-10-18; lights, emitters and sabers 2026-10-20.
 
 Written by the implementer from measurement; no implementation's source was read.

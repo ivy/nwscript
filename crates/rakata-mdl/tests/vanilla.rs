@@ -4,10 +4,14 @@
 //! read with its MDX, and what the layout leaves open is counted: node
 //! kinds, classifications, the MDX attribute layouts, the flags, the
 //! animations and their controllers by type, the compressed orientation
-//! keys, and the skins. Further tests resolve every supermodel chain,
-//! read the four character skeletons (`s_male01`, `s_male02`,
-//! `s_female01`, `s_female02`) through theirs, and read every room, door
-//! and placeable model the Endar Spire's first area, `end_m01aa`, uses.
+//! keys, and the skins. A census of the light, emitter and saber headers
+//! counts every field of each, confirms their lengths from where the next
+//! structure begins, counts the controllers lights and emitters carry, and
+//! resolves the names emitters hold. Further tests resolve every
+//! supermodel chain, read the four character skeletons (`s_male01`,
+//! `s_male02`, `s_female01`, `s_female02`) through theirs, and read every
+//! room, door and placeable model the Endar Spire's first area,
+//! `end_m01aa`, uses.
 //! Run with `--nocapture` to see the counts.
 //!
 //! Reads the user's own install from `$RAKATA_GAME_K1` (the folder holding
@@ -24,8 +28,8 @@ use rakata_game::{Install, ModuleName, Profile};
 use rakata_gff::{Gff, Value};
 use rakata_lyt::Lyt;
 use rakata_mdl::{
-    Chain, Controller, Lineage, Model, ModelFile, Node, NodeKind, Quaternion, controller_types,
-    mdx_flags,
+    Body, Chain, Controller, Lineage, MeshKind, Model, ModelFile, Node, NodeKind, Quaternion,
+    controller_types, mdx_flags,
 };
 use rakata_res::{ResId, ResRef, ResType};
 
@@ -979,4 +983,460 @@ fn the_character_skeletons_resolve_through_their_supermodels() {
             .iter()
             .all(|n| !n.contains("thigh") && !n.contains("bicep"))
     );
+}
+
+/// A NUL-ended name in a fixed field, and whether any byte after its NUL
+/// is not zero.
+fn field_name(b: &[u8]) -> (String, bool) {
+    let end = b.iter().position(|&c| c == 0).unwrap_or(b.len());
+    let rest = b.get(end + 1..).unwrap_or(&[]);
+    (
+        String::from_utf8_lossy(&b[..end]).into_owned(),
+        rest.iter().any(|&c| c != 0),
+    )
+}
+
+fn word(b: &[u8], at: usize) -> u32 {
+    u32::from_le_bytes(b[at..at + 4].try_into().unwrap())
+}
+
+fn float(b: &[u8], at: usize) -> f32 {
+    f32::from_le_bytes(b[at..at + 4].try_into().unwrap())
+}
+
+/// A controller record's type and column byte, and the first value of
+/// its first row.
+fn controller_head(n: &rakata_mdl::NodeFile, c: &[u8; 16]) -> (u32, u8, f32) {
+    let first = u16::from_le_bytes([c[10], c[11]]) as usize;
+    (word(c, 0), c[12], float(&n.controller_data, 4 * first))
+}
+
+/// Where the first structure after a node's own headers begins, from the
+/// raw model data: the node at `at` (an offset in the model data) is
+/// followed by its kind's header of `len` bytes, then the first array
+/// any of them points to.
+fn after_headers(d: &[u8], at: usize, flags: u16) -> (usize, usize) {
+    let h = at + 80;
+    match flags {
+        // A light's arrays, then its children's array.
+        0x003 => {
+            let arrays = [4, 16, 28, 40, 52].map(|o| word(d, h + o) as usize);
+            let next = arrays
+                .iter()
+                .copied()
+                .filter(|&o| o != 0)
+                .chain([word(d, at + 0x2C) as usize])
+                .min()
+                .unwrap();
+            (h + rakata_mdl::LIGHT_HEADER_LEN, next)
+        }
+        // An emitter points nowhere: its children's array follows.
+        0x005 => (
+            h + rakata_mdl::EMITTER_HEADER_LEN,
+            word(d, at + 0x2C) as usize,
+        ),
+        // A saber's header follows the mesh header; its first array, at
+        // 0, follows it.
+        0x821 => {
+            let s = h + rakata_mdl::MESH_HEADER_LEN;
+            (s + rakata_mdl::SABER_HEADER_LEN, word(d, s) as usize)
+        }
+        _ => unreachable!(),
+    }
+}
+
+/// The geometry's nodes of one model, raw: (offset, flags) for every node
+/// the tree reaches.
+fn raw_nodes(mdl: &[u8]) -> Vec<(usize, u16)> {
+    let d = &mdl[12..];
+    let mut out = Vec::new();
+    let mut stack = vec![word(d, 0x28) as usize];
+    while let Some(at) = stack.pop() {
+        out.push((at, u16::from_le_bytes([d[at], d[at + 1]])));
+        let (off, n) = (word(d, at + 0x2C) as usize, word(d, at + 0x30) as usize);
+        stack.extend((0..n).map(|i| word(d, off + 4 * i) as usize));
+    }
+    out
+}
+
+/// What resolves a name in the install: the first of `types` that does,
+/// outside the modules or else in some module's capsules (`in_modules`).
+fn held_as(
+    install: &Install,
+    in_modules: &BTreeSet<(String, ResType)>,
+    name: &str,
+    types: &[ResType],
+) -> &'static str {
+    let Ok(r) = ResRef::new(name) else {
+        return "nothing";
+    };
+    for &ty in types {
+        let res = install.resolve(ResId::new(r, ty), None).unwrap();
+        if res.winner().is_some() {
+            return match ty {
+                ResType::Tpc => "TPC",
+                ResType::Tga => "TGA",
+                ResType::Mdl => "MDL",
+                _ => "other",
+            };
+        }
+    }
+    if types
+        .iter()
+        .any(|&ty| in_modules.contains(&(name.to_ascii_lowercase(), ty)))
+    {
+        return "a module's capsule only";
+    }
+    "nothing"
+}
+
+/// The census of the light, emitter and saber headers (docs/formats/mdl.md,
+/// "Light header", "Emitter header", "Saber header"), and of the
+/// controllers lights and emitters carry: every byte of each header is
+/// counted over every vanilla model, the headers' lengths are confirmed by
+/// where the next structure begins, and the names emitters hold are
+/// resolved through the install.
+#[test]
+fn the_light_emitter_and_saber_headers() {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let Some(root) = game() else { return };
+    let install = Install::open(&root, Profile::K1).unwrap();
+    let in_modules: BTreeSet<(String, ResType)> = install
+        .modules()
+        .iter()
+        .flat_map(|m| install.module_ids(m).unwrap())
+        .map(|id| (id.name.to_string().to_ascii_lowercase(), id.ty))
+        .collect();
+
+    let mut light_words: BTreeMap<String, usize> = BTreeMap::new();
+    let mut emitter_fields: BTreeMap<String, usize> = BTreeMap::new();
+    let mut saber_fields: BTreeMap<String, usize> = BTreeMap::new();
+    let mut controllers: BTreeMap<String, usize> = BTreeMap::new();
+    let mut checks: BTreeMap<String, usize> = BTreeMap::new();
+    let mut namings: BTreeMap<String, usize> = BTreeMap::new();
+    let mut names: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut contents = BTreeSet::new();
+    let mut failed = Vec::new();
+    let (mut lights, mut emitters, mut sabers) = (0, 0, 0);
+
+    each_model(&root, |label, mdl, mdx| {
+        let m = ModelFile::parse(mdl, mdx).unwrap();
+        let d = &mdl[12..];
+        let mut h = DefaultHasher::new();
+        mdl.hash(&mut h);
+        let distinct = contents.insert(h.finish());
+
+        // The header lengths, from where the next structure begins.
+        for (at, flags) in raw_nodes(mdl) {
+            if matches!(flags, 0x003 | 0x005 | 0x821) {
+                let (end, next) = after_headers(d, at, flags);
+                let ok = if end == next {
+                    "follows"
+                } else {
+                    "does not follow"
+                };
+                *checks
+                    .entry(format!("{flags:#05x}: next structure {ok} the header"))
+                    .or_default() += 1;
+                if end != next {
+                    failed.push(format!(
+                        "{label}: node at {at}: header ends {end}, next {next}"
+                    ));
+                }
+            }
+        }
+
+        let kind_of: HashMap<u16, u16> =
+            m.nodes().iter().map(|n| (n.number(), n.flags())).collect();
+        let count = |map: &mut BTreeMap<String, usize>, k: String| *map.entry(k).or_default() += 1;
+
+        for n in m.nodes() {
+            for c in &n.controllers {
+                let (ty, cols, _) = controller_head(n, c);
+                let kind = match n.flags() {
+                    0x003 => "light",
+                    0x005 => "emitter",
+                    _ => continue,
+                };
+                count(
+                    &mut controllers,
+                    format!("{kind} {ty:3} cols {cols:2} geometry"),
+                );
+            }
+            match &n.body {
+                Body::Light(l) => {
+                    lights += 1;
+                    let b = &l.header;
+                    let flares = l.flare_textures.len();
+                    count(
+                        &mut light_words,
+                        format!(
+                            "0 flare radius > 0: {}, flares: {}",
+                            float(b, 0) > 0.0,
+                            flares
+                        ),
+                    );
+                    for (o, what) in [
+                        (64, "64"),
+                        (68, "68"),
+                        (72, "72"),
+                        (76, "76"),
+                        (80, "80"),
+                        (84, "84"),
+                        (88, "88"),
+                    ] {
+                        count(&mut light_words, format!("{what}: {}", word(b, o) as i32));
+                    }
+                    let same = l.flare_sizes.len() / 4 == flares
+                        && l.flare_positions.len() / 4 == flares
+                        && l.flare_colors.len() / 12 == flares;
+                    count(
+                        &mut light_words,
+                        format!("flare arrays of one count: {same}"),
+                    );
+                    count(
+                        &mut light_words,
+                        format!("array at 4 empty: {}", l.unknown.is_empty()),
+                    );
+                }
+                Body::Emitter(e) => {
+                    emitters += 1;
+                    let b = &e[..];
+                    for (o, what) in [(0, "0 f32"), (4, "4 f32"), (8, "8 f32")] {
+                        count(&mut emitter_fields, format!("{what}: {}", float(b, o)));
+                    }
+                    let update = field_name(&b[32..64]).0;
+                    for (o, what) in [(12, "12"), (16, "16"), (20, "20"), (24, "24"), (28, "28")] {
+                        count(
+                            &mut emitter_fields,
+                            format!("{what}: {} ({update})", word(b, o)),
+                        );
+                    }
+                    for (o, len, what) in [
+                        (32, 32, "32 update"),
+                        (64, 32, "64 render"),
+                        (96, 32, "96 blend"),
+                        (128, 32, "128 texture"),
+                        (160, 16, "160 chunk"),
+                        (187, 32, "187 name"),
+                    ] {
+                        let (s, junk) = field_name(&b[o..o + len]);
+                        count(&mut emitter_fields, format!("{what} longest {}", s.len()));
+                        count(
+                            &mut emitter_fields,
+                            format!("{what} bytes after the NUL not zero: {junk}"),
+                        );
+                        if o != 128 || !s.is_empty() {
+                            names
+                                .entry(what.to_string())
+                                .or_default()
+                                .insert(s.to_ascii_lowercase());
+                        }
+                        if matches!(o, 32 | 64 | 96 | 187) {
+                            count(&mut emitter_fields, format!("{what}: {s}"));
+                        }
+                    }
+                    count(&mut emitter_fields, format!("176: {}", word(b, 176)));
+                    count(&mut emitter_fields, format!("180: {}", word(b, 180)));
+                    count(
+                        &mut emitter_fields,
+                        format!("184 u16: {}", u16::from_le_bytes([b[184], b[185]])),
+                    );
+                    count(&mut emitter_fields, format!("186: {}", b[186]));
+                    count(&mut emitter_fields, format!("219 zero: {}", b[219] == 0));
+                    let flags = word(b, 220);
+                    for bit in 0..32 {
+                        if flags >> bit & 1 != 0 {
+                            count(&mut emitter_fields, format!("220 bit {bit:2}"));
+                        }
+                    }
+                    // The controllers the header's fields go with.
+                    let value = |ty: u32| {
+                        n.controllers
+                            .iter()
+                            .map(|c| controller_head(n, c))
+                            .find(|(t, _, _)| *t == ty)
+                            .map(|(_, _, v)| v)
+                    };
+                    let extended = value(284).is_some();
+                    let named = !field_name(&b[187..219]).0.is_empty();
+                    count(
+                        &mut checks,
+                        format!("emitter: controller 284 {extended}, name at 187 {named}"),
+                    );
+                    if let (Some(start), Some(end)) = (value(112), value(108)) {
+                        count(
+                            &mut checks,
+                            format!(
+                                "emitter: frame start (112) <= frame end (108): {}",
+                                start <= end
+                            ),
+                        );
+                        let grid = word(b, 20) * word(b, 24);
+                        count(
+                            &mut checks,
+                            format!(
+                                "emitter: frame end within the grid: {}",
+                                (end as u32) < grid.max(1)
+                            ),
+                        );
+                    }
+                    for (ty, needs) in [(184, "Lightning"), (188, "Lightning"), (192, "Lightning")]
+                    {
+                        if value(ty).is_some_and(|v| v != 0.0) {
+                            count(
+                                &mut checks,
+                                format!(
+                                    "emitter: {ty} non-zero on update {update} (expected {needs})"
+                                ),
+                            );
+                        }
+                    }
+                    for ty in [128, 132] {
+                        if value(ty).is_some_and(|v| v != 0.0) {
+                            count(
+                                &mut checks,
+                                format!(
+                                    "emitter: {ty} non-zero with flag bit 0: {}",
+                                    flags & 1 != 0
+                                ),
+                            );
+                        }
+                    }
+                    for ty in [124, 140, 168] {
+                        if value(ty).is_some_and(|v| v != 0.0) {
+                            count(
+                                &mut checks,
+                                format!("emitter: {ty} non-zero on update {update}"),
+                            );
+                        }
+                    }
+                    if distinct {
+                        let tex = field_name(&b[128..160]).0;
+                        let chunk = field_name(&b[160..176]).0;
+                        let depth = field_name(&b[187..219]).0;
+                        for (site, s, types) in [
+                            ("emitter texture", tex, &[ResType::Tpc, ResType::Tga][..]),
+                            ("emitter chunk", chunk, &[ResType::Mdl][..]),
+                            (
+                                "emitter name at 187",
+                                depth,
+                                &[ResType::Tpc, ResType::Tga][..],
+                            ),
+                        ] {
+                            if s.is_empty() || s.eq_ignore_ascii_case("NULL") {
+                                continue;
+                            }
+                            let held = held_as(&install, &in_modules, &s, types);
+                            count(&mut namings, format!("{site}: held as {held}"));
+                            names
+                                .entry(format!("{site} held as {held}"))
+                                .or_default()
+                                .insert(s.to_ascii_lowercase());
+                        }
+                    }
+                }
+                Body::Mesh(me) => {
+                    if let MeshKind::Saber(s) = &me.kind {
+                        sabers += 1;
+                        let b = &s.header;
+                        count(
+                            &mut saber_fields,
+                            format!("vertices: {}", me.vertex_count()),
+                        );
+                        count(&mut saber_fields, format!("faces: {}", me.faces.len() / 32));
+                        let (w12, w16) = (word(b, 12), word(b, 16));
+                        count(
+                            &mut saber_fields,
+                            format!("words 12, 16 differ: {}", w12 != w16),
+                        );
+                        count(
+                            &mut saber_fields,
+                            format!(
+                                "word 12 names a node number: {}",
+                                kind_of.contains_key(&(w12 as u16))
+                            ),
+                        );
+                        count(
+                            &mut saber_fields,
+                            format!(
+                                "word 12 range: {}",
+                                if (86..=98).contains(&w12) {
+                                    "86..98"
+                                } else {
+                                    "other"
+                                }
+                            ),
+                        );
+                        count(
+                            &mut saber_fields,
+                            format!(
+                                "word 16 range: {}",
+                                if (86..=98).contains(&w16) {
+                                    "86..98"
+                                } else {
+                                    "other"
+                                }
+                            ),
+                        );
+                        count(
+                            &mut saber_fields,
+                            format!("array 0 is the positions: {}", s.arrays[0] == me.positions),
+                        );
+                        let unit = s.arrays[2].chunks(12).all(|v| {
+                            let l: f32 = (0..3).map(|i| float(v, 4 * i).powi(2)).sum();
+                            (l.sqrt() - 1.0).abs() < 1e-3
+                        });
+                        count(&mut saber_fields, format!("array 8 unit vectors: {unit}"));
+                        let in01 = s.arrays[1]
+                            .chunks(4)
+                            .all(|v| (0.0..=1.0).contains(&float(v, 0)));
+                        count(&mut saber_fields, format!("array 4 in 0..1: {in01}"));
+                    }
+                }
+                _ => {}
+            }
+        }
+        // Controllers of an animation's nodes, by the kind of the geometry
+        // node of the same number.
+        for a in &m.animations {
+            let mut stack = vec![&a.root];
+            while let Some(n) = stack.pop() {
+                stack.extend(n.children.iter());
+                let kind = match kind_of.get(&n.number()) {
+                    Some(0x003) => "light",
+                    Some(0x005) => "emitter",
+                    _ => continue,
+                };
+                for c in &n.controllers {
+                    let (ty, cols, _) = controller_head(n, c);
+                    count(
+                        &mut controllers,
+                        format!("{kind} {ty:3} cols {cols:2} animations"),
+                    );
+                }
+            }
+        }
+    });
+
+    println!(
+        "{lights} lights, {emitters} emitters, {sabers} sabers, {} distinct MDL contents",
+        contents.len()
+    );
+    table("header lengths and other checks", &checks);
+    table("light header", &light_words);
+    table("emitter header", &emitter_fields);
+    table("saber header", &saber_fields);
+    table("light and emitter controllers", &controllers);
+    table(
+        "names emitters hold, one per node and site over distinct contents",
+        &namings,
+    );
+    for (k, v) in &names {
+        show(k, &v.iter().cloned().collect::<Vec<_>>());
+    }
+    assert!(failed.is_empty(), "{failed:#?}");
+    assert_eq!((lights, emitters, sabers), (5_599, 9_442, 68));
 }
