@@ -482,6 +482,109 @@ fn a_resource_of_another_format_is_re1307_naming_its_command() {
     }
 }
 
+/// A PNG's size and its RGBA8 pixels.
+fn read_png(path: &Path) -> (u32, u32, Vec<u8>) {
+    let file = std::io::BufReader::new(std::fs::File::open(path).unwrap());
+    let mut reader = png::Decoder::new(file).read_info().unwrap();
+    let mut buf = vec![0; reader.output_buffer_size().unwrap()];
+    let info = reader.next_frame(&mut buf).unwrap();
+    assert_eq!(info.color_type, png::ColorType::Rgba);
+    buf.truncate(info.buffer_size());
+    (info.width, info.height, buf)
+}
+
+#[test]
+fn texture_export_writes_a_png_and_the_txi_beside_it() {
+    let f = Fixture::new();
+    let g = f.game();
+    let out = f.path("out");
+    std::fs::create_dir(&out).unwrap();
+    let png = format!("{out}/t.png");
+    let t = text(
+        &["--game", s(&g), "texture", "export", "t.tpc", "-o", &png],
+        0,
+    );
+    assert_eq!(
+        t,
+        format!("wrote {out}/t.png  8x8, level 0 of 4\nwrote {out}/t.txi  from the TPC\n")
+    );
+    // Every block is 0x1111 twice: RGB565 (2, 8, 17) in the three-colour
+    // mode, codes 0 and 1 only.
+    let (w, h, px) = read_png(Path::new(&png));
+    assert_eq!((w, h), (8, 8));
+    assert!(px.chunks(4).all(|p| p == [16, 32, 140, 255]), "{px:?}");
+    assert_eq!(
+        std::fs::read(format!("{out}/t.txi")).unwrap(),
+        b"envmaptexture cm_bright\r\nmipmap 0\r\n"
+    );
+
+    let (code, doc) = json(&[
+        "--game",
+        s(&g),
+        "texture",
+        "export",
+        "t.tpc",
+        "-o",
+        &format!("{out}/all.png"),
+        "--all-levels",
+    ]);
+    assert_eq!(code, Some(0), "{doc}");
+    let r = &doc["result"];
+    let pngs = r["pngs"].as_array().unwrap();
+    assert_eq!(pngs.len(), 4);
+    assert_eq!(pngs[3]["path"], format!("{out}/all.3.png"));
+    assert_eq!(pngs[3]["width"], 1);
+    assert_eq!(r["txi"]["embedded"], true);
+    assert_eq!(read_png(Path::new(&format!("{out}/all.2.png"))).0, 2);
+    assert_eq!(doc["outputs"].as_array().unwrap().len(), 5);
+
+    // A TGA takes its TXI from beside it in the install.
+    std::fs::write(g.join("Override/lm.txi"), b"islightmap 1\r\n").unwrap();
+    let (code, doc) = json(&[
+        "--game",
+        s(&g),
+        "texture",
+        "export",
+        "lm.tga",
+        "-o",
+        &format!("{out}/lm.png"),
+    ]);
+    assert_eq!(code, Some(0), "{doc}");
+    assert_eq!(doc["result"]["txi"]["source"], "Override/lm.txi");
+    assert_eq!(doc["result"]["txi"]["embedded"], false);
+    let (w, h, px) = read_png(Path::new(&format!("{out}/lm.png")));
+    assert_eq!((w, h, px), (2, 2, vec![7; 16]));
+    assert_eq!(
+        std::fs::read(format!("{out}/lm.txi")).unwrap(),
+        b"islightmap 1\r\n"
+    );
+
+    for (args, code) in [
+        (&["t.tpc", "--level", "4"][..], "RE2210"),
+        (&["t.tpc", "--image", "1"], "RE2211"),
+        (&["lm.tga", "--level", "1"], "RE2210"),
+        (&["t.txi"], "RE1307"),
+    ] {
+        let mut all = vec!["--game", s(&g), "texture", "export"];
+        all.extend_from_slice(args);
+        all.extend(["-o", &png]);
+        let (exit, doc) = json(&all);
+        assert_eq!(exit, Some(1), "{args:?}");
+        assert_eq!(codes(&doc), [code], "{args:?}");
+    }
+    let (exit, doc) = json(&[
+        "--game",
+        s(&g),
+        "texture",
+        "export",
+        "t.tpc",
+        "-o",
+        &f.path("missing/t.png"),
+    ]);
+    assert_eq!(exit, Some(1));
+    assert_eq!(codes(&doc), ["RE1306"]);
+}
+
 #[test]
 fn lyt_show_prints_rooms_and_door_hooks_and_a_vis_the_rooms_seen() {
     let f = Fixture::new();
@@ -788,4 +891,61 @@ fn mdl_show_prints_the_vanilla_emitters_lights_and_sabers() {
         .unwrap();
     assert_eq!(blade["saber"]["positions"].as_array().unwrap().len(), 176);
     assert_eq!(blade["saber"]["words"], serde_json::json!([98, 97]));
+}
+
+/// Export `name` from the vanilla install into `dir`, then the size and
+/// the content hash of the PNG's pixels, and the TXI written, if any.
+fn export_vanilla(g: &str, dir: &Path, name: &str) -> (u32, u32, String, Option<Vec<u8>>) {
+    let stem = name.rsplit_once('.').unwrap().0;
+    let png = dir.join(format!("{stem}.png"));
+    let (code, doc) = json(&["--game", g, "texture", "export", name, "-o", s(&png)]);
+    assert_eq!(code, Some(0), "{doc}");
+    assert!(codes(&doc).is_empty(), "{doc}");
+    let (w, h, px) = read_png(&png);
+    let hash = rakata_res::ContentHash::of(&px).to_hex();
+    let txi = std::fs::read(dir.join(format!("{stem}.txi"))).ok();
+    (w, h, hash, txi)
+}
+
+#[test]
+fn vanilla_textures_export_as_png() {
+    let Some(g) = vanilla() else { return };
+    let g = s(&g);
+    let dir = tempfile::tempdir().unwrap();
+
+    // DXT5 with alpha, from the high-quality texture pack.
+    let (w, h, hash, txi) = export_vanilla(g, dir.path(), "lhr_flr01.tpc");
+    assert_eq!((w, h), (512, 512));
+    assert_eq!(
+        hash,
+        "18365933ff0140bfb358c48c958c849ce93e96da4161c79f42154730151e0034"
+    );
+    assert_eq!(txi.as_deref(), Some(&b"envmaptexture CM_Endar\r\n\r\n"[..]));
+
+    // DXT1.
+    let (w, h, hash, _) = export_vanilla(g, dir.path(), "lhr_flr02.tpc");
+    assert_eq!((w, h), (256, 256));
+    assert_eq!(
+        hash,
+        "5d7b06c610608fb7282406540ad7b0914d8a43bc83bf1de94768579b441761f5"
+    );
+
+    // A font: DXT5, its glyph coordinates in the TXI after the pixels.
+    let (w, h, hash, txi) = export_vanilla(g, dir.path(), "fnt_d16x16.tpc");
+    assert_eq!((w, h), (512, 512));
+    assert_eq!(
+        hash,
+        "4dc36b877dc792b2d7e78bba564fe9d2fefc8898b61da9cd1b7e014995d1ae73"
+    );
+    let txi = String::from_utf8(txi.expect("the font's TXI")).unwrap();
+    assert!(txi.contains("upperleftcoords"), "{txi}");
+
+    // A lightmap TGA, its TXI a separate resource.
+    let (w, h, hash, txi) = export_vanilla(g, dir.path(), "m01aa_01a_lm0.tga");
+    assert_eq!((w, h), (64, 64));
+    assert_eq!(
+        hash,
+        "6bc0cedd682b734e0ef3a8d402f563d24e3607ae55033f05c6addd33f500cc2a"
+    );
+    assert!(txi.is_some());
 }

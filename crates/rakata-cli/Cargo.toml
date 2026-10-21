@@ -25,6 +25,7 @@ assert_cmd = "2.2"
 tempfile = "3"
 rakata-archive = { workspace = true }
 rakata-gff = { workspace = true }
+png = "0.18"
 predicates = "3.1"
 serde_json = "1"
 nwscript-diag = { workspace = true }

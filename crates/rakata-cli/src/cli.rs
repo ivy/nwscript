@@ -29,6 +29,8 @@ Examples:
   rakata lip show ./n_juhani_01.lip        a lip-sync file's keyframes
   rakata texture show lhr_flr01.tpc --game DIR
                                            a texture's format, mip levels and TXI
+  rakata texture export lhr_flr01.tpc --game DIR
+                                           the texture as lhr_flr01.png, its TXI beside it
   rakata lyt show m01aa.lyt --game DIR     an area's rooms and door hooks
   rakata walkmesh show m01aa_01a.wok --game DIR
                                            a walkmesh's materials and room transitions
@@ -203,7 +205,7 @@ pub enum Command {
     Tlk(crate::cmd::TlkArgs),
     /// Show a lip-sync file's keyframes.
     Lip(crate::cmd::LipArgs),
-    /// Show a texture: a TPC's header, pixel format, images, mip levels and TXI; a TXI's instructions; a TGA's header.
+    /// Show a texture (a TPC's header, pixel format, images, mip levels and TXI; a TXI's instructions; a TGA's header), or export a TPC or TGA as PNG.
     Texture(crate::cmd::TextureArgs),
     /// Show an area's room layout (.lyt: rooms, tracks, obstacles, door hooks) or room visibility (.vis).
     Lyt(crate::cmd::LytArgs),

@@ -1225,6 +1225,7 @@ dependencies = [
  "clap",
  "nwscript-diag",
  "nwscript-ncs",
+ "png",
  "predicates",
  "rakata",
  "rakata-archive",
