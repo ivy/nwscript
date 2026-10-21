@@ -40,6 +40,12 @@ cases = [
     ("allow", {"tool_name": "Bash", "tool_input": {"command": "bash conformance/drivers/tslpatcher.sh data game 1"}}),
     ("DENY", {"tool_name": "Bash", "tool_input": {"command": "cat /other/conformance/../PyKotor/x.py; cat ~/x/pykotor/docs/y"}}),
     ("DENY", {"tool_name": "Read", "tool_input": {"file_path": "/home/user/src/github.com/OpenKotOR/PyKotor/conformance/x.py"}}),
+    ("DENY", {"tool_name": "Read", "tool_input": {"file_path": "/home/user/src/github.com/ivy/odyssey-ue/vendor/nwscript/crates/rakata-mdl/src/model.rs"}}),
+    ("DENY", {"tool_name": "Bash", "tool_input": {"command": "git -C ~/src/github.com/ivy/odyssey-ue/vendor/nwscript log -p"}}),
+    ("DENY", {"tool_name": "Grep", "tool_input": {"path": "/home/user/src/github.com/ivy/odyssey-ue/docs"}}),
+    ("DENY", {"tool_name": "mcp__codebase-memory__search_graph", "tool_input": {"project": "github-com-ivy-odyssey-ue", "query": "emitter"}}),
+    ("allow", {"tool_name": "Bash", "tool_input": {"command": "git commit -m 'feat(mdl): what OdysseyUE asked for, measured from the game'"}}),
+    ("allow", {"tool_name": "Read", "tool_input": {"file_path": "/x/odyssey-ue/vendor/nwscript/crates/odyssey-capi/src/lib.rs"}, "agent_type": "format-scribe"}),
 ]
 bad = 0
 for want, ev in cases:

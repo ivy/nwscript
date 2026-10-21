@@ -25,6 +25,7 @@ FORBIDDEN = [
     r"xoreos-tools",
     r"nwnrs",
     r"holocron",
+    r"odyssey-ue",  # built outside the room, including its vendored copy of this repository
 ]
 NAMES = "|".join(FORBIDDEN)
 # A path or a glob names a project if the word appears anywhere in it.
