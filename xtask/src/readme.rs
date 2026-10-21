@@ -1,9 +1,9 @@
-//! `cargo xtask readme`: regenerate the tables the README carries from
-//! reports, between marker comments. Today one table: the round-trip
+//! `cargo xtask readme`: regenerate the tables `docs/results.md` carries
+//! from reports, between marker comments. Today one table: the round-trip
 //! conformance summary from a `rakata conformance --report` JSON file,
 //! between `<!-- rakata-conformance:begin -->` and
 //! `<!-- rakata-conformance:end -->`. Running it twice over the same report
-//! leaves the README unchanged.
+//! leaves the file unchanged.
 
 use std::path::PathBuf;
 
@@ -13,15 +13,16 @@ const BEGIN: &str = "<!-- rakata-conformance:begin -->";
 const END: &str = "<!-- rakata-conformance:end -->";
 
 const USAGE: &str = "\
-usage: cargo xtask readme --report FILE [--readme README.md] [--check]
+usage: cargo xtask readme --report FILE [--readme docs/results.md] [--check]
 
 Insert the per-format table of a `rakata conformance --report FILE` report
-between the rakata-conformance markers of the README. --check exits 1
-instead of writing when the README would change.";
+between the rakata-conformance markers of docs/results.md, or of the file
+--readme names. --check exits 1 instead of writing when the file would
+change.";
 
 pub fn main(args: &[String]) -> Result<(), String> {
     let mut report: Option<PathBuf> = None;
-    let mut readme = PathBuf::from("README.md");
+    let mut readme = PathBuf::from("docs/results.md");
     let mut check = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {

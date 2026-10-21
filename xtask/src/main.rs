@@ -1,7 +1,7 @@
 //! Development tasks. `cargo xtask corpus --help` for the corpus commands,
 //! `cargo xtask grammar-census --help` for the grammar's evidence,
 //! `cargo xtask ini-census --help` for what the mods' change files contain.
-//! `cargo xtask readme --help` for the README's generated tables.
+//! `cargo xtask readme --help` for the generated tables of `docs/results.md`.
 //! `cargo xtask bench --help` for the benchmark against other tools.
 
 mod bench;

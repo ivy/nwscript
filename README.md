@@ -1,66 +1,131 @@
 # nwscript
 
-A toolset for the data of BioWare's Aurora-family games, KotOR 1 and 2 first, in Rust. The scripts layer is complete and measured: a compiler byte for byte against BioWare's own, an interpreter that makes scripts testable without the game, a decompiler that verifies its output by recompiling it, and a drop-in replacement for `nwnnsscomp`. The rest is in progress under the name Rakata, as [`docs/proposals/rakata.md`](docs/proposals/rakata.md) specifies: the archives, the resource formats, the install's loading rules, dialogues, saves, an index that joins them, an authoring API, and a TSLPatcher-compatible installer, each verified by round-tripping the bytes the games ship. Built for people new to modding who work with coding agents, and for the installers and mods that already exist.
+Mod Star Wars: Knights of the Old Republic (KotOR) with a coding agent. Unit-test scripts without launching the game, compile them to BioWare's exact bytecode more often than any other compiler measured, decompile with proof, install TSLPatcher mods, and read and write the game's files byte for byte, from a command line with JSON output and from Python. Every claim is measured against the files the game ships, and the measurements rerun on your own copy.
 
-## Results
+It stands on two decades of the community's work, named in [Acknowledgments](#acknowledgments).
 
-### The compiler reproduces BioWare's bytecode, and accounts for every script it doesn't
+## Getting started
 
-KotOR 1 ships 1,754 scripts as both source and BioWare's compiled bytecode. Compiled with the declarations each was built against, **1,665 of them (94.9%) come out of `nws` byte for byte identical to BioWare's**, more than any other compiler measured:
+There are no releases yet: clone the repository and build it. The Rust toolchain and uv come from [mise](https://mise.jdx.dev) (`mise install` reads [`mise.toml`](mise.toml)); the Python modules build with [maturin](https://www.maturin.rs).
 
-<!-- conformance:begin -->
-| Compiler | Byte-identical to BioWare |
-| --- | ---: |
-| `nws`, with the declarations each script was compiled against | **1,665** (94.9%) |
-| `nws --declarations bioware`, one setting for all | 1,652 (94.2%) |
-| `nws`, the shipped declarations | 1,603 (91.4%) |
-| nwnnsscomp `-v1.00` | 1,598 (91.1%) |
-| nwnnsscomp, default version | 1,204 (68.6%) |
-| pykotor (HoloPatcher) | 262 (14.9%) |
-| nwnrs | 0 |
-<!-- conformance:end -->
+```bash
+git clone https://github.com/ivy/nwscript && cd nwscript
+mise install
+cargo build --release -p nws -p nwnnsscomp -p rakata-cli   # target/release/nws, nwnnsscomp, rakata
+maturin build --release -m crates/rakata-py/Cargo.toml      # the Python module `rakata`
+maturin build --release -m crates/nwscript-py/Cargo.toml    # the Python module `nwscript`
+```
 
-The other 89 are not compiler failures. No compiler can reproduce them from the sources and declarations that shipped with KotOR, and each has an established cause in [`conformance/known.toml`](conformance/known.toml), re-derived by the tests rather than asserted:
+Put `target/release` on your `PATH` and install the wheels from `target/wheels/` into your Python environment. `nws` handles scripts, `rakata` the game's data, and `nwnnsscomp` stands in for the compiler of that name wherever a mod installer expects it.
 
-- **5 are include files**, with no entry point and nothing to compile.
-- **75 were compiled against older versions of their include files.** Their bytecode lacks globals and functions the shipped includes have, such as `k_inc_utility`'s `SW_CONSTANT_*` globals in 60 of them.
-- **8 were compiled from an older version of the script itself**, such as `k_qa`, whose bytecode holds a subroutine its shipped source no longer has.
-- **1 is Neverwinter Nights code** left in the game's archive, compiled against NWN's engine table.
+With Claude Code, the repository is also a plugin that teaches an agent the workflows. From a session in any project:
 
-Getting there meant reconstructing BioWare's build environment from its output. The engine's declarations changed while the game was written, and the bytecode carries each era: of the 55 scripts that call `ActionStartConversation`, 51 were compiled when it took eleven arguments, three against the twelve-argument declaration that shipped, and one against five; ten call the party-member routines at numbers and with arguments the shipped table no longer has. `--declarations bioware` restores the eleven-argument era, and [`conformance/overlays/`](conformance/overlays/) holds the earlier declarations inferred from the bytecode, each file citing the bytes it rests on. The findings are written up in [`docs/research/bytecode-quirks.md`](docs/research/bytecode-quirks.md); the full report, with every differing script, is [`conformance/report.md`](conformance/report.md).
+```text
+/plugin marketplace add /path/to/nwscript
+/plugin install nwscript@nwscript
+```
 
-### Every archive, GFF, 2DA, talk table and lip-sync file of KotOR 1 writes back byte for byte
+[`plugin/README.md`](plugin/README.md) says what its two skills cover and how to check that it loaded. You need your own copy of the game: nothing here contains game data.
 
-`rakata conformance` is the suite for the game's data: over an install it reads every file a format crate handles, writes it again with that crate's writer, and classifies the result per file. Over a vanilla KotOR 1 install, into every archive's members:
+## What it does
 
-<!-- rakata-conformance:begin -->
-| Format | Files | Identical | Equal after re-read | Different | No reader |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `archive` | 401 | 401 | 0 | 0 | |
-| `tlk` | 1 | 1 | 0 | 0 | |
-| `lip` | 18206 | 18206 | 0 | 0 | |
-| `2da` | 519 | 519 | 0 | 0 | |
-| `gff` | 11143 | 11143 | 0 | 0 | |
-| no format | 48235 | | | | 48235 |
-<!-- rakata-conformance:end -->
+| Capability | State | Verified by | What to use instead |
+| --- | --- | --- | --- |
+| Compile NWScript to KotOR bytecode (`nws compile`) | shipped | [1,665 of 1,754 vanilla scripts byte-identical to BioWare's](docs/results.md#the-compiler-reproduces-biowares-bytecode-and-accounts-for-every-script-it-doesnt); each of the other 89 has an established cause | nwnnsscomp, the compiler nearly every KotOR mod has been built with |
+| Stand in for `nwnnsscomp` in installers | shipped | [a modded KotOR 1 built with it is identical over 21,300 files](docs/results.md#it-builds-a-real-modded-game-identically) | |
+| Test scripts without the game (`nws test`, `nws run`) | shipped | [12,967 of 13,139 compiled scripts run to completion](docs/results.md#the-interpreter-runs-the-games-scripts-without-the-game) | playing the game, for what depends on the engine itself |
+| Decompile, each function proved by recompiling (`nws decompile`, `rakata decompile`) | shipped | [4,023 of 4,029 functions verify in the vanilla scripts](docs/results.md#the-decompiler-proves-what-it-recovers) | DeNCS, the decompiler the community learned the module scripts from |
+| Read and write archives: KEY/BIF, ERF, MOD, RIM | shipped | [401 of 401 archives byte-identical](docs/results.md#every-file-of-kotor-1-a-format-reads-writes-back-byte-for-byte) | KotOR Tool and the Holocron Toolset, to browse them in a window |
+| Read and write GFF, 2DA, talk tables and lip-sync files | shipped | [11,143 GFFs, 519 2DAs, the talk table and 18,206 lip-sync files byte-identical](docs/results.md#every-file-of-kotor-1-a-format-reads-writes-back-byte-for-byte) | the Holocron Toolset's editors, to edit them visually |
+| Read and write textures (TPC, TGA, TXI); export to PNG (`rakata texture export`) | shipped | [11,536 TPCs, 5,601 TGAs and 5,616 TXIs byte-identical](docs/results.md#every-file-of-kotor-1-a-format-reads-writes-back-byte-for-byte) | an image editor on the exported PNG; turning an edited image back into a TPC is not here yet |
+| Read and write models, walkmeshes and room layouts (`rakata mdl`, `walkmesh`, `lyt`) | shipped | [6,157 MDL and MDX files, 1,554 walkmeshes and 124 layouts byte-identical](docs/results.md#every-file-of-kotor-1-a-format-reads-writes-back-byte-for-byte) | KotorBlender, to edit models in Blender |
+| Find the copy the game loads, and everything that refers to a resource (`rakata which`, `index`, `refs`) | shipped | the command line's tests over the install (`crates/rakata-cli/tests/`) | |
+| Change dialogues, globals, tables and blueprints from Python | shipped | a published mod rebuilt on it, 178 of 184 changed files byte-identical (modshop's port of the Juhani mod) | the Holocron Toolset's dialogue editor, and DLGEditor |
+| Read saved games; copy one with changed globals or party (`rakata save`) | shipped | the save tests over the user's saves (`crates/rakata-save/tests/`) | KotOR Savegame Editor, to edit a save in a window |
+| Install TSLPatcher mods (`rakata install`) | shipped | [72 install entries compared with TSLPatcher and HoloPatcher](docs/results.md#it-installs-tslpatcher-mods-as-the-games-community-does) | the TSLPatcher or HoloPatcher each mod ships with |
+| Lint a game tree, and diff two (`rakata lint`, `rakata diff`) | shipped | the lint and diff tests (`crates/rakata/src/lint/`, `crates/rakata/src/diff/`) | |
+| A window to work in | not yet | | the Holocron Toolset and KotOR Tool |
+| KotOR II: The Sith Lords | not yet | nothing has been measured against it | the tools above, most of which support both games |
 
-A file is **identical** when the writer reproduces its bytes; **equal after re-read** when the bytes differ but read back to the same data, a layout another tool chose and [`conformance/rakata-known.toml`](conformance/rakata-known.toml) names; **different** when they do not, which is a defect and exits 3. Over the modded build the same suite took 0.63 s for 40,628 files: none different, and 159 equal after re-read under five named layouts other tools wrote. Files with no reader are the formats still to come (textures, models, walkmeshes, sound sets); each format crate joins the table as it lands. The table is generated from the report by `cargo xtask readme`.
+The numbers are KotOR 1's. [`docs/results.md`](docs/results.md) has every table in full, with the command that reproduces each.
 
-### It builds a real modded game identically
+## Roadmap
 
-modshop, a companion project, builds a modded KotOR 1 by script from a pristine game and the community's mod archives; four of its mods compile scripts at install time. Built with `nws`'s nwnnsscomp shim natively instead of nwnnsscomp under Wine, the game is identical: the same tree hash over 21,300 files, and none of its 24,277 compiled scripts differs.
+KotOR runs on Odyssey, BioWare's branch of its Aurora engine, so the formats the games share carry across from one game to the next. In order, without dates:
 
-### The decompiler proves what it recovers
+- **Next:** KotOR II: The Sith Lords, on the same Odyssey engine. The tools already take a KotOR II profile (`nws --game k2`, `rakata which --profile k2`); nothing has been verified against the game yet.
+- **Later:** Jade Empire, the last Odyssey game; then Neverwinter Nights: Enhanced Edition, NWScript's home on Aurora, which has mature, maintained tools of its own, Beamdog's `nwnsc` and the neverwinter.nim utilities among them.
+- **Considering:** Neverwinter Nights 2 and The Witcher, whose formats drift further from Aurora's, and Dragon Age, a newer generation of formats on the Eclipse engine.
 
-`nws decompile` recompiles the source it recovers and marks a function verified only when that reproduces the original instructions exactly. **4,023 of 4,029 functions (99.85%) in the vanilla scripts verify, and 46,475 of 46,511 (99.92%) across the 11,355 scripts that ship in KotOR 1's modules as bytecode only.** None is left unrecovered, and every function that does not verify calls an engine routine with arguments from another era of the table, or from Neverwinter Nights'. The fraction for every module is in [`docs/decompiler.md`](docs/decompiler.md).
+## Examples
 
-These are KotOR 1 results. KotOR 2 has not been measured yet.
+Find the copy of a resource the game loads, what refers to it, what a conversation says, and what a script does:
 
-## Usage
+```bash
+rakata which appearance.2da --game ~/games/swkotor
+rakata index build --game ~/games/swkotor --db idx.sqlite
+rakata refs Cand --db idx.sqlite                     # every reference to Canderous's tag
+rakata dialog show k_hcan_dialog.dlg --game ~/games/swkotor
+rakata decompile k_pdan_attack.ncs --module danm14ab --game ~/games/swkotor
+rakata install MyMod/tslpatchdata --game ~/games/swkotor --dry-run
+```
 
-Nothing is released yet. The design is in [`docs/prd.md`](docs/prd.md).
+Every command takes `--format json` and then writes exactly one JSON document, and `rakata explain CODE` explains any diagnostic it prints. The same data from Python:
 
-From a checkout, `cargo build --release -p nws -p nwnnsscomp` builds the command and the nwnnsscomp-compatible shim, and `maturin build --release -m crates/nwscript-py/Cargo.toml` builds the Python module (`import nwscript`; its functions are documented in [`crates/nwscript-py/src/lib.rs`](crates/nwscript-py/src/lib.rs)).
+```python
+import rakata
+
+install = rakata.Install("/path/to/swkotor")        # the folder holding chitin.key
+model = rakata.Model.load(install, "v_muzflash_01")
+for node in model.nodes:
+    if node.emitter is not None:
+        print(node.name, node.emitter.update, node.emitter.texture)
+```
+
+A script tested without the game. The condition, `k_my_cond.nss`:
+
+```c
+int StartingConditional()
+{
+    return GetIsObjectValid(GetItemPossessedBy(GetFirstPC(), "keycard"));
+}
+```
+
+Its test, in Lua, with `describe` and `it` as in busted. The world model answers the engine's calls, and each run records every call the script made:
+
+```lua
+-- tests/k_my_cond_test.lua
+describe("k_my_cond: true once the player has the keycard", function()
+  local script = nws.script("k_my_cond")
+
+  it("is false without it", function()
+    assert.is_false(script:conditional(nws.world()).result)
+  end)
+
+  it("is true with it", function()
+    local w = nws.world()
+    local pc = w:create("creature", "player", { is_pc = true })
+    w.party = { pc }
+    pc:give("keycard")
+    local run = script:conditional(w)
+    assert.is_true(run.result)
+    assert.called(run, "GetItemPossessedBy")
+  end)
+end)
+```
+
+```bash
+nws --game k1 --game-dir ~/games/swkotor compile k_my_cond.nss -o tests/k_my_cond.ncs
+nws --game k1 --game-dir ~/games/swkotor -I tests test tests/
+```
+
+`--game-dir` supplies the game's `nwscript.nss` and include files, from your copy of the game.
+
+`nws test --reference` prints the whole testing API.
+
+## How it's built
+
+This is a clean-room implementation. It reads no other project's source: other tools are run only as black boxes and measured, and the file formats are learned from public documentation and from the game's own bytes, every fact recorded in [`docs/formats/`](docs/formats/) with how it was established. That keeps the code free of other projects' licences and its design its own. The rule and how it is enforced are in [`AGENTS.md`](AGENTS.md); the designs are [`docs/prd.md`](docs/prd.md) for the scripts and [`docs/proposals/rakata.md`](docs/proposals/rakata.md) for the data.
 
 ## Acknowledgments
 
