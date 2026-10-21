@@ -75,7 +75,7 @@ pub use layout::{BlockOrder, Layout, Padding, layout};
 pub use lineage::{Chain, Lineage, ModelFiles, supermodel_name};
 pub use model::{
     BoundingBox, Classification, FILE_HEADER_LEN, MESH_HEADER_LEN, Mesh, Model, NODE_HAS_MESH,
-    NODE_HEADER_LEN, Node, NodeKind, Quaternion, mdx_flags, parse,
+    NODE_HEADER_LEN, Node, NodeKind, Quaternion, TextureMotion, mdx_flags, parse,
 };
 pub use skin::{SKIN_HEADER_LEN, Skin, Vec4s};
 pub use view::{Attribute, FACE_LEN, Face, Faces, Indices, Vec2s, Vec3s};

@@ -634,6 +634,14 @@ fn mesh_table(lua: &Lua, m: &Mesh<'_>) -> mlua::Result<Table> {
     t.set("render", m.render)?;
     t.set("shadow", m.shadow)?;
     t.set("transparency_hint", m.transparency_hint)?;
+    if let Some(tm) = &m.texture_motion {
+        let mt = lua.create_table()?;
+        mt.set("u_rate", tm.u_rate)?;
+        mt.set("v_rate", tm.v_rate)?;
+        mt.set("floats_244_248", seq(lua, tm.floats_244_248)?)?;
+        t.set("texture_motion", mt)?;
+    }
+    t.set("area", m.area)?;
     t.set("diffuse", seq(lua, m.diffuse)?)?;
     t.set("ambient", seq(lua, m.ambient)?)?;
     t.set("bounding_box", bbox(lua, m.bounding_box)?)?;

@@ -504,6 +504,13 @@ class Mesh:
     def faces(self) -> list[MeshFace]: ...
     @property
     def indices(self) -> list[int] | None: ...
+    @property
+    def texture_motion(self) -> tuple[float, float, tuple[float, float]] | None:
+        """How the texture coordinates move: `(u_rate, v_rate, (f244, f248))`, the floats at 244 and 248
+        a second motion not yet established; `None` when the texture doesn't move."""
+    @property
+    def area(self) -> float:
+        """The sum of the faces' areas, on a trimesh or AABB mesh; 0 on the other kinds."""
 
 class Skin:
     @property

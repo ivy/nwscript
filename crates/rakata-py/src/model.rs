@@ -134,6 +134,13 @@ pub struct PyMesh {
     /// within the stride.
     #[pyo3(get)]
     offsets: BTreeMap<&'static str, usize>,
+    /// How the texture coordinates move, as `(u_rate, v_rate, (f244,
+    /// f248))`; `None` on a mesh whose texture doesn't move.
+    #[pyo3(get)]
+    texture_motion: Option<(f32, f32, (f32, f32))>,
+    /// The sum of the faces' areas, on a trimesh or AABB mesh.
+    #[pyo3(get)]
+    area: f32,
     positions: Vec<[f32; 3]>,
     normals: Option<Vec<[f32; 3]>>,
     uv1: Option<Vec<[f32; 2]>>,
@@ -179,6 +186,14 @@ impl PyMesh {
             stride: m.stride,
             vertex_buffer: PyBytes::new(py, m.vertex_buffer).unbind(),
             offsets,
+            texture_motion: m.texture_motion.map(|t| {
+                (
+                    t.u_rate,
+                    t.v_rate,
+                    (t.floats_244_248[0], t.floats_244_248[1]),
+                )
+            }),
+            area: m.area,
             positions: m.positions.iter().collect(),
             normals: m.normals.map(|a| a.iter().collect()),
             uv1: m.uv1.map(|a| a.iter().collect()),

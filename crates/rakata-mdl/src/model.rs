@@ -45,6 +45,8 @@ const MESH_AVERAGE: usize = 48;
 const MESH_DIFFUSE: usize = 60;
 const MESH_AMBIENT: usize = 72;
 const MESH_TRANSPARENCY: usize = 84;
+const MESH_TEXTURE_MOTION: usize = 232;
+const MESH_AREA: usize = 316;
 pub(crate) const MESH_TEXTURE: usize = 88;
 pub(crate) const MESH_LIGHTMAP: usize = 120;
 const MESH_INDEX_COUNTS: usize = 176;
@@ -373,6 +375,28 @@ pub struct Mesh<'a> {
     pub faces: Faces<'a>,
     /// The triangle index list, when the mesh stores one.
     pub indices: Option<Indices<'a>>,
+    /// How the texture coordinates move, on a mesh whose texture-motion
+    /// word (232) is set: water, clouds, planets, energy effects.
+    pub texture_motion: Option<TextureMotion>,
+    /// The float at 316: the sum of the faces' areas in the node's
+    /// coordinates, on a trimesh or AABB mesh; zero on a skin, dangly mesh
+    /// or saber.
+    pub area: f32,
+}
+
+/// How a mesh's texture coordinates move (`docs/formats/mdl.md`, "Texture
+/// motion"). The rates' unit and the direction a positive rate moves are
+/// not established.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TextureMotion {
+    /// The rate the first texture coordinate (U) moves at (236).
+    pub u_rate: f32,
+    /// The rate the second texture coordinate (V) moves at (240).
+    pub v_rate: f32,
+    /// The floats at 244 and 248: a second motion's two values, the first
+    /// never zero and the second from 0 to 1 in vanilla; which is which,
+    /// and what they drive, is not established.
+    pub floats_244_248: [f32; 2],
 }
 
 impl<'a> Model<'a> {
@@ -734,6 +758,15 @@ fn read_mesh<'a>(d: &Data<'a>, mdx: &'a [u8], h: usize, node: &str) -> Result<Me
         uv2: view2(uv2_at),
         faces,
         indices,
+        texture_motion: match d.u32(h + MESH_TEXTURE_MOTION, "texture motion")? {
+            0 => None,
+            _ => Some(TextureMotion {
+                u_rate: d.f32(h + MESH_TEXTURE_MOTION + 4)?,
+                v_rate: d.f32(h + MESH_TEXTURE_MOTION + 8)?,
+                floats_244_248: d.f32s::<2>(h + MESH_TEXTURE_MOTION + 12)?,
+            }),
+        },
+        area: d.f32(h + MESH_AREA)?,
     })
 }
 

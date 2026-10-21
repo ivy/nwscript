@@ -301,6 +301,13 @@ fn node_line(n: &Node<'_>) -> String {
         if !m.render {
             line.push_str("  not rendered");
         }
+        if let Some(t) = &m.texture_motion {
+            line.push_str(&format!(
+                "  texture moves u {} v {}",
+                num(t.u_rate),
+                num(t.v_rate)
+            ));
+        }
     }
     if let Some(s) = &n.skin {
         line.push_str(&format!("  {}", count(s.bones.len(), "bone")));
@@ -576,6 +583,12 @@ fn node_json(n: &Node<'_>) -> Json {
             "normals": m.normals.is_some(),
             "uv1": m.uv1.is_some(),
             "uv2": m.uv2.is_some(),
+            "texture_motion": m.texture_motion.map(|t| json!({
+                "u_rate": t.u_rate,
+                "v_rate": t.v_rate,
+                "floats_244_248": t.floats_244_248,
+            })),
+            "area": m.area,
         })),
         "skin": n.skin.as_ref().map(|s| json!({"bones": s.bones.len()})),
         "light": n.light.as_ref().map(light_json),

@@ -190,6 +190,10 @@ def test_lights_emitters_and_sabers_read_as_typed_values(install: rakata.Install
     assert blade.saber.positions == blade.mesh.positions
     assert len(blade.saber.uv) == len(blade.saber.normals) == 176
     assert blade.saber.words == (98, 97)
+    planet = rakata.Model.load(install, "planet_01").node("Planet")
+    assert planet is not None and planet.mesh is not None
+    assert planet.mesh.texture_motion is not None and planet.mesh.texture_motion[1] == 0.0
+    assert planet.mesh.area > 0
     assert len(blade.saber.triangles) == 12
     assert {v for t in blade.saber.triangles for v in t} >= {0, 4, 88, 92}
 

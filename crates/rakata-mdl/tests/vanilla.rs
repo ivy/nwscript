@@ -1913,3 +1913,47 @@ fn kind_name_raw(flags: u16) -> &'static str {
         _ => "other",
     }
 }
+
+/// Every mesh whose texture moves read as `Mesh::texture_motion`, as many
+/// as `docs/formats/mdl.md` ("Texture motion") counts, with spot values.
+#[test]
+fn every_moving_texture_reads_as_the_spec_says() {
+    let Some(root) = game() else { return };
+    let mut moving = 0;
+    each_model(&root, |label, mdl, mdx| {
+        let m = Model::parse(mdl, mdx).unwrap_or_else(|e| panic!("{label}: {e}"));
+        for (n, mesh) in m.meshes() {
+            if mesh.texture_motion.is_some() {
+                moving += 1;
+                assert_eq!(n.kind, NodeKind::Trimesh, "{label}");
+            }
+        }
+    });
+    assert_eq!(moving, 214);
+
+    let install = install().unwrap();
+    let model = |name: &str| load_model(&install, name).unwrap().unwrap();
+    let (mdl, mdx) = model("planet_01");
+    let m = Model::parse(&mdl, &mdx).unwrap();
+    let planet = m.node("Planet").unwrap().mesh.as_ref().unwrap();
+    let t = planet.texture_motion.unwrap();
+    assert_eq!((t.u_rate, t.v_rate), (-0.00005, 0.0));
+    assert!(planet.area > 0.0);
+    // The thrusters move by the second pair alone.
+    let (mdl, mdx) = model("v_superbike");
+    let m = Model::parse(&mdl, &mdx).unwrap();
+    let t = m
+        .node("Thruster_07")
+        .unwrap()
+        .mesh
+        .as_ref()
+        .unwrap()
+        .texture_motion
+        .unwrap();
+    assert_eq!((t.u_rate, t.v_rate), (0.0, 0.0));
+    assert_eq!(t.floats_244_248[1], 1.0);
+    // A mesh whose texture stays put.
+    let (mdl, mdx) = model("m01aa_01a");
+    let m = Model::parse(&mdl, &mdx).unwrap();
+    assert!(m.meshes().all(|(_, mesh)| mesh.texture_motion.is_none()));
+}
