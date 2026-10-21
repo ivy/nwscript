@@ -2,3 +2,4 @@
 /corpus
 *.orig
 /.claude/worktrees/
+/.env
