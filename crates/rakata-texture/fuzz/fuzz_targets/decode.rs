@@ -1,6 +1,6 @@
 //! `Tpc::parse`, `Txi::parse` and `Tga::parse` on arbitrary bytes: each
 //! returns a texture or an error, never panics, and what it returns
-//! answers its accessors.
+//! answers its accessors, and every level of a TPC read decodes.
 
 #![no_main]
 
@@ -17,6 +17,13 @@ fuzz_target!(|data: &[u8]| {
                     level.data
                 );
             }
+        }
+        for level in 0..t.level_count() {
+            let img = t.decode_level(level).expect("a level the TPC has decodes");
+            assert_eq!(
+                img.pixels.len(),
+                img.width as usize * img.height as usize * 4
+            );
         }
     }
     let txi = Txi::parse(data);

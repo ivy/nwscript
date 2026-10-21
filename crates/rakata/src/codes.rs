@@ -196,6 +196,9 @@ nwscript_diag::codes! {
     RE2207 Error "a TPC the writer cannot write as given";
     RE2208 Error "a TXI line that would not read back as written";
     RE2209 Error "a TGA the writer cannot write as given";
+    RE2210 Error "a mip level the texture does not have";
+    RE2211 Error "a cube face or animation frame the texture does not have";
+    RE2212 Error "pixels the PNG encoder cannot write as given";
     RE2301 Error "not a room layout: no beginlayout line";
     RE2302 Error "a room layout line in no form the layout takes where it stands";
     RE2303 Error "a count or coordinate of a layout or visibility file that is not a number";

@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 
 use rakata_archive::{Bif, Erf, Key, Rim};
 use rakata_res::ResType;
-use rakata_texture::{Layout, Tga, Tpc, Txi};
+use rakata_texture::{Layout, Levels, PixelFormat, Tga, Tpc, Txi};
 
 const GAME_VAR: &str = "RAKATA_GAME_K1";
 
@@ -324,4 +324,97 @@ fn every_vanilla_texture_parses() {
     );
     assert!(c.cube_without_txi_cube.is_empty());
     assert!(c.data_size_rule_broken.is_empty());
+}
+
+/// The size a PNG's header states.
+fn png_size(bytes: &[u8]) -> (u32, u32) {
+    let reader = png::Decoder::new(std::io::Cursor::new(bytes))
+        .read_info()
+        .unwrap();
+    let info = reader.info();
+    (info.width, info.height)
+}
+
+/// Every TPC and TGA exports as a PNG of the size its header states (a
+/// cube's faces stacked, a sheet's frames laid out), and every lower level
+/// of a TPC decodes. A DXT5 file's header float is compared with the mean
+/// of its decoded level-0 alpha over 255, as `docs/formats/tpc.md` finds
+/// it for uncompressed RGBA. Ignored by default, since it decodes and
+/// encodes every texture of the install: run it in release with
+/// `RAKATA_GAME_K1=… cargo test --release -p rakata-texture --test vanilla
+/// -- --ignored --nocapture` to see the counts.
+#[test]
+#[ignore = "decodes every texture of $RAKATA_GAME_K1; run in release"]
+fn every_vanilla_texture_exports_as_png() {
+    let Some(root) = game() else { return };
+    let (mut tpc, mut packs, mut tga) = (0usize, 0usize, 0usize);
+    // How far the header float lies from the decoded mean alpha.
+    const BUCKETS: [f64; 4] = [1e-3, 1e-2, 5e-2, 2e-1];
+    let mut dxt5 = 0usize;
+    let mut dxt5_off = [0usize; BUCKETS.len() + 1];
+    let mut failed = Vec::new();
+    each_texture(&root, |name, ty, data| match ty {
+        ResType::Tpc => {
+            tpc += 1;
+            if name.to_ascii_lowercase().starts_with("swpc_tex_") {
+                packs += 1;
+            }
+            let t = Tpc::parse(data).unwrap();
+            let png = match t.to_pngs(Levels::Largest, None) {
+                Ok(p) => p,
+                Err(e) => return failed.push(format!("{name}: {e}")),
+            };
+            if t.format == PixelFormat::Dxt5 && t.layout == Layout::Single {
+                dxt5 += 1;
+                let px = t.decode_level(0).unwrap().pixels;
+                let sum: u64 = px.chunks(4).map(|p| u64::from(p[3])).sum();
+                let mean = sum as f64 / (px.len() / 4) as f64 / 255.0;
+                let off = (mean - f64::from(t.alpha_mean)).abs();
+                let bucket = BUCKETS
+                    .iter()
+                    .position(|&b| off < b)
+                    .unwrap_or(BUCKETS.len());
+                dxt5_off[bucket] += 1;
+            }
+            let want = (u32::from(t.width), u32::from(t.height));
+            let got = png_size(&png[0].bytes);
+            if got != want {
+                failed.push(format!("{name}: {got:?} for {want:?}"));
+            }
+            for level in 1..t.level_count() {
+                if let Err(e) = t.decode_level(level) {
+                    failed.push(format!("{name} level {level}: {e}"));
+                }
+            }
+        }
+        ResType::Tga => {
+            tga += 1;
+            let t = Tga::parse(data).unwrap();
+            let want = (u32::from(t.width), u32::from(t.height));
+            match t.to_png() {
+                Ok(p) if png_size(&p) == want => {}
+                Ok(p) => failed.push(format!("{name}: {:?} for {want:?}", png_size(&p))),
+                Err(e) => failed.push(format!("{name}: {e}")),
+            }
+        }
+        _ => {}
+    });
+    println!("exported {tpc} TPC ({packs} in the texture packs) and {tga} TGA");
+    println!(
+        "single-image DXT5, {dxt5}, by how far the header float lies from level 0's decoded mean alpha:"
+    );
+    for (i, n) in dxt5_off.iter().enumerate() {
+        match BUCKETS.get(i) {
+            Some(b) => println!("    under {b}: {n}"),
+            None => println!("    more: {n}"),
+        }
+    }
+    show("refused", &failed);
+    assert!(packs > 0, "no texture packs found");
+    assert!(failed.is_empty(), "refused: {failed:#?}");
+    assert_eq!(
+        dxt5_off[2..].iter().sum::<usize>(),
+        0,
+        "a DXT5 header float 0.01 or more from its decoded mean alpha"
+    );
 }

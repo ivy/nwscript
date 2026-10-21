@@ -11,6 +11,11 @@
 //! - [`Tga`], a Truevision TARGA image (the game's lightmaps), decoded to
 //!   RGBA8 with rows top first.
 //!
+//! - [`Rgba`], any of these as RGBA8 with rows top first: a TPC level
+//!   decoded from DXT1, DXT5 or its uncompressed bytes ([`decode`],
+//!   [`Tpc::decode_level`], [`Tpc::decode_image`]), or a TGA's pixels; and
+//!   encoded as PNG ([`Rgba::to_png`], [`Tpc::to_pngs`], [`Tga::to_png`]).
+//!
 //! Each has a `parse(&[u8])` entry point and a `to_bytes()` writer that
 //! gives back the bytes it read: a [`Tpc`] keeps its header's unused bytes
 //! and writes its [`Txi`]; a [`Txi`] keeps the spelling of its lines in a
@@ -30,11 +35,13 @@
 //! repository, measured from the game's files; this crate was written
 //! without sight of any other implementation.
 
+mod decode;
 mod error;
 mod tga;
 mod tpc;
 mod txi;
 
+pub use decode::{Levels, Png, Rgba, decode};
 pub use error::{Error, Result, codes};
 pub use tga::{ImageType, Origin, Tga, TgaLayout};
 pub use tpc::{Image, Layout, Level, PixelFormat, Tpc};

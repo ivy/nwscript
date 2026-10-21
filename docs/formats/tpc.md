@@ -11,7 +11,7 @@ The header is 128 bytes.
 | Offset | Size | Content |
 | --- | --- | --- |
 | 0x00 | 4 | Data size, u32. Zero for an uncompressed format; non-zero for a DXT format. See below for its value. |
-| 0x04 | 4 | A float32. 1.0 in all 5,530 files whose format has no alpha. In the 6,006 files with alpha it lies in 0 to 1; in 1,447 of the 1,495 uncompressed RGBA files it equals the mean of level 0's alpha bytes divided by 255 to within 1e-4. `rakata-texture` calls it `alpha_mean`; what the engine does with it is not established. |
+| 0x04 | 4 | A float32. 1.0 in all 5,530 files whose format has no alpha. In the 6,006 files with alpha it lies in 0 to 1; in 1,447 of the 1,495 uncompressed RGBA files it equals the mean of level 0's alpha bytes divided by 255 to within 1e-4, and in all 4,306 single-image DXT5 files it lies within 0.01 of the mean of level 0's decoded alpha divided by 255 (1,551 of them within 0.001). `rakata-texture` calls it `alpha_mean`; what the engine does with it is not established. |
 | 0x08 | 2 | Width, u16. |
 | 0x0A | 2 | Height, u16. For a cube map, six times the width. |
 | 0x0C | 1 | Encoding: 1, 2 or 4 (see Pixel formats). |
@@ -72,7 +72,7 @@ Public documents read: xoreos-docs `specs/torlack/basics.html`, for the resource
 
 Reference projects read: none.
 
-Measured: on 2026-10-18, every count above comes from the vanilla KotOR 1 install under `$RAKATA_GAME_K1`, first with short Python scripts reading the header, the pixel data lengths, the bytes after the pixels, the TXI lines, and the block colours of the animation sheets of every TPC and TXI the KEY's BIFs, `TexturePacks/*.erf`, `patch.erf`, `modules/` and `rims/` hold, then with `crates/rakata-texture/tests/vanilla.rs`, which parses every one of them and prints the counts (`RAKATA_GAME_K1=… cargo test -p rakata-texture --test vanilla -- --nocapture`).
+Measured: on 2026-10-18, every count above comes from the vanilla KotOR 1 install under `$RAKATA_GAME_K1`, first with short Python scripts reading the header, the pixel data lengths, the bytes after the pixels, the TXI lines, and the block colours of the animation sheets of every TPC and TXI the KEY's BIFs, `TexturePacks/*.erf`, `patch.erf`, `modules/` and `rims/` hold, then with `crates/rakata-texture/tests/vanilla.rs`, which parses every one of them and prints the counts (`RAKATA_GAME_K1=… cargo test -p rakata-texture --test vanilla -- --nocapture`). On 2026-10-20, the DXT5 header float against the decoded alpha, with the same file's ignored test `every_vanilla_texture_exports_as_png`, which decodes every texture (`… cargo test --release -p rakata-texture --test vanilla -- --ignored --nocapture`).
 
 Observed in a renderer: the row order, from the OdysseyUE runtime drawing the Endar Spire (`end_m01aa`) from these structures.
 

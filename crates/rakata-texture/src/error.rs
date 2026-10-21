@@ -26,6 +26,13 @@ pub mod codes {
     pub const TXI_UNWRITABLE: &str = "RE2208";
     /// A TGA the writer cannot write as given.
     pub const TGA_UNWRITABLE: &str = "RE2209";
+    /// A mip level the texture does not have.
+    pub const LEVEL_MISSING: &str = "RE2210";
+    /// An image (a cube face or an animation frame) the texture does not
+    /// have.
+    pub const IMAGE_MISSING: &str = "RE2211";
+    /// Pixels the PNG encoder cannot write as given.
+    pub const PNG_UNWRITABLE: &str = "RE2212";
 }
 
 /// An error in reading or writing a texture.
@@ -95,6 +102,25 @@ pub enum Error {
         /// Why.
         reason: String,
     },
+    /// A mip level the texture does not have.
+    LevelMissing {
+        /// The level asked for, from 0.
+        level: usize,
+        /// The levels each image has.
+        levels: usize,
+    },
+    /// An image the texture does not have.
+    ImageMissing {
+        /// The image asked for, from 0.
+        image: usize,
+        /// The images the texture has.
+        images: usize,
+    },
+    /// Pixels the PNG encoder cannot write as given.
+    PngUnwritable {
+        /// Why.
+        reason: String,
+    },
 }
 
 /// This crate's result type.
@@ -113,6 +139,9 @@ impl Error {
             Error::TpcUnwritable { .. } => codes::TPC_UNWRITABLE,
             Error::TxiUnwritable { .. } => codes::TXI_UNWRITABLE,
             Error::TgaUnwritable { .. } => codes::TGA_UNWRITABLE,
+            Error::LevelMissing { .. } => codes::LEVEL_MISSING,
+            Error::ImageMissing { .. } => codes::IMAGE_MISSING,
+            Error::PngUnwritable { .. } => codes::PNG_UNWRITABLE,
         }
     }
 }
@@ -159,6 +188,17 @@ impl fmt::Display for Error {
                 write!(f, "cannot write the TXI line `{line}`: {reason}")
             }
             Error::TgaUnwritable { reason } => write!(f, "cannot write the TGA: {reason}"),
+            Error::LevelMissing { level, levels } => write!(
+                f,
+                "mip level {level} asked for; the texture has {levels}, 0 to {}",
+                levels.saturating_sub(1)
+            ),
+            Error::ImageMissing { image, images } => write!(
+                f,
+                "image {image} asked for; the texture has {images}, 0 to {}",
+                images.saturating_sub(1)
+            ),
+            Error::PngUnwritable { reason } => write!(f, "cannot write the PNG: {reason}"),
         }
     }
 }
