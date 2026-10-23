@@ -3,4 +3,4 @@
 # virtual display; openbox because Wine maps and focuses windows reliably only under a window manager.
 FROM localhost/modshop-wine
 LABEL io.modshop.keep=true
-RUN dnf install -y --setopt=install_weak_deps=False xdotool xwininfo xprop ImageMagick openbox && dnf clean all
+RUN dnf upgrade -y --refresh ca-certificates && dnf install -y --setopt=install_weak_deps=False xdotool xwininfo xprop ImageMagick openbox && dnf clean all
