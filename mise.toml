@@ -1,6 +1,6 @@
 [tools]
 rust = "1.99.0"
-uv = "0.13.1"
+uv = "0.13.5"
 
 [tasks."test:py"]
 description = "Build the rakata Python module into a uv environment with maturin develop, then run its pytest suite and pyright"
